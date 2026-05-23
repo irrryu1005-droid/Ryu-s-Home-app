@@ -192,13 +192,14 @@ body {
   justify-content: center;
   padding: 16px;
   overflow-y: auto;
-  pointer-events: none;
 }
 #form-container[hidden] { display: none; }
 #form-container .form-card {
-  pointer-events: auto;
+  width: 100%;
+  max-width: 480px;
   max-height: calc(100vh - 32px);
   overflow-y: auto;
+  margin: auto;
 }
 
 .form-card {
