@@ -1557,7 +1557,12 @@ function gcalGetEventId(title, dateStr, startUtc) {
 
 function gcalSetConnected() {
   const btn = document.getElementById('gcal-login-btn');
-  if (btn) { btn.textContent = '✅ 接続済み'; btn.classList.add('connected'); }
+  if (btn) {
+    btn.textContent = '✅ 接続済み';
+    btn.classList.add('connected');
+  } else {
+    setTimeout(gcalSetConnected, 200);
+  }
 }
 
 function initGcalBetting() {
@@ -1603,6 +1608,8 @@ function initScheduleTab() {
   document.getElementById('sched-today').addEventListener('click', () => {
     scheduleDate = new Date(); loadSportsSchedule();
   });
+
+  if (gcalTokenBet) gcalSetConnected();
 
   document.getElementById('gcal-login-btn').addEventListener('click', () => {
     if (!gcTokenClientBet) {
