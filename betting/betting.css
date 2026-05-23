@@ -125,6 +125,26 @@ body {
 }
 .tab-header h2 { margin-bottom: 0; }
 
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.month-nav h2 { font-size: 17px; font-weight: 700; margin: 0; min-width: 110px; text-align: center; }
+.month-nav button {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+.month-nav button:hover { border-color: var(--purple); color: var(--purple); }
+
 /* ============================================================
    ボタン
 ============================================================ */
@@ -793,3 +813,89 @@ tr:last-child td { border-bottom: none; }
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
+
+/* ============================================================
+   損益計算書
+============================================================ */
+.pnl-heading {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 4px 0 12px;
+  letter-spacing: 0.05em;
+}
+.pnl-columns {
+  display: flex;
+  gap: 10px;
+}
+.pnl-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.pnl-col > .pnl-section:last-child { flex: 1; }
+.pnl-section {
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;
+}
+/* --- 費用: 赤ベース --- */
+.pnl-section.expense                  { background: #FFF5F5; }
+.pnl-section.expense .pnl-sec-header  { background: #FECACA; color: #991B1B; }
+.pnl-section.expense .pnl-row         { border-bottom: 1px solid #FED7D7; }
+.pnl-section.expense .pnl-bar         { background: #F87171; }
+/* --- 収益: 緑ベース --- */
+.pnl-section.revenue                  { background: #F0FFF4; }
+.pnl-section.revenue .pnl-sec-header  { background: #BBF7D0; color: #166534; }
+.pnl-section.revenue .pnl-row         { border-bottom: 1px solid #D1FAE5; }
+.pnl-section.revenue .pnl-bar         { background: #34D399; }
+/* --- 利益: 青ベース --- */
+.pnl-section.profit                   { background: #EFF6FF; }
+.pnl-section.profit  .pnl-sec-header  { background: #BFDBFE; color: #1E40AF; }
+/* --- 損失: オレンジベース --- */
+.pnl-section.netloss                  { background: #FFFBEB; }
+.pnl-section.netloss .pnl-sec-header  { background: #FED7AA; color: #92400E; }
+
+.pnl-sec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.pnl-sec-total { font-size: 15px; font-weight: 700; }
+
+.pnl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+}
+.pnl-row:last-child { border-bottom: none !important; }
+.pnl-row.sport  { padding: 9px 16px; }
+.pnl-row.league { padding: 5px 16px 5px 28px; }
+
+.pnl-row-label { flex: 0 0 90px; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pnl-row.league .pnl-row-label { font-size: 11px; font-weight: 400; color: var(--muted); }
+
+.pnl-bar-wrap { flex: 1; height: 6px; background: rgba(0,0,0,0.06); border-radius: 3px; overflow: hidden; }
+.pnl-row.league .pnl-bar-wrap { height: 4px; }
+.pnl-bar { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+
+.pnl-row-amount { flex: 0 0 72px; text-align: right; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pnl-row.league .pnl-row-amount { font-size: 11px; font-weight: 400; color: var(--muted); }
+
+.pnl-profit-body {
+  text-align: center;
+  padding: 16px;
+  font-size: 22px;
+  font-weight: 700;
+  background: var(--white);
+}
+.pnl-profit-body.is-profit { color: #1D4ED8; }
+.pnl-profit-body.is-loss   { color: #B45309; }

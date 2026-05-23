@@ -26,13 +26,13 @@
         <span class="nav-icon">📊</span>
         <span class="nav-label">統計</span>
       </button>
-      <button class="nav-btn" data-tab="calculator">
-        <span class="nav-icon">🧮</span>
-        <span class="nav-label">計算機</span>
-      </button>
       <button class="nav-btn" data-tab="schedule">
         <span class="nav-icon">🏆</span>
         <span class="nav-label">試合予定</span>
+      </button>
+      <button class="nav-btn" data-tab="pnl">
+        <span class="nav-icon">📒</span>
+        <span class="nav-label">損益</span>
       </button>
     </nav>
 
@@ -287,42 +287,6 @@
     </main>
 
     <!-- ======== 計算機タブ ======== -->
-    <main id="tab-calculator" class="tab-content" hidden>
-      <h2>期待値・ベット計算機</h2>
-      <div class="calc-card">
-        <div class="form-row">
-          <div class="form-group">
-            <label>オッズ</label>
-            <input type="number" id="calc-odds" step="0.01" min="1.01" placeholder="2.10">
-          </div>
-          <div class="form-group">
-            <label>予想勝率 (%)</label>
-            <input type="number" id="calc-prob" step="1" min="1" max="99" placeholder="55">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>手持ち資金 (¥)</label>
-          <input type="number" id="calc-bankroll" step="1000" placeholder="100000">
-        </div>
-        <button id="calc-btn" class="btn-primary">計算する</button>
-        <div id="calc-result" class="calc-result" hidden>
-          <div class="calc-row"><span class="calc-lbl">期待値 (EV)</span><span id="calc-ev" class="calc-val"></span></div>
-          <div class="calc-row"><span class="calc-lbl">判定</span><span id="calc-verdict" class="calc-val"></span></div>
-          <div class="calc-row"><span class="calc-lbl">ケリー基準 推奨賭け金</span><span id="calc-kelly" class="calc-val"></span></div>
-          <p class="calc-note">ケリー基準はリスクが高いため、実際には 1/4〜1/2 ケリーを推奨します。</p>
-        </div>
-      </div>
-      <div class="glossary-card">
-        <h3>用語解説</h3>
-        <dl class="glossary">
-          <dt>期待値 (EV)</dt>
-          <dd>プラスなら長期的に利益が出る可能性があるベット。計算式: <code>(予想勝率 × オッズ) − 1</code></dd>
-          <dt>ケリー基準</dt>
-          <dd>長期的な資金成長を最大化する賭け金の割合。計算式: <code>EV ÷ (オッズ − 1)</code></dd>
-        </dl>
-      </div>
-    </main>
-
     <!-- ======== 試合予定タブ ======== -->
     <main id="tab-schedule" class="tab-content" hidden>
       <div class="sched-tab-header">
@@ -351,6 +315,16 @@
       <div id="schedule-events" class="schedule-events-container">
         <div class="schedule-empty">読み込み待機中...</div>
       </div>
+    </main>
+
+    <!-- ======== 損益タブ ======== -->
+    <main id="tab-pnl" class="tab-content" hidden>
+      <div class="month-nav">
+        <button id="pnl-prev">＜</button>
+        <h2 id="pnl-month-label"></h2>
+        <button id="pnl-next">＞</button>
+      </div>
+      <div id="pnl-container"></div>
     </main>
 
   </div>

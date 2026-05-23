@@ -56,6 +56,10 @@ let _campaigns = [];
 let _settings  = { bankroll: null };
 let _goals     = [];
 
+const _now = new Date();
+let _pnlYear  = _now.getFullYear();
+let _pnlMonth = _now.getMonth() + 1;
+
 function normalizeBet(row) {
   return {
     id:           row.id,
@@ -312,6 +316,112 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+
+// ============================================================
+// 損益計算書
+// ============================================================
+function renderPnlStatement() {
+  const y = _pnlYear, m = _pnlMonth;
+  document.getElementById('pnl-month-label').textContent = `${y}年${m}月`;
+
+  const start = `${y}-${String(m).padStart(2, '0')}-01`;
+  const end   = `${y}-${String(m).padStart(2, '0')}-31`;
+  const filtered = _bets.filter(b =>
+    b.date >= start && b.date <= end && (b.result === 'win' || b.result === 'loss')
+  );
+
+  const expenses = {};
+  const revenues = {};
+
+  for (const bet of filtered) {
+    const sport  = bet.type === 'parlay' ? 'マルチ' : (bet.sport  || 'その他');
+    const league = bet.type === 'parlay'
+      ? `${(bet.legs || []).length}連`
+      : (bet.league || '未設定');
+    const odds = bet.type === 'parlay' ? calcEffectiveOdds(bet) : (bet.odds || 1);
+
+    // FB は実費ゼロなので費用に計上しない
+    if (!bet.isFreebet) {
+      if (!expenses[sport]) expenses[sport] = {};
+      expenses[sport][league] = (expenses[sport][league] || 0) + bet.stake;
+    }
+
+    if (bet.result === 'win') {
+      // FB勝ちは元手が戻らないため純利益分のみ収益
+      const revenue = bet.isFreebet
+        ? Math.round(bet.stake * (odds - 1))
+        : Math.round(bet.stake * odds);
+      if (!revenues[sport]) revenues[sport] = {};
+      revenues[sport][league] = (revenues[sport][league] || 0) + revenue;
+    }
+  }
+
+  const expTotal = Object.values(expenses).flatMap(Object.values).reduce((a, b) => a + b, 0);
+  const revTotal = Object.values(revenues).flatMap(Object.values).reduce((a, b) => a + b, 0);
+  const profit   = revTotal - expTotal;
+
+  const buildSection = (type, label, data, total) => {
+    if (total === 0) return '';
+    const allAmounts = Object.values(data).flatMap(Object.values);
+    const maxAmt = Math.max(...allAmounts, 1);
+    let rows = '';
+    for (const [sport, leagues] of Object.entries(data)) {
+      const sportTotal = Object.values(leagues).reduce((a, b) => a + b, 0);
+      const sportPct   = Math.round(sportTotal / maxAmt * 100);
+      rows += `
+        <div class="pnl-row sport">
+          <div class="pnl-row-label">${escapeHtml(sport)}</div>
+          <div class="pnl-bar-wrap"><div class="pnl-bar" style="width:${sportPct}%"></div></div>
+          <div class="pnl-row-amount">¥${sportTotal.toLocaleString()}</div>
+        </div>`;
+      for (const [league, amt] of Object.entries(leagues)) {
+        const pct = Math.round(amt / maxAmt * 100);
+        rows += `
+          <div class="pnl-row league">
+            <div class="pnl-row-label">${escapeHtml(league)}</div>
+            <div class="pnl-bar-wrap"><div class="pnl-bar" style="width:${pct}%"></div></div>
+            <div class="pnl-row-amount">¥${amt.toLocaleString()}</div>
+          </div>`;
+      }
+    }
+    return `
+      <div class="pnl-section ${type}">
+        <div class="pnl-sec-header">
+          <span>${label}</span>
+          <span class="pnl-sec-total">¥${total.toLocaleString()}</span>
+        </div>
+        ${rows}
+      </div>`;
+  };
+
+  const profitType  = profit >= 0 ? 'profit' : 'netloss';
+  const profitLabel = profit >= 0 ? '利益' : '損失';
+  const profitSign  = profit >= 0 ? '+' : '';
+  const resultBlock = `
+    <div class="pnl-section ${profitType}">
+      <div class="pnl-sec-header"><span>${profitLabel}</span></div>
+      <div class="pnl-profit-body ${profit >= 0 ? 'is-profit' : 'is-loss'}">${profitSign}¥${profit.toLocaleString()}</div>
+    </div>`;
+
+  const expBlock = buildSection('expense', '費用', expenses, expTotal);
+  const revBlock = buildSection('revenue', '収益', revenues, revTotal);
+
+  // 利益 → 左列に費用＋利益、右列に収益
+  // 損失 → 左列に費用、右列に収益＋損失
+  const leftCol  = profit >= 0
+    ? `${expBlock}${resultBlock}`
+    : `${expBlock}`;
+  const rightCol = profit >= 0
+    ? `${revBlock}`
+    : `${revBlock}${resultBlock}`;
+
+  document.getElementById('pnl-container').innerHTML = `
+    <div class="pnl-heading">損益計算書</div>
+    <div class="pnl-columns">
+      <div class="pnl-col">${leftCol}</div>
+      <div class="pnl-col">${rightCol}</div>
+    </div>`;
+}
 
 // ============================================================
 // 記録レンダリング
@@ -1006,27 +1116,6 @@ function renderStatsTable() {
 // ============================================================
 // 計算機
 // ============================================================
-function initCalculator() {
-  document.getElementById('calc-btn').addEventListener('click', () => {
-    const odds     = parseFloat(document.getElementById('calc-odds').value);
-    const prob     = parseFloat(document.getElementById('calc-prob').value) / 100;
-    const bankroll = parseFloat(document.getElementById('calc-bankroll').value);
-    if (isNaN(odds) || isNaN(prob)) { alert('オッズと勝率を入力してください'); return; }
-    const ev      = prob * odds - 1;
-    const kelly   = (odds - 1) > 0 ? ev / (odds - 1) : 0;
-    const kellyBet = (!isNaN(bankroll) && bankroll > 0) ? Math.round(bankroll * kelly) : null;
-    const verdict  = ev > 0.05 ? '✅ プラス期待値（推奨）' : ev >= 0 ? '⚠️ ギリギリプラス' : '❌ マイナス期待値（非推奨）';
-
-    document.getElementById('calc-ev').textContent      = (ev * 100).toFixed(2) + '%';
-    document.getElementById('calc-ev').className        = 'calc-val ' + (ev > 0 ? 'win' : 'loss');
-    document.getElementById('calc-verdict').textContent = verdict;
-    document.getElementById('calc-kelly').textContent   = kellyBet !== null
-      ? `¥${kellyBet.toLocaleString()}（1/4ケリー: ¥${Math.round(kellyBet / 4).toLocaleString()}）`
-      : `${(kelly * 100).toFixed(1)}%`;
-    document.getElementById('calc-result').hidden = false;
-  });
-}
-
 // ============================================================
 // 試合予定タブ（ESPN + MLB Stats API + TheSportsDB）
 // ============================================================
@@ -1705,7 +1794,21 @@ function initTabs() {
       if (btn.dataset.tab === 'schedule') {
         loadSportsSchedule();
       }
+      if (btn.dataset.tab === 'pnl') {
+        renderPnlStatement();
+      }
     });
+  });
+
+  document.getElementById('pnl-prev').addEventListener('click', () => {
+    _pnlMonth--;
+    if (_pnlMonth < 1) { _pnlMonth = 12; _pnlYear--; }
+    renderPnlStatement();
+  });
+  document.getElementById('pnl-next').addEventListener('click', () => {
+    _pnlMonth++;
+    if (_pnlMonth > 12) { _pnlMonth = 1; _pnlYear++; }
+    renderPnlStatement();
   });
 }
 
@@ -1714,7 +1817,6 @@ function initTabs() {
 // ============================================================
 document.addEventListener('DOMContentLoaded', async () => {
   initTabs();
-  initCalculator();
   initSettings();
   initScheduleTab();
 
