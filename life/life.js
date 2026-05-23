@@ -72,7 +72,6 @@ function normalizeSub(row) {
     autoRenew:     row.auto_renew     ?? true,
     note:          row.note,
     currency:      row.currency       || 'JPY',
-    billingDay:    row.billing_day    || null,
   };
 }
 
@@ -90,7 +89,6 @@ function subToRow(sub) {
     auto_renew:     sub.autoRenew     ?? true,
     note:           sub.note          || null,
     currency:       sub.currency      || 'JPY',
-    billing_day:    sub.billingDay    ? parseInt(sub.billingDay) : null,
   };
 }
 
@@ -267,7 +265,6 @@ function openEditSubForm(id) {
   form.elements.autoRenew.checked   = sub.autoRenew      ?? true;
   form.elements.status.value        = sub.status;
   form.elements.currency.value      = sub.currency       || 'JPY';
-  form.elements.billingDay.value    = sub.billingDay      || '';
   form.elements.note.value         = sub.note || '';
   updateCostFields(sub.contractForm);
   document.getElementById('sub-form-title').textContent = '編集';
@@ -347,7 +344,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       status:        f.elements.status.value,
       note:          f.elements.note.value.trim()   || null,
       currency:      f.elements.currency.value      || 'JPY',
-      billingDay:    f.elements.billingDay.value     || null,
     };
     const id = f.elements.id.value;
     if (id) await updateSub(id, sub); else await addSub(sub);

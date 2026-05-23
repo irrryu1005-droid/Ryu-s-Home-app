@@ -537,7 +537,7 @@ async function renderPlannedTab() {
                    : (r.currency === 'USD' ? Math.round((r.cost_per_month||0)*usdRate) : (r.cost_per_month||0)),
     category:    'subscription',
     frequency:   r.contract_form === 'year' ? 'yearly' : 'monthly',
-    billingDay:  r.billing_day  || null,
+    billingDay:   (() => { const d = r.start_date ? new Date(r.start_date) : null; return r.billing_day || (d ? d.getDate() : null); })(),
     billingMonth: r.start_date ? new Date(r.start_date).getMonth() : null,
     startDate:   r.start_date  || null,
     endDate:     null,
@@ -584,7 +584,9 @@ async function renderPlannedTab() {
       ${items.map(it => `
         <div class="planned-item">
           <div class="planned-item-left">
-            <span class="planned-day">${it.billingDay ? it.billingDay + '日' : '-'}</span>
+            <span class="planned-day">${it.frequency === 'yearly' && it.billingMonth != null && it.billingDay
+              ? (it.billingMonth + 1) + '/' + it.billingDay
+              : it.billingDay ? it.billingDay + '日' : '-'}</span>
             <div>
               <div class="planned-name">${escapeHtmlF(it.name)}${it.source === 'subscription' ? ' <span class="badge-sub">サブスク</span>' : ''}</div>
               ${it.note ? `<div class="planned-note">${escapeHtmlF(it.note)}</div>` : ''}
