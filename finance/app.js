@@ -1027,9 +1027,10 @@ function renderLoans() {
           </div>
           <div class="loan-progress-label">返済進捗 ${progress}%</div>` : ''}
         ${l.note ? `<div class="loan-note">${escapeHtmlF(l.note)}</div>` : ''}
-        <div class="sub-actions-f" style="margin-top:8px">
-          <button class="planned-edit-btn btn-loan-edit" data-id="${l.id}">編集</button>
-          <button class="planned-edit-btn btn-loan-del"  data-id="${l.id}">削除</button>
+        <div class="loan-actions">
+          <button class="planned-edit-btn btn-loan-borrow" data-id="${l.id}">＋ 追加借入</button>
+          <button class="planned-edit-btn btn-loan-edit"   data-id="${l.id}">編集</button>
+          <button class="planned-edit-btn btn-loan-del"    data-id="${l.id}">削除</button>
         </div>
       </div>`;
   }).join('');
@@ -1040,6 +1041,49 @@ function renderLoans() {
   listEl.querySelectorAll('.btn-loan-del').forEach(btn => {
     btn.addEventListener('click', () => deleteLoan(btn.dataset.id));
   });
+  listEl.querySelectorAll('.btn-loan-borrow').forEach(btn => {
+    btn.addEventListener('click', () => openBorrowMore(btn.dataset.id, btn));
+  });
+}
+
+function openBorrowMore(id, btn) {
+  const wrap = document.createElement('div');
+  wrap.className = 'borrow-inline';
+  wrap.innerHTML = `
+    <input type="number" class="borrow-input" placeholder="追加借入額（円）" min="1">
+    <button class="borrow-confirm">追加</button>
+    <button class="borrow-cancel-btn">×</button>
+  `;
+  btn.replaceWith(wrap);
+
+  const input = wrap.querySelector('.borrow-input');
+  input.focus();
+
+  wrap.querySelector('.borrow-confirm').addEventListener('click', async () => {
+    const amount = parseInt(input.value);
+    if (!amount || amount <= 0) { input.focus(); return; }
+    await addBorrowing(id, amount);
+  });
+  wrap.querySelector('.borrow-cancel-btn').addEventListener('click', renderLoans);
+  input.addEventListener('keydown', async e => {
+    if (e.key === 'Enter') {
+      const amount = parseInt(input.value);
+      if (!amount || amount <= 0) return;
+      await addBorrowing(id, amount);
+    }
+    if (e.key === 'Escape') renderLoans();
+  });
+}
+
+async function addBorrowing(id, amount) {
+  const l = _loans.find(x => x.id === id);
+  if (!l) return;
+  await db.from('loans').update({
+    remaining_amount: (l.remainingAmount || 0) + amount,
+    total_amount:     (l.totalAmount     || 0) + amount,
+  }).eq('id', id);
+  await loadLoans();
+  renderLoans();
 }
 
 function openAddLoan() {
