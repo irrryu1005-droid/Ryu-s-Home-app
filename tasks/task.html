@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tasks</title>
+  <link rel="stylesheet" href="task.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div id="app">
+
+    <header class="header">
+      <a href="../home/home.html" class="home-link">🏠 HOME</a>
+      <h1>Tasks</h1>
+    </header>
+
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="todo">✅ ToDo</button>
+      <button class="tab-btn" data-tab="routine">🔄 Routine</button>
+    </nav>
+
+    <!-- ======== ToDo タブ ======== -->
+    <section id="tab-todo" class="tab-content active">
+
+      <!-- ---- リストビュー ---- -->
+      <div id="view-list">
+
+        <div class="status-filter">
+          <button class="status-btn active" data-status="all">すべて</button>
+          <button class="status-btn" data-status="will">Will</button>
+          <button class="status-btn" data-status="doing">Doing</button>
+          <button class="status-btn" data-status="done">Done</button>
+        </div>
+
+        <div class="category-filter">
+          <button class="cat-btn active" data-cat="all">すべて</button>
+          <button class="cat-btn" data-cat="神大">神大</button>
+          <button class="cat-btn" data-cat="バイト">バイト</button>
+          <button class="cat-btn" data-cat="Betting">Betting</button>
+          <button class="cat-btn" data-cat="資格">資格</button>
+          <button class="cat-btn" data-cat="その他">その他</button>
+        </div>
+
+        <div id="todo-list"></div>
+
+        <div class="add-card">
+          <div class="add-card-title">＋ タスクを追加</div>
+          <form id="todo-form" novalidate>
+            <input type="text" id="todo-text" placeholder="タスク名" required>
+            <div class="form-row">
+              <select id="todo-category">
+                <option value="">カテゴリなし</option>
+                <option value="神大">神大</option>
+                <option value="バイト">バイト</option>
+                <option value="Betting">Betting</option>
+                <option value="資格">資格</option>
+                <option value="その他">その他</option>
+              </select>
+              <select id="todo-status">
+                <option value="will" selected>Will</option>
+                <option value="doing">Doing</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+            <div class="form-row due-row">
+              <input type="date" id="todo-start" placeholder="開始日">
+              <span class="date-sep">〜</span>
+              <input type="date" id="todo-due" placeholder="期限">
+              <label class="allday-toggle">
+                <input type="checkbox" id="todo-allday" checked>
+                <span>終日</span>
+              </label>
+              <input type="time" id="todo-time" class="time-input" disabled>
+            </div>
+            <!-- 実行予定日 -->
+            <div class="schedule-section">
+              <div class="schedule-row">
+                <span class="schedule-label">🗓 実行予定日</span>
+                <input type="date" id="todo-schedule-input">
+                <button type="button" id="todo-schedule-add" class="add-schedule-btn">＋追加</button>
+              </div>
+              <div id="todo-schedule-chips" class="schedule-chips"></div>
+            </div>
+            <button type="submit" class="add-btn">追加する</button>
+          </form>
+        </div>
+
+      </div><!-- /view-list -->
+
+      <!-- ---- タイムラインビュー ---- -->
+      <div id="view-timeline">
+
+        <div class="tl-controls">
+          <button id="tl-prev">＜</button>
+          <span id="tl-month-label"></span>
+          <button id="tl-next">＞</button>
+        </div>
+
+        <div class="tl-container">
+          <div class="tl-labels" id="tl-labels"></div>
+          <div class="tl-scroll" id="tl-scroll">
+            <div class="tl-dates-header" id="tl-dates-header"></div>
+            <div class="tl-task-rows" id="tl-task-rows"></div>
+          </div>
+        </div>
+
+        <div class="tl-hint">📌 空き行をクリックしてタスクを追加 ／ バーの端をドラッグして期間を変更</div>
+
+      </div><!-- /view-timeline -->
+
+    </section>
+
+    <!-- タイムライン追加モーダル -->
+    <div class="tl-overlay" id="tl-overlay">
+      <div class="tl-modal">
+        <div class="tl-modal-title">＋ タスクを追加</div>
+        <form id="tl-add-form" novalidate>
+          <input type="text" id="tl-text" placeholder="タスク名" required>
+          <div class="tl-form-row">
+            <select id="tl-category">
+              <option value="">カテゴリなし</option>
+              <option value="神大">神大</option>
+              <option value="バイト">バイト</option>
+              <option value="Betting">Betting</option>
+              <option value="資格">資格</option>
+              <option value="その他">その他</option>
+            </select>
+            <select id="tl-status">
+              <option value="will">Will</option>
+              <option value="doing">Doing</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+          <div class="tl-form-row due-row">
+            <label>開始 <input type="date" id="tl-start"></label>
+            <span class="date-sep">〜</span>
+            <label>期限 <input type="date" id="tl-end"></label>
+            <label class="allday-toggle">
+              <input type="checkbox" id="tl-allday" checked>
+              <span>終日</span>
+            </label>
+            <input type="time" id="tl-time" class="time-input" disabled>
+          </div>
+          <div class="schedule-section">
+            <div class="schedule-row">
+              <span class="schedule-label">🗓 実行予定日</span>
+              <input type="date" id="tl-schedule-input">
+              <button type="button" id="tl-schedule-add" class="add-schedule-btn">＋追加</button>
+            </div>
+            <div id="tl-schedule-chips" class="schedule-chips"></div>
+          </div>
+          <div class="tl-modal-btns">
+            <button type="button" id="tl-cancel">キャンセル</button>
+            <button type="submit" class="tl-submit">追加する</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- タイムライン編集モーダル -->
+    <div class="tl-overlay" id="tl-edit-overlay">
+      <div class="tl-modal">
+        <div class="tl-modal-title">✏️ タスクを編集</div>
+        <form id="tl-edit-form" novalidate>
+          <input type="text" id="tl-edit-text" placeholder="タスク名" required>
+          <div class="tl-form-row">
+            <select id="tl-edit-category">
+              <option value="">カテゴリなし</option>
+              <option value="神大">神大</option>
+              <option value="バイト">バイト</option>
+              <option value="Betting">Betting</option>
+              <option value="資格">資格</option>
+              <option value="その他">その他</option>
+            </select>
+            <select id="tl-edit-status">
+              <option value="will">Will</option>
+              <option value="doing">Doing</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+          <div class="tl-form-row due-row">
+            <label>開始 <input type="date" id="tl-edit-start"></label>
+            <span class="date-sep">〜</span>
+            <label>期限 <input type="date" id="tl-edit-end"></label>
+            <label class="allday-toggle">
+              <input type="checkbox" id="tl-edit-allday" checked>
+              <span>終日</span>
+            </label>
+            <input type="time" id="tl-edit-time" class="time-input" disabled>
+          </div>
+          <div class="schedule-section">
+            <div class="schedule-row">
+              <span class="schedule-label">🗓 実行予定日</span>
+              <input type="date" id="tl-edit-schedule-input">
+              <button type="button" id="tl-edit-schedule-add" class="add-schedule-btn">＋追加</button>
+            </div>
+            <div id="tl-edit-schedule-chips" class="schedule-chips"></div>
+          </div>
+          <div class="tl-modal-btns">
+            <button type="button" id="tl-edit-cancel">キャンセル</button>
+            <button type="submit" class="tl-submit">保存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ======== Routine タブ ======== -->
+    <section id="tab-routine" class="tab-content">
+
+      <div class="routine-date-header" id="routine-date-header"></div>
+
+      <div class="routine-block">
+        <div class="routine-block-title">
+          🔄 今日のルーティン
+          <span class="routine-block-date" id="routine-record-date"></span>
+        </div>
+        <div class="routine-hint" id="routine-hint"></div>
+        <div class="routine-items">
+          <label class="routine-item">
+            <input type="checkbox" data-key="ielts">
+            <span class="r-icon">📖</span><span>IELTS単語</span>
+          </label>
+          <label class="routine-item">
+            <input type="checkbox" data-key="reading">
+            <span class="r-icon">📚</span><span>読書</span>
+          </label>
+          <label class="routine-item">
+            <input type="checkbox" data-key="training">
+            <span class="r-icon">💪</span><span>トレーニング</span>
+          </label>
+        </div>
+        <div class="routine-progress-wrap">
+          <div class="progress-track"><div class="progress-fill" id="routine-fill"></div></div>
+          <span class="progress-count" id="routine-count">0 / 3</span>
+        </div>
+      </div>
+
+      <div class="habit-chart-card">
+        <div class="habit-chart-title">📈 Habit Chart <span class="muted">（直近30日）</span></div>
+        <div class="habit-chart-legend">
+          <span class="legend-dot green"></span>3/3
+          <span class="legend-dot yellow"></span>1〜2/3
+          <span class="legend-dot gray"></span>0/3
+        </div>
+        <div class="chart-wrap"><canvas id="habit-chart"></canvas></div>
+      </div>
+
+    </section>
+
+  </div>
+  <script src="task.js"></script>
+</body>
+</html>

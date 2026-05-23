@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HOME</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="home.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <!-- ======================================================
+       PC版（768px以上で表示）
+  ====================================================== -->
+  <div id="pc-home" class="pc-only">
+
+    <header class="pc-header">
+      <div class="pc-header-title">🏠 HOME</div>
+      <div class="pc-header-date" id="pc-date"></div>
+    </header>
+
+    <div class="pc-grid">
+
+      <!-- 時計 -->
+      <div class="pc-card clock-card">
+        <canvas id="analog-clock" width="180" height="180"></canvas>
+        <div class="digital-time" id="digital-time">00:00:00</div>
+        <div class="clock-date-sub" id="clock-date-sub"></div>
+      </div>
+
+      <!-- 今日の予定 -->
+      <div class="pc-card schedule-card">
+        <div class="card-title">📅 今日の予定</div>
+        <div id="schedule-list" class="schedule-list">
+          <div class="schedule-loading">読み込み中...</div>
+        </div>
+        <div class="schedule-add-wrap">
+          <button class="schedule-add-toggle" id="schedule-add-toggle">＋ 予定を追加</button>
+          <form class="schedule-add-form hidden" id="schedule-add-form">
+            <input type="text" id="sch-title" placeholder="タイトル" required>
+            <input type="date" id="sch-date" class="sch-date-input">
+            <div class="sch-time-row">
+              <input type="time" id="sch-start">
+              <span class="sch-sep">〜</span>
+              <input type="time" id="sch-end">
+            </div>
+            <select id="sch-calendar" class="sch-calendar-select">
+              <option value="primary">読み込み中...</option>
+            </select>
+            <div class="sch-btns">
+              <button type="button" id="sch-cancel">キャンセル</button>
+              <button type="submit" id="sch-submit">追加</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ToDo -->
+      <div class="pc-card todo-card">
+        <div class="card-title">✅ ToDo</div>
+        <div class="todo-inner">
+          <div class="todo-left">
+            <div id="pc-todo-list"></div>
+            <form id="pc-todo-form" class="todo-add-form">
+              <div class="todo-form-row">
+                <input type="text" id="pc-todo-input" placeholder="タスクを追加..." required>
+                <button type="submit">追加</button>
+              </div>
+              <div class="todo-form-row">
+                <select id="pc-todo-category">
+                  <option value="">カテゴリなし</option>
+                  <option value="神大">神大</option>
+                  <option value="バイト">バイト</option>
+                  <option value="Betting">Betting</option>
+                  <option value="資格">資格</option>
+                  <option value="その他">その他</option>
+                </select>
+                <select id="pc-todo-status">
+                  <option value="will">Will</option>
+                  <option value="doing">Doing</option>
+                  <option value="done">Done</option>
+                </select>
+              </div>
+              <div class="todo-form-dates">
+                <label class="todo-date-label">開始<input type="date" id="pc-todo-start"></label>
+                <span class="date-sep-sm">〜</span>
+                <label class="todo-date-label">期限<input type="date" id="pc-todo-due"></label>
+              </div>
+              <div class="schedule-section">
+                <div class="schedule-row">
+                  <span class="schedule-label">🗓 実行予定日</span>
+                  <input type="date" id="pc-todo-scheduled-input">
+                  <button type="button" id="pc-todo-schedule-add" class="add-schedule-btn">＋追加</button>
+                </div>
+                <div id="pc-todo-schedule-chips" class="schedule-chips"></div>
+              </div>
+            </form>
+          </div>
+          <div class="todo-right">
+            <div class="home-tl-controls">
+              <button id="home-tl-prev">＜</button>
+              <span id="home-tl-month"></span>
+              <button id="home-tl-next">＞</button>
+            </div>
+            <div class="home-tl-wrap">
+              <div class="home-tl-labels" id="home-tl-labels"></div>
+              <div class="home-tl-scroll" id="home-tl-scroll">
+                <div class="home-tl-header" id="home-tl-header"></div>
+                <div class="home-tl-rows"   id="home-tl-rows"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <!-- ガント編集モーダル -->
+    <div class="home-tl-overlay" id="home-tl-overlay">
+      <div class="home-tl-modal">
+        <div class="home-tl-modal-title">✏️ タスクを編集</div>
+        <input type="text" id="home-tl-edit-text" placeholder="タスク名">
+        <div class="home-tl-form-row">
+          <label>📅 実行予定日<input type="date" id="home-tl-edit-scheduled"></label>
+          <label>⏰ 締切日<input type="date" id="home-tl-edit-due"></label>
+        </div>
+        <div class="home-tl-modal-btns">
+          <button id="home-tl-edit-cancel">キャンセル</button>
+          <button id="home-tl-edit-save">保存</button>
+        </div>
+      </div>
+    </div>
+
+      <!-- ルーティン -->
+      <div class="pc-card routine-card">
+        <div class="card-title">🔄 今日のルーティン</div>
+        <div class="routine-today" id="routine-today-label"></div>
+        <div class="routine-items">
+          <label class="routine-item">
+            <input type="checkbox" data-key="ielts">
+            <span class="routine-icon">📖</span>
+            <span>IELTS単語</span>
+          </label>
+          <label class="routine-item">
+            <input type="checkbox" data-key="reading">
+            <span class="routine-icon">📚</span>
+            <span>読書</span>
+          </label>
+          <label class="routine-item">
+            <input type="checkbox" data-key="training">
+            <span class="routine-icon">💪</span>
+            <span>トレーニング</span>
+          </label>
+        </div>
+        <div class="routine-progress-wrap">
+          <div class="routine-progress-track">
+            <div class="routine-progress-fill" id="routine-progress-fill"></div>
+          </div>
+          <div class="routine-count" id="routine-count">0 / 3</div>
+        </div>
+      </div>
+
+      <!-- Habit Chart -->
+      <div class="pc-card chart-card">
+        <div class="card-title">📈 Habit Chart <span class="chart-subtitle">（直近30日）</span></div>
+        <div class="chart-wrap">
+          <canvas id="habit-chart"></canvas>
+        </div>
+      </div>
+
+    </div><!-- /pc-grid -->
+
+    <!-- 今月の収支 -->
+    <div class="pc-card finance-card">
+      <div class="card-title">📊 今月の収支</div>
+      <div class="finance-summary">
+        <div class="fin-item">
+          <div class="fin-label">収入</div>
+          <div class="fin-value income" id="home-income">¥0</div>
+        </div>
+        <div class="fin-item">
+          <div class="fin-label">支出</div>
+          <div class="fin-value expense" id="home-expense">¥0</div>
+        </div>
+        <div class="fin-item">
+          <div class="fin-label">損益</div>
+          <div class="fin-value" id="home-profit">¥0</div>
+        </div>
+      </div>
+      <a href="../finance/finance.html" class="to-finance-link">収支アプリを開く →</a>
+    </div>
+
+    <!-- ナビゲーションカード -->
+    <div class="nav-cards">
+      <a href="../study/study.html" class="nav-card nav-study">
+        <div class="nav-icon">📚</div>
+        <div class="nav-label">Study</div>
+      </a>
+      <a href="../life/life.html" class="nav-card nav-life">
+        <div class="nav-icon">🏠</div>
+        <div class="nav-label">Life</div>
+      </a>
+      <a href="../tasks/task.html" class="nav-card nav-tasks">
+        <div class="nav-icon">📋</div>
+        <div class="nav-label">Tasks</div>
+      </a>
+      <a href="../finance/finance.html" class="nav-card nav-finance">
+        <div class="nav-icon">💰</div>
+        <div class="nav-label">Finance</div>
+      </a>
+      <a href="../betting/betting.html" class="nav-card nav-betting">
+        <div class="nav-icon">🎯</div>
+        <div class="nav-label">Betting</div>
+      </a>
+    </div>
+
+  </div><!-- /pc-home -->
+
+
+  <!-- ======================================================
+       モバイル版（768px未満で表示）
+  ====================================================== -->
+  <div id="mobile-home" class="mobile-only">
+
+    <header class="mobile-header">
+      <h1>🏠 HOME</h1>
+    </header>
+
+    <!-- ToDo -->
+    <section class="m-section">
+      <h2>✅ ToDo</h2>
+      <div id="mobile-todo-list"></div>
+      <form id="mobile-todo-form" class="m-todo-add">
+        <input type="text" id="mobile-todo-input" placeholder="タスクを追加...">
+        <button type="submit">＋</button>
+      </form>
+    </section>
+
+    <!-- 収支クイック入力 -->
+    <section class="m-section">
+      <h2>💰 収支入力</h2>
+      <form id="mobile-finance-form">
+        <div class="type-toggle">
+          <button type="button" class="type-btn expense active" data-type="expense">支出</button>
+          <button type="button" class="type-btn income" data-type="income">収入</button>
+        </div>
+        <div class="form-group">
+          <label>金額（円）</label>
+          <input type="number" id="m-amount" placeholder="0" min="1" required>
+        </div>
+        <div class="form-group">
+          <label>カテゴリ</label>
+          <select id="m-category" required></select>
+        </div>
+        <div class="form-group">
+          <label>支払科目</label>
+          <select id="m-payment"></select>
+        </div>
+        <button type="submit" id="m-submit" class="submit-btn">登録する</button>
+      </form>
+      <div id="m-message"></div>
+      <a href="../finance/finance.html" class="to-finance-link">収支アプリの詳細 →</a>
+    </section>
+
+  </div><!-- /mobile-home -->
+
+  <script src="home.js"></script>
+</body>
+</html>

@@ -1,0 +1,557 @@
+/* ============================================================
+   Reset & Variables
+============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --accent:  #2563EB;
+  --accent2: #1D4ED8;
+  --bg:      #F2F4F7;
+  --white:   #FFFFFF;
+  --text:    #2C3E50;
+  --muted:   #8A9BB0;
+  --border:  #E4E9F0;
+  --radius:  14px;
+  --shadow:  0 2px 12px rgba(0,0,0,0.07);
+  --green:   #16A085;
+  --orange:  #E67E22;
+  --red:     #E74C3C;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#app { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
+
+/* ============================================================
+   ヘッダー
+============================================================ */
+.header {
+  background: var(--white);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 11;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+}
+.home-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 5px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  transition: color 0.15s;
+}
+.home-link:hover { color: var(--text); }
+.header h1 { font-size: 20px; font-weight: 800; }
+
+/* ============================================================
+   ナビゲーション
+============================================================ */
+.nav {
+  display: flex;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 56px;
+  z-index: 10;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+}
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+.nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.nav-btn:hover  { color: var(--accent); }
+.nav-icon { font-size: 18px; line-height: 1; }
+.nav-home-btn { flex: 0.7; }
+
+/* ============================================================
+   タブコンテンツ
+============================================================ */
+.tab-content { padding: 14px 16px; }
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+.tab-header-simple {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 10px;
+}
+.tab-header-simple h2 { font-size: 15px; font-weight: 800; white-space: nowrap; }
+
+/* ============================================================
+   ボタン
+============================================================ */
+.btn-primary {
+  padding: 9px 18px;
+  background: var(--accent);
+  color: var(--white);
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary.btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+
+.btn-cancel {
+  padding: 9px 18px;
+  background: var(--bg);
+  color: var(--muted);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-ghost {
+  padding: 6px 12px;
+  background: none;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.small-btn {
+  padding: 3px 9px;
+  font-size: 11px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.btn-edit:hover   { border-color: var(--accent); color: var(--accent); }
+.btn-delete:hover { border-color: var(--red);    color: var(--red);    }
+
+/* ============================================================
+   フォーム
+============================================================ */
+.form-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.form-card h3 { font-size: 14px; font-weight: 800; margin-bottom: 14px; }
+.form-group { margin-bottom: 10px; }
+.form-group > label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.form-group input:focus,
+.form-group select:focus { outline: none; border-color: var(--accent); }
+.form-row { display: flex; gap: 10px; align-items: flex-start; }
+.form-row .form-group { flex: 1; }
+.form-btns { display: flex; gap: 10px; margin-top: 14px; }
+.form-btns button { flex: 1; }
+
+/* ============================================================
+   モーダル
+============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 200;
+  padding: 0 0 env(safe-area-inset-bottom);
+}
+.modal-overlay[hidden] { display: none; }
+.modal-card {
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: var(--radius) var(--radius) 0 0;
+  margin: 0;
+}
+
+/* ============================================================
+   サマリーバー（Reading）
+============================================================ */
+.summary-bar {
+  display: flex;
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.s-item { flex: 1; text-align: center; padding: 10px 0; border-right: 1px solid var(--border); }
+.s-item:last-child { border-right: none; }
+.s-label { font-size: 10px; color: var(--muted); font-weight: 600; margin-bottom: 3px; }
+.s-val   { font-size: 18px; font-weight: 800; }
+
+/* ============================================================
+   フィルター
+============================================================ */
+.status-filters, .cat-filters {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.cat-filters { margin-bottom: 10px; }
+
+.filter-btn, .cat-filter-btn {
+  padding: 5px 12px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.filter-btn.active, .filter-btn:hover,
+.cat-filter-btn.active, .cat-filter-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* ============================================================
+   本リスト
+============================================================ */
+.book-list-wrap {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.book-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.book-row:last-child { border-bottom: none; }
+
+.book-row-left {
+  flex: 1;
+  min-width: 0;
+}
+.book-title {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.book-author {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.book-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.progress-bar-bg {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.3s;
+}
+.progress-text { font-size: 10px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+
+.book-row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.book-actions { display: flex; gap: 4px; }
+
+/* ステータスバッジ */
+.badge-status {
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.badge-unread    { background: #F4F6F7; color: #8A9BB0; }
+.badge-reading   { background: #EBF5FB; color: #2563EB; }
+.badge-completed { background: #EAFAF1; color: #16A085; }
+
+.badge-cat {
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  background: #F0F4FF;
+  color: #2563EB;
+}
+
+.completed-date { font-size: 11px; color: var(--muted); }
+
+.empty-msg {
+  text-align: center;
+  padding: 30px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ============================================================
+   IELTS
+============================================================ */
+.ielts-goal-card {
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  color: white;
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.3);
+}
+.ielts-goal-left, .ielts-goal-right { flex: 1; }
+.ielts-goal-label { font-size: 10px; font-weight: 600; opacity: 0.75; margin-bottom: 3px; }
+.ielts-goal-val { font-size: 28px; font-weight: 800; }
+
+.study-time-summary {
+  display: flex;
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.st-item { flex: 1; text-align: center; padding: 10px 0; border-right: 1px solid var(--border); }
+.st-item:last-child { border-right: none; }
+.st-label { font-size: 10px; color: var(--muted); font-weight: 600; margin-bottom: 3px; }
+.st-val   { font-size: 18px; font-weight: 800; color: var(--accent); }
+
+.ielts-sections { display: flex; flex-direction: column; gap: 12px; }
+
+.ielts-section-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.ielts-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.ielts-section-title { font-size: 13px; font-weight: 800; }
+
+/* スコア行 */
+.score-row {
+  display: flex;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+.score-row:last-child { border-bottom: none; }
+.score-date { font-size: 12px; color: var(--muted); flex-shrink: 0; width: 72px; }
+.score-type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.score-type-mock     { background: #FEF9E7; color: #D68910; }
+.score-type-official { background: #EAFAF1; color: #16A085; }
+.score-overall { font-size: 18px; font-weight: 800; flex-shrink: 0; width: 44px; }
+.score-sections {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.score-sec {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.score-sec span { color: var(--text); font-weight: 700; }
+.score-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* 学習ログ行 */
+.log-row {
+  display: flex;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+.log-row:last-child { border-bottom: none; }
+.log-date { font-size: 12px; color: var(--muted); flex-shrink: 0; width: 72px; }
+.log-section-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: #F0F4FF;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.log-duration { font-size: 15px; font-weight: 800; flex-shrink: 0; }
+.log-note { font-size: 12px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* ============================================================
+   Programming 知識メモ
+============================================================ */
+.prog-search-wrap { flex: 1; max-width: 240px; }
+.prog-search-wrap input {
+  width: 100%;
+  padding: 7px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--white);
+  color: var(--text);
+  font-family: inherit;
+}
+.prog-search-wrap input:focus { outline: none; border-color: var(--accent); }
+
+.prog-section { margin-bottom: 14px; }
+.prog-section-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0 2px 6px;
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: 8px;
+  display: inline-block;
+}
+
+.prog-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.prog-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.prog-card-header:hover { background: var(--bg); }
+.prog-card-title { font-size: 13px; font-weight: 700; }
+.prog-card-arrow {
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+.prog-card.open .prog-card-arrow { transform: rotate(90deg); }
+.prog-card-body {
+  display: none;
+  padding: 0 14px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+  border-top: 1px solid var(--border);
+}
+.prog-card.open .prog-card-body { display: block; }
+.prog-card-body code {
+  background: #F0F4FF;
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: 'Menlo', 'Monaco', monospace;
+  font-size: 12px;
+}
+.prog-card-body pre {
+  background: #1e2a3a;
+  color: #e8f0fe;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: 'Menlo', 'Monaco', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.prog-card-body ul { padding-left: 18px; margin: 6px 0; }
+.prog-card-body li { margin-bottom: 4px; }
+.prog-card-body p { margin-bottom: 6px; }
+.prog-card-hidden { display: none; }

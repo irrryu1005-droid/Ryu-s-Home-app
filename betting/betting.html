@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Betting</title>
+  <link rel="stylesheet" href="betting.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div id="app">
+
+    <header class="header">
+      <a href="../home/home.html" class="home-link">🏠 HOME</a>
+      <h1>Betting</h1>
+    </header>
+
+    <nav class="nav">
+      <button class="nav-btn active" data-tab="records">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">記録</span>
+      </button>
+      <button class="nav-btn" data-tab="stats">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">統計</span>
+      </button>
+      <button class="nav-btn" data-tab="calculator">
+        <span class="nav-icon">🧮</span>
+        <span class="nav-label">計算機</span>
+      </button>
+      <button class="nav-btn" data-tab="schedule">
+        <span class="nav-icon">🏆</span>
+        <span class="nav-label">試合予定</span>
+      </button>
+    </nav>
+
+    <!-- サマリーバー -->
+    <div class="summary-bar">
+      <div class="s-item"><div class="s-label">ベット数</div><div class="s-val" id="total-bets">0</div></div>
+      <div class="s-item"><div class="s-label">残高</div><div class="s-val" id="balance">¥0</div></div>
+      <div class="s-item"><div class="s-label">勝率</div><div class="s-val" id="win-rate">-%</div></div>
+      <div class="s-item"><div class="s-label">的中率</div><div class="s-val" id="hit-rate">-%</div></div>
+      <div class="s-item"><div class="s-label">連勝/連敗</div><div class="s-val" id="streak">-</div></div>
+    </div>
+
+    <!-- ======== 記録タブ ======== -->
+    <main id="tab-records" class="tab-content">
+
+      <div class="tab-header">
+        <h2>ベット記録</h2>
+        <button id="btn-add" class="btn-primary">＋ 追加</button>
+      </div>
+
+      <!-- 追加・編集フォーム -->
+      <div id="form-container" class="form-card" hidden>
+        <h3 id="form-title">新規ベット</h3>
+        <form id="bet-form" novalidate>
+
+          <div class="type-selector">
+            <label><input type="radio" name="type" value="single" checked> シングル</label>
+            <label><input type="radio" name="type" value="parlay"> マルチ（複数選択）</label>
+          </div>
+
+          <div class="form-group">
+            <label>日付</label>
+            <input type="date" name="date" required>
+          </div>
+
+          <!-- シングル専用 -->
+          <div id="single-fields">
+            <div class="form-row">
+              <div class="form-group">
+                <label>スポーツ</label>
+                <select name="sport">
+                  <option value="Football">Football</option>
+                  <option value="Baseball">Baseball</option>
+                  <option value="Basketball">Basketball</option>
+                  <option value="Tennis">Tennis</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="form-group" id="league-select-wrap" hidden>
+                <label>リーグ</label>
+                <div class="league-row">
+                  <select id="single-league-select" name="league"></select>
+                  <button type="button" id="btn-add-league" class="btn-add-league" title="リーグを追加">＋</button>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>ベット内容</label>
+              <input type="text" name="bet" placeholder="ホーム勝利、ハンデなど">
+            </div>
+            <div class="form-group">
+              <label>オッズ</label>
+              <input type="number" name="odds" step="0.01" min="1.01" placeholder="2.10">
+            </div>
+          </div>
+
+          <!-- マルチ専用 -->
+          <div id="parlay-fields" hidden>
+            <div id="legs-container"></div>
+            <button type="button" id="btn-add-leg" class="btn-secondary">＋ レッグを追加</button>
+            <p class="combined-odds-row">組み合わせオッズ: <strong id="combined-odds-display">-</strong></p>
+            <div class="form-group">
+              <label>コンボブースト (%)<span class="label-hint">（ない場合は 0）</span></label>
+              <input type="number" name="comboBoost" id="input-combo-boost" step="0.01" min="1" placeholder="1.08">
+            </div>
+            <p class="combined-odds-row">ブースト後オッズ: <strong id="boosted-odds-display">-</strong></p>
+          </div>
+
+          <div class="form-group">
+            <label>賭け金 (¥)</label>
+            <input type="number" name="stake" step="100" min="0" placeholder="1000" required>
+          </div>
+          <input type="hidden" name="isFreebet" value="false">
+          <div class="form-group">
+            <label>結果</label>
+            <select name="result">
+              <option value="pending">⏳ 未確定</option>
+              <option value="win">✅ 勝ち</option>
+              <option value="loss">❌ 負け</option>
+              <option value="void">➖ 無効</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>プロモーション（任意）</label>
+            <select name="campaignId" id="form-campaign-select"><option value="">なし</option></select>
+          </div>
+          <div class="form-group">
+            <label>メモ</label>
+            <textarea name="memo" rows="2" placeholder="根拠・振り返りなど"></textarea>
+          </div>
+          <div class="form-btns">
+            <button type="button" id="btn-cancel" class="btn-cancel">キャンセル</button>
+            <button type="submit" class="btn-primary">保存</button>
+          </div>
+          <input type="hidden" name="id">
+        </form>
+      </div>
+
+      <!-- プロモーション管理 -->
+      <details class="campaign-section">
+        <summary>🎁 プロモーション管理</summary>
+        <div id="campaign-list" class="campaign-list-inner"></div>
+        <div class="campaign-add-card">
+          <h4>＋ キャンペーンを追加</h4>
+          <form id="campaign-add-form" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label>名前</label>
+                <input type="text" name="campaignName" placeholder="5月入金ボーナス" required>
+              </div>
+              <div class="form-group">
+                <label>開始日</label>
+                <input type="date" name="campaignStart" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>達成条件 (¥)</label>
+                <input type="number" name="wagerRequired" step="1000" placeholder="90000" required>
+              </div>
+              <div class="form-group">
+                <label>FB報酬額 (¥)</label>
+                <input type="number" name="fbReward" step="500" placeholder="15000" required>
+              </div>
+            </div>
+            <button type="submit" class="btn-secondary">追加</button>
+          </form>
+        </div>
+      </details>
+
+
+      <div id="records-list"></div>
+
+    </main>
+
+    <!-- ======== 統計タブ ======== -->
+    <main id="tab-stats" class="tab-content" hidden>
+      <h2>統計・グラフ</h2>
+
+      <!-- バンクロール設定 -->
+      <details class="settings-section">
+        <summary>⚙️ バンクロール設定</summary>
+        <div class="settings-inner">
+          <div class="form-group">
+            <label>元手 (¥)</label>
+            <input type="number" id="settings-bankroll" step="1000" placeholder="100000">
+          </div>
+          <button id="btn-save-settings" class="btn-primary">保存</button>
+
+          <div class="settings-divider"></div>
+
+          <div class="form-group">
+            <label>追加入金 (¥)</label>
+            <input type="number" id="settings-deposit" step="1000" placeholder="5000" min="1">
+          </div>
+          <button id="btn-deposit" class="btn-deposit">＋ 入金を反映</button>
+        </div>
+      </details>
+
+      <!-- 期間別損益 -->
+      <div class="period-stats-card">
+        <h3>期間別損益</h3>
+        <div class="period-stats-grid" id="period-stats"></div>
+      </div>
+
+      <!-- 目標進捗（複数対応） -->
+      <div class="goals-section">
+        <div class="goals-section-header">
+          <h3>🎯 目標進捗</h3>
+        </div>
+        <div id="goals-list"></div>
+        <details class="goal-add-section">
+          <summary>＋ 目標を追加</summary>
+          <form id="goal-add-form" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label>目標名</label>
+                <input type="text" name="goalName" placeholder="5月の目標" required>
+              </div>
+              <div class="form-group">
+                <label>目標損益 (¥)</label>
+                <input type="number" name="goalAmount" step="1000" placeholder="30000" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>開始日</label>
+                <input type="date" name="goalStart" required>
+              </div>
+              <div class="form-group">
+                <label>終了日</label>
+                <input type="date" name="goalEnd" required>
+              </div>
+            </div>
+            <button type="submit" class="btn-secondary">追加</button>
+          </form>
+        </details>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="stats-card-header">
+            <h3>累計損益の推移</h3>
+            <div class="stats-toggle">
+              <button class="stats-toggle-btn active" data-pnl="bet">ベット別</button>
+              <button class="stats-toggle-btn" data-pnl="day">日別</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-pnl"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="stats-card-header">
+            <h3 id="chart-sport-title">勝敗数</h3>
+            <div class="stats-toggle">
+              <button class="stats-toggle-btn" data-group="league">リーグ別</button>
+              <button class="stats-toggle-btn active" data-group="sport">スポーツ別</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-sport"></canvas></div>
+        </div>
+      </div>
+      <div class="stats-card">
+        <div class="stats-card-header">
+          <h3 id="stats-table-title">リーグ別 内訳</h3>
+        </div>
+        <div id="stats-table"></div>
+      </div>
+    </main>
+
+    <!-- ======== 計算機タブ ======== -->
+    <main id="tab-calculator" class="tab-content" hidden>
+      <h2>期待値・ベット計算機</h2>
+      <div class="calc-card">
+        <div class="form-row">
+          <div class="form-group">
+            <label>オッズ</label>
+            <input type="number" id="calc-odds" step="0.01" min="1.01" placeholder="2.10">
+          </div>
+          <div class="form-group">
+            <label>予想勝率 (%)</label>
+            <input type="number" id="calc-prob" step="1" min="1" max="99" placeholder="55">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>手持ち資金 (¥)</label>
+          <input type="number" id="calc-bankroll" step="1000" placeholder="100000">
+        </div>
+        <button id="calc-btn" class="btn-primary">計算する</button>
+        <div id="calc-result" class="calc-result" hidden>
+          <div class="calc-row"><span class="calc-lbl">期待値 (EV)</span><span id="calc-ev" class="calc-val"></span></div>
+          <div class="calc-row"><span class="calc-lbl">判定</span><span id="calc-verdict" class="calc-val"></span></div>
+          <div class="calc-row"><span class="calc-lbl">ケリー基準 推奨賭け金</span><span id="calc-kelly" class="calc-val"></span></div>
+          <p class="calc-note">ケリー基準はリスクが高いため、実際には 1/4〜1/2 ケリーを推奨します。</p>
+        </div>
+      </div>
+      <div class="glossary-card">
+        <h3>用語解説</h3>
+        <dl class="glossary">
+          <dt>期待値 (EV)</dt>
+          <dd>プラスなら長期的に利益が出る可能性があるベット。計算式: <code>(予想勝率 × オッズ) − 1</code></dd>
+          <dt>ケリー基準</dt>
+          <dd>長期的な資金成長を最大化する賭け金の割合。計算式: <code>EV ÷ (オッズ − 1)</code></dd>
+        </dl>
+      </div>
+    </main>
+
+    <!-- ======== 試合予定タブ ======== -->
+    <main id="tab-schedule" class="tab-content" hidden>
+      <div class="sched-tab-header">
+        <h2>🏆 試合予定</h2>
+        <button id="gcal-login-btn" class="btn-gcal-login">📅 カレンダー連携</button>
+      </div>
+
+      <div class="sched-date-nav">
+        <button id="sched-prev" class="sched-nav-btn">＜</button>
+        <button id="sched-today" class="sched-today-btn">今日</button>
+        <span id="sched-date-label" class="sched-date-label"></span>
+        <button id="sched-next" class="sched-nav-btn">＞</button>
+      </div>
+
+      <div class="sport-filters">
+        <button class="sport-filter-btn active" data-sport="all">すべて</button>
+        <button class="sport-filter-btn" data-sport="Soccer">⚽ サッカー</button>
+        <button class="sport-filter-btn" data-sport="Baseball">⚾ 野球</button>
+        <button class="sport-filter-btn" data-sport="Basketball">🏀 バスケ</button>
+        <button class="sport-filter-btn" data-sport="Tennis">🎾 テニス</button>
+        <button class="sport-filter-btn" data-sport="TableTennis">🏓 卓球</button>
+        <button class="sport-filter-btn" data-sport="Rugby">🏉 ラグビー</button>
+        <button class="sport-filter-btn" data-sport="Volleyball">🏐 バレー</button>
+      </div>
+
+      <div id="schedule-events" class="schedule-events-container">
+        <div class="schedule-empty">読み込み待機中...</div>
+      </div>
+    </main>
+
+  </div>
+  <script src="betting.js"></script>
+</body>
+</html>

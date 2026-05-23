@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>収支管理</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div id="app">
+
+    <header class="header">
+      <a href="../home/home.html" class="home-link">🏠 HOME</a>
+      <h1>Finance</h1>
+    </header>
+
+    <!-- ナビゲーション -->
+    <nav class="nav">
+      <button class="nav-btn active" data-tab="input">
+        <span class="nav-icon">✏️</span>
+        <span class="nav-label">入力</span>
+      </button>
+      <button class="nav-btn" data-tab="dashboard">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">ダッシュボード</span>
+      </button>
+      <button class="nav-btn" data-tab="list">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">一覧</span>
+      </button>
+      <button class="nav-btn" data-tab="accounts">
+        <span class="nav-icon">🏦</span>
+        <span class="nav-label">口座</span>
+      </button>
+    </nav>
+
+    <!-- ======== 入力タブ ======== -->
+    <main id="tab-input" class="tab-content active">
+      <div class="form-center">
+      <h1>収支入力</h1>
+
+      <form id="transaction-form">
+        <div class="type-toggle">
+          <button type="button" class="type-btn expense active" data-type="expense">支出</button>
+          <button type="button" class="type-btn income" data-type="income">収入</button>
+        </div>
+
+        <div class="form-group">
+          <label>日付</label>
+          <input type="date" id="input-date" required>
+        </div>
+
+        <div class="form-group">
+          <label>金額（円）</label>
+          <input type="number" id="input-amount" placeholder="0" min="1" required>
+        </div>
+
+        <div class="form-group">
+          <label>カテゴリ</label>
+          <select id="input-category" required></select>
+        </div>
+
+        <div class="form-group">
+          <label>支払科目</label>
+          <select id="input-payment" required></select>
+        </div>
+
+        <div class="form-group">
+          <label>場所（任意）</label>
+          <select id="input-location">
+            <option value="">-- 未選択 --</option>
+          </select>
+          <input type="text" id="input-location-new" placeholder="場所名を入力" style="display:none; margin-top:8px;">
+        </div>
+
+        <div class="form-group">
+          <label>メモ（任意）</label>
+          <input type="text" id="input-memo" placeholder="例：コンビニ、電車など">
+        </div>
+
+        <button type="submit" id="submit-btn" class="submit-btn">登録する</button>
+      </form>
+
+      <div id="form-message"></div>
+      </div><!-- /.form-center -->
+    </main>
+
+    <!-- ======== ダッシュボードタブ ======== -->
+    <main id="tab-dashboard" class="tab-content">
+
+      <div class="month-nav">
+        <button id="dash-prev">＜</button>
+        <h2 id="dash-month-label"></h2>
+        <button id="dash-next">＞</button>
+      </div>
+
+      <div class="summary-cards">
+        <div class="card income-card">
+          <div class="card-label">収入</div>
+          <div class="card-value" id="dash-income">¥0</div>
+        </div>
+        <div class="card expense-card">
+          <div class="card-label">支出</div>
+          <div class="card-value" id="dash-expense">¥0</div>
+        </div>
+        <div class="card profit-card">
+          <div class="card-label">損益</div>
+          <div class="card-value" id="dash-profit">¥0</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <canvas id="monthly-chart"></canvas>
+      </div>
+
+      <h3 class="section-title">カテゴリ別支出</h3>
+      <table class="data-table">
+        <thead>
+          <tr><th>カテゴリ</th><th>金額</th></tr>
+        </thead>
+        <tbody id="category-tbody">
+          <tr><td colspan="2" class="empty-msg">データを読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </main>
+
+    <!-- ======== 一覧タブ ======== -->
+    <main id="tab-list" class="tab-content">
+
+      <div class="month-nav">
+        <button id="list-prev">＜</button>
+        <h2 id="list-month-label"></h2>
+        <button id="list-next">＞</button>
+      </div>
+
+      <div id="transaction-list">
+        <div class="empty-msg">データを読み込み中...</div>
+      </div>
+    </main>
+
+    <!-- ======== 口座タブ ======== -->
+    <main id="tab-accounts" class="tab-content">
+      <h1>口座残高</h1>
+      <p class="accounts-hint">残高をタップして編集できます</p>
+      <div id="accounts-list">
+        <div class="empty-msg">データを読み込み中...</div>
+      </div>
+    </main>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

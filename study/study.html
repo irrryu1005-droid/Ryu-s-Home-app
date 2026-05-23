@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Study</title>
+  <link rel="stylesheet" href="study.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="app">
+
+    <header class="header">
+      <a href="../home/home.html" class="home-link">🏠 HOME</a>
+      <h1>Study</h1>
+    </header>
+
+    <nav class="nav">
+      <button class="nav-btn active" data-tab="reading">
+        <span class="nav-icon">📚</span>
+        <span class="nav-label">Reading</span>
+      </button>
+      <button class="nav-btn" data-tab="ielts">
+        <span class="nav-icon">🎓</span>
+        <span class="nav-label">IELTS</span>
+      </button>
+      <button class="nav-btn" data-tab="programming">
+        <span class="nav-icon">💻</span>
+        <span class="nav-label">Programming</span>
+      </button>
+    </nav>
+
+    <!-- ======== Reading タブ ======== -->
+    <main id="tab-reading" class="tab-content">
+
+      <!-- サマリーバー -->
+      <div class="summary-bar">
+        <div class="s-item">
+          <div class="s-label">読中</div>
+          <div class="s-val" id="count-reading">0</div>
+        </div>
+        <div class="s-item">
+          <div class="s-label">完読</div>
+          <div class="s-val" id="count-completed">0</div>
+        </div>
+        <div class="s-item">
+          <div class="s-label">積読</div>
+          <div class="s-val" id="count-unread">0</div>
+        </div>
+      </div>
+
+      <div class="tab-header">
+        <div class="status-filters">
+          <button class="filter-btn active" data-status="all">すべて</button>
+          <button class="filter-btn" data-status="reading">読中</button>
+          <button class="filter-btn" data-status="unread">未読</button>
+          <button class="filter-btn" data-status="completed">完読</button>
+        </div>
+        <button id="btn-add-book" class="btn-primary">＋ 追加</button>
+      </div>
+
+      <!-- カテゴリフィルター -->
+      <div class="cat-filters">
+        <button class="cat-filter-btn active" data-cat="all">すべて</button>
+        <button class="cat-filter-btn" data-cat="小説">小説</button>
+        <button class="cat-filter-btn" data-cat="ビジネス">ビジネス</button>
+        <button class="cat-filter-btn" data-cat="思想・哲学">思想・哲学</button>
+        <button class="cat-filter-btn" data-cat="技術">技術</button>
+        <button class="cat-filter-btn" data-cat="英語">英語</button>
+        <button class="cat-filter-btn" data-cat="その他">その他</button>
+      </div>
+
+      <div id="book-list"></div>
+
+      <!-- 追加・編集モーダル -->
+      <div id="book-modal-overlay" class="modal-overlay" hidden>
+        <div class="form-card modal-card">
+          <h3 id="book-form-title">本を追加</h3>
+          <form id="book-form" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label>タイトル</label>
+                <input type="text" name="title" placeholder="書名" required>
+              </div>
+              <div class="form-group">
+                <label>著者</label>
+                <input type="text" name="author" placeholder="著者名">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>カテゴリ</label>
+                <select name="category">
+                  <option value="">未分類</option>
+                  <option value="小説">小説</option>
+                  <option value="ビジネス">ビジネス</option>
+                  <option value="思想・哲学">思想・哲学</option>
+                  <option value="技術">技術</option>
+                  <option value="英語">英語</option>
+                  <option value="その他">その他</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>ステータス</label>
+                <select name="status">
+                  <option value="unread">未読</option>
+                  <option value="reading">読中</option>
+                  <option value="completed">完読</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>現在ページ</label>
+                <input type="number" name="currentPage" min="0" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label>総ページ数</label>
+                <input type="number" name="totalPages" min="1" placeholder="300">
+              </div>
+            </div>
+            <div class="form-group" id="completed-at-wrap">
+              <label>完読日</label>
+              <input type="date" name="completedAt">
+            </div>
+            <div class="form-btns">
+              <button type="button" id="btn-cancel-book" class="btn-cancel">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+            <input type="hidden" name="id">
+          </form>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ======== IELTS タブ ======== -->
+    <main id="tab-ielts" class="tab-content" hidden>
+
+      <!-- 目標スコア -->
+      <div class="ielts-goal-card">
+        <div class="ielts-goal-left">
+          <div class="ielts-goal-label">目標スコア</div>
+          <div class="ielts-goal-val" id="ielts-goal-val">—</div>
+        </div>
+        <div class="ielts-goal-right">
+          <div class="ielts-goal-label">最新スコア</div>
+          <div class="ielts-goal-val" id="ielts-latest-val">—</div>
+        </div>
+        <button class="btn-ghost" id="btn-edit-goal">目標を設定</button>
+      </div>
+
+      <!-- 学習時間サマリー -->
+      <div class="study-time-summary">
+        <div class="st-item">
+          <div class="st-label">今週</div>
+          <div class="st-val" id="study-week">0h</div>
+        </div>
+        <div class="st-item">
+          <div class="st-label">今月</div>
+          <div class="st-val" id="study-month">0h</div>
+        </div>
+        <div class="st-item">
+          <div class="st-label">累計</div>
+          <div class="st-val" id="study-total">0h</div>
+        </div>
+      </div>
+
+      <div class="ielts-sections">
+
+        <!-- スコア記録 -->
+        <div class="ielts-section-card">
+          <div class="ielts-section-header">
+            <span class="ielts-section-title">📊 スコア記録</span>
+            <button class="btn-primary btn-sm" id="btn-add-score">＋ 追加</button>
+          </div>
+          <div id="score-list"></div>
+        </div>
+
+        <!-- 学習ログ -->
+        <div class="ielts-section-card">
+          <div class="ielts-section-header">
+            <span class="ielts-section-title">⏱ 学習ログ</span>
+            <button class="btn-primary btn-sm" id="btn-add-log">＋ 追加</button>
+          </div>
+          <div id="study-log-list"></div>
+        </div>
+
+      </div>
+
+      <!-- スコア追加モーダル -->
+      <div id="score-modal-overlay" class="modal-overlay" hidden>
+        <div class="form-card modal-card">
+          <h3>スコアを記録</h3>
+          <form id="score-form" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label>日付</label>
+                <input type="date" name="date" required>
+              </div>
+              <div class="form-group">
+                <label>種別</label>
+                <select name="scoreType">
+                  <option value="mock">模試</option>
+                  <option value="official">本番</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Overall</label>
+                <input type="number" name="overall" step="0.5" min="0" max="9" placeholder="6.5">
+              </div>
+              <div class="form-group">
+                <label>Listening</label>
+                <input type="number" name="listening" step="0.5" min="0" max="9" placeholder="6.5">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Reading</label>
+                <input type="number" name="reading" step="0.5" min="0" max="9" placeholder="6.5">
+              </div>
+              <div class="form-group">
+                <label>Writing</label>
+                <input type="number" name="writing" step="0.5" min="0" max="9" placeholder="6.5">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Speaking</label>
+                <input type="number" name="speaking" step="0.5" min="0" max="9" placeholder="6.5">
+              </div>
+              <div class="form-group">
+                <label>メモ</label>
+                <input type="text" name="note" placeholder="備考">
+              </div>
+            </div>
+            <div class="form-btns">
+              <button type="button" class="btn-cancel modal-close-score">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+            <input type="hidden" name="id">
+          </form>
+        </div>
+      </div>
+
+      <!-- 学習ログ追加モーダル -->
+      <div id="log-modal-overlay" class="modal-overlay" hidden>
+        <div class="form-card modal-card">
+          <h3>学習を記録</h3>
+          <form id="log-form" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label>日付</label>
+                <input type="date" name="date" required>
+              </div>
+              <div class="form-group">
+                <label>時間（分）</label>
+                <input type="number" name="duration" min="1" placeholder="60" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>セクション</label>
+                <select name="section">
+                  <option value="overall">総合</option>
+                  <option value="listening">Listening</option>
+                  <option value="reading">Reading</option>
+                  <option value="writing">Writing</option>
+                  <option value="speaking">Speaking</option>
+                  <option value="vocabulary">単語</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>メモ</label>
+                <input type="text" name="note" placeholder="備考">
+              </div>
+            </div>
+            <div class="form-btns">
+              <button type="button" class="btn-cancel modal-close-log">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+            <input type="hidden" name="id">
+          </form>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ======== Programming タブ ======== -->
+    <main id="tab-programming" class="tab-content" hidden>
+      <div class="tab-header-simple">
+        <h2>💻 Programming 知識メモ</h2>
+        <div class="prog-search-wrap">
+          <input type="text" id="prog-search" placeholder="🔍 キーワード検索...">
+        </div>
+      </div>
+      <div id="prog-list"></div>
+    </main>
+
+  </div>
+  <script src="study.js"></script>
+</body>
+</html>
