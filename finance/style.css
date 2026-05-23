@@ -567,6 +567,19 @@ h3.section-title {
   overflow-y: auto;
 }
 
+/* フォームカード（モーダル内コンテンツ背景） */
+.form-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+}
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+.form-row .form-group { flex: 1; }
+
 /* ============================================================
    サブタブ（予定支出内）
 ============================================================ */
@@ -594,7 +607,7 @@ h3.section-title {
 .sub-title { font-size: 16px; font-weight: 700; }
 
 /* ============================================================
-   サブスク行（Finance内）
+   サブスク行（Finance内）— Life と同じ横3列レイアウト
 ============================================================ */
 .sub-summary-grid {
   display: grid;
@@ -620,6 +633,9 @@ h3.section-title {
 .sub-summary-val { font-size: 15px; font-weight: 800; color: var(--expense); }
 
 .sub-row-f {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: var(--white);
   border-radius: var(--radius);
   padding: 12px 14px;
@@ -627,43 +643,69 @@ h3.section-title {
   box-shadow: var(--shadow);
 }
 .sub-muted-f { opacity: 0.55; }
-.sub-row-f-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 4px;
+.sub-row-f-left { flex: 1; min-width: 0; }
+.sub-name-f {
+  font-size: 14px;
+  font-weight: 700;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.sub-name-f { font-size: 14px; font-weight: 700; }
-.badge-purpose-f {
+.sub-row-f-note {
   font-size: 11px;
+  color: var(--text-muted);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.sub-row-f-center {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+.sub-badges-f { display: flex; gap: 3px; flex-wrap: wrap; }
+.sub-row-f-meta { font-size: 11px; color: var(--text-muted); }
+.sub-row-f-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.sub-cost-f { font-size: 15px; font-weight: 800; white-space: nowrap; }
+.sub-unit-f { font-size: 11px; font-weight: 400; color: var(--text-muted); }
+.sub-jpy-hint-f { font-size: 11px; color: var(--text-muted); margin-left: 3px; }
+.sub-actions-f { display: flex; gap: 4px; }
+
+.badge-purpose-f {
+  font-size: 10px;
   background: #EEF2FF;
   color: #6366F1;
   border-radius: 4px;
-  padding: 1px 6px;
-  font-weight: 600;
+  padding: 1px 5px;
+  font-weight: 700;
 }
 .badge-contract-f {
-  font-size: 11px;
+  font-size: 10px;
   background: #E8F4F8;
   color: #2471A3;
   border-radius: 4px;
-  padding: 1px 6px;
-  font-weight: 600;
+  padding: 1px 5px;
+  font-weight: 700;
 }
-.sub-row-f-meta {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 6px;
+.badge-payer-f {
+  font-size: 10px;
+  background: #fde8e8;
+  color: #c0392b;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-weight: 700;
 }
-.sub-row-f-right {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.sub-cost-f { font-size: 16px; font-weight: 800; }
-.sub-unit-f { font-size: 12px; font-weight: 400; color: var(--text-muted); }
-.sub-actions-f { display: flex; gap: 6px; }
 .sub-group-sep-f {
   font-size: 11px;
   font-weight: 700;

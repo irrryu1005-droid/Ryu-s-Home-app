@@ -699,6 +699,26 @@ function initPlannedTab() {
 }
 
 // ============================================================
+// USD 為替レート（サブスク換算用）
+// ============================================================
+let _usdRateF = 150;
+
+async function fetchUsdRateF() {
+  try {
+    const res  = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json');
+    const data = await res.json();
+    _usdRateF  = data.usd.jpy;
+  } catch {
+    _usdRateF = 150;
+  }
+}
+
+function toJpyF(amount, currency) {
+  if (!amount) return 0;
+  return currency === 'USD' ? Math.round(amount * _usdRateF) : Math.round(amount);
+}
+
+// ============================================================
 // 予定支出サブタブ切り替え
 // ============================================================
 function initPlannedSubTabs() {
@@ -731,6 +751,7 @@ function normalizeSubF(row) {
     startDate:     row.start_date     || '',
     purpose:       row.purpose        || '',
     paymentMethod: row.payment_method || '',
+    payer:         row.payer          || '自分',
     note:          row.note           || '',
     currency:      row.currency       || 'JPY',
   };
@@ -812,24 +833,40 @@ function renderSubsF() {
 
 function renderSubGroupF(subs, muted) {
   return subs.map(s => {
+    const isUsd  = s.currency === 'USD';
     const amtKey = s.contractForm === 'month' ? s.costPerMonth : s.costPerYear;
     const unit   = s.contractForm === 'month' ? '/月' : '/年';
-    const symbol = s.currency === 'USD' ? '$' : '¥';
-    const amtFmt = s.currency === 'USD'
+    const symbol = isUsd ? '$' : '¥';
+    const amtFmt = isUsd
       ? (amtKey || 0).toFixed(2)
       : (amtKey || 0).toLocaleString();
-    const contractLabel = s.contractForm === 'month' ? '月払い' : '年払い';
-    const metaParts = [s.paymentMethod, s.note].filter(Boolean).join(' · ');
+
+    let jpyHint = '';
+    if (isUsd && amtKey) {
+      const monthly = s.contractForm === 'month'
+        ? toJpyF(amtKey, 'USD')
+        : Math.round(toJpyF(amtKey, 'USD') / 12);
+      jpyHint = `<span class="sub-jpy-hint-f">≈¥${monthly.toLocaleString()}/月</span>`;
+    } else if (!isUsd && s.contractForm === 'year' && amtKey) {
+      jpyHint = `<span class="sub-jpy-hint-f">≈¥${Math.round(amtKey / 12).toLocaleString()}/月</span>`;
+    }
+
+    const payerBadge   = s.payer === '家族' ? '<span class="badge-payer-f">家族</span>' : '';
+    const purposeBadge = s.purpose ? `<span class="badge-purpose-f">${escapeHtmlF(s.purpose)}</span>` : '';
+    const formBadge    = `<span class="badge-contract-f">${s.contractForm === 'month' ? '月' : '年'}</span>`;
+
     return `
       <div class="sub-row-f${muted ? ' sub-muted-f' : ''}">
-        <div class="sub-row-f-info">
+        <div class="sub-row-f-left">
           <span class="sub-name-f">${escapeHtmlF(s.name)}</span>
-          ${s.purpose ? `<span class="badge-purpose-f">${escapeHtmlF(s.purpose)}</span>` : ''}
-          <span class="badge-contract-f">${contractLabel}</span>
+          ${s.note ? `<span class="sub-row-f-note">${escapeHtmlF(s.note)}</span>` : ''}
         </div>
-        ${metaParts ? `<div class="sub-row-f-meta">${escapeHtmlF(metaParts)}</div>` : ''}
+        <div class="sub-row-f-center">
+          <span class="sub-badges-f">${payerBadge}${purposeBadge}${formBadge}</span>
+          ${s.paymentMethod ? `<span class="sub-row-f-meta">${escapeHtmlF(s.paymentMethod)}</span>` : ''}
+        </div>
         <div class="sub-row-f-right">
-          <span class="sub-cost-f">${symbol}${amtFmt}<span class="sub-unit-f">${unit}</span></span>
+          <span class="sub-cost-f">${symbol}${amtFmt}<span class="sub-unit-f">${unit}</span>${jpyHint}</span>
           <div class="sub-actions-f">
             <button class="planned-edit-btn btn-sub-edit-f" data-id="${s.id}">編集</button>
             <button class="planned-edit-btn btn-sub-del-f"  data-id="${s.id}">削除</button>
@@ -1068,6 +1105,7 @@ function initLoans() {
 // ============================================================
 // 初期表示
 // ============================================================
+fetchUsdRateF();
 renderDashboard();
 initPlannedTab();
 initPlannedSubTabs();
