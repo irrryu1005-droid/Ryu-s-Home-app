@@ -12,8 +12,8 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ============================================================
 const GC_CLIENT_ID            = '1053779234925-qc97npjce6q3avsssjkfl3jvldjv4sj1.apps.googleusercontent.com';
 const GC_SCOPE                = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
-const GCAL_TOKEN_KEY_HOME     = 'gcal_home_token';
-const GCAL_AUTOLOGIN_KEY_HOME = 'gcal_home_autologin';
+const GCAL_TOKEN_KEY_HOME     = 'gcal_shared_token';
+const GCAL_AUTOLOGIN_KEY_HOME = 'gcal_autologin';
 
 let gcTokenClient = null;
 let gcalToken     = null;

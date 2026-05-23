@@ -197,8 +197,8 @@ async function deleteCampaign(id) {
 // ============================================================
 const GC_CLIENT_ID_BET  = '1053779234925-qc97npjce6q3avsssjkfl3jvldjv4sj1.apps.googleusercontent.com';
 const GC_SCOPE_BET      = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
-const GCAL_TOKEN_KEY    = 'gcal_bet_token';
-const GCAL_AUTOLOGIN_KEY = 'gcal_betting_autologin';
+const GCAL_TOKEN_KEY    = 'gcal_shared_token';
+const GCAL_AUTOLOGIN_KEY = 'gcal_autologin';
 
 let gcTokenClientBet    = null;
 let gcalTokenBet        = null;
