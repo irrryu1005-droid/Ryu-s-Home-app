@@ -106,6 +106,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (tab === 'dashboard') renderDashboard();
     if (tab === 'list')      renderList();
     if (tab === 'accounts')  renderAccounts();
+    if (tab === 'planned')   renderPlannedTab();
   });
 });
 
@@ -474,6 +475,213 @@ function startEditBalance(el) {
 }
 
 // ============================================================
+// 予定支出タブ
+// ============================================================
+let _plannedMonth = new Date();
+_plannedMonth.setDate(1);
+
+const PLANNED_CATEGORY_LABEL = {
+  transport: '🚃 交通',
+  loan:      '💴 ローン・返済',
+  utility:   '💡 光熱費・通信',
+  other:     '📦 その他',
+  subscription: '💳 サブスク',
+};
+
+function plannedMonthLabel(d) {
+  return `${d.getFullYear()}年${d.getMonth() + 1}月`;
+}
+
+// その月に発生するか判定
+function isActiveInMonth(item, year, month) {
+  const start = item.startDate ? new Date(item.startDate) : null;
+  const end   = item.endDate   ? new Date(item.endDate)   : null;
+  const mStart = new Date(year, month, 1);
+  const mEnd   = new Date(year, month + 1, 0);
+  if (start && start > mEnd)   return false;
+  if (end   && end   < mStart) return false;
+  if (item.frequency === 'monthly')   return true;
+  if (item.frequency === 'once')      return start && start >= mStart && start <= mEnd;
+  if (item.frequency === 'quarterly') {
+    if (!start) return false;
+    const diff = (year - start.getFullYear()) * 12 + (month - start.getMonth());
+    return diff >= 0 && diff % 3 === 0;
+  }
+  if (item.frequency === 'yearly') {
+    const billingM = item.billingMonth != null ? item.billingMonth : (start ? start.getMonth() : 0);
+    return month === billingM;
+  }
+  return false;
+}
+
+async function renderPlannedTab() {
+  const year  = _plannedMonth.getFullYear();
+  const month = _plannedMonth.getMonth();
+  document.getElementById('planned-month-label').textContent = plannedMonthLabel(_plannedMonth);
+
+  // サブスク（Life）+ 予定支出 を並行取得
+  const [subRes, planRes] = await Promise.all([
+    db.from('subscriptions').select('*').eq('status', 'active'),
+    db.from('planned_expenses').select('*').order('billing_day'),
+  ]);
+
+  const usdRate = 150; // 簡易レート（Life と共有不可なため固定）
+
+  // サブスクを統一フォーマットに変換
+  const subItems = (subRes.data || []).map(r => ({
+    id:          r.id,
+    source:      'subscription',
+    name:        r.name,
+    amount:      r.contract_form === 'year'
+                   ? Math.round((r.currency === 'USD' ? (r.cost_per_year||0)*usdRate : (r.cost_per_year||0)) / 12)
+                   : (r.currency === 'USD' ? Math.round((r.cost_per_month||0)*usdRate) : (r.cost_per_month||0)),
+    category:    'subscription',
+    frequency:   r.contract_form === 'year' ? 'yearly' : 'monthly',
+    billingDay:  r.billing_day  || null,
+    billingMonth: r.start_date ? new Date(r.start_date).getMonth() : null,
+    startDate:   r.start_date  || null,
+    endDate:     null,
+    note:        r.note        || null,
+  }));
+
+  // planned_expenses を統一フォーマットに変換
+  const planItems = (planRes.data || []).map(r => ({
+    id:          r.id,
+    source:      'planned',
+    name:        r.name,
+    amount:      r.amount,
+    category:    r.category || 'other',
+    frequency:   r.frequency || 'monthly',
+    billingDay:  r.billing_day   || null,
+    billingMonth: null,
+    startDate:   r.start_date   || null,
+    endDate:     r.end_date     || null,
+    note:        r.note         || null,
+  }));
+
+  const all = [...subItems, ...planItems].filter(it => isActiveInMonth(it, year, month));
+  all.sort((a, b) => (a.billingDay || 99) - (b.billingDay || 99));
+
+  const total = all.reduce((s, it) => s + it.amount, 0);
+  document.getElementById('planned-total').textContent = '¥' + total.toLocaleString();
+
+  // カテゴリ別グループ
+  const groups = {};
+  for (const it of all) {
+    if (!groups[it.category]) groups[it.category] = [];
+    groups[it.category].push(it);
+  }
+
+  const list = document.getElementById('planned-list');
+  if (all.length === 0) {
+    list.innerHTML = '<p class="empty-msg">この月の予定支出はありません</p>';
+    return;
+  }
+
+  list.innerHTML = Object.entries(groups).map(([cat, items]) => `
+    <div class="planned-group">
+      <div class="planned-group-title">${PLANNED_CATEGORY_LABEL[cat] || cat}</div>
+      ${items.map(it => `
+        <div class="planned-item">
+          <div class="planned-item-left">
+            <span class="planned-day">${it.billingDay ? it.billingDay + '日' : '-'}</span>
+            <div>
+              <div class="planned-name">${escapeHtmlF(it.name)}${it.source === 'subscription' ? ' <span class="badge-sub">サブスク</span>' : ''}</div>
+              ${it.note ? `<div class="planned-note">${escapeHtmlF(it.note)}</div>` : ''}
+            </div>
+          </div>
+          <div class="planned-item-right">
+            <span class="planned-amount">¥${it.amount.toLocaleString()}</span>
+            ${it.source === 'planned' ? `<button class="planned-edit-btn" data-id="${it.id}">編集</button>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.planned-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => openPlannedEditForm(btn.dataset.id, planRes.data));
+  });
+}
+
+function escapeHtmlF(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function openPlannedEditForm(id, rows) {
+  const r = rows.find(x => x.id === id);
+  if (!r) return;
+  const f = document.getElementById('planned-form');
+  f.elements.id.value         = r.id;
+  f.elements.name.value       = r.name;
+  f.elements.amount.value     = r.amount;
+  f.elements.category.value   = r.category || 'other';
+  f.elements.frequency.value  = r.frequency || 'monthly';
+  f.elements.billingDay.value = r.billing_day || '';
+  f.elements.startDate.value  = r.start_date || '';
+  f.elements.endDate.value    = r.end_date   || '';
+  f.elements.note.value       = r.note       || '';
+  document.getElementById('planned-form-title').textContent = '予定支出を編集';
+  document.getElementById('planned-modal').hidden = false;
+}
+
+function initPlannedTab() {
+  document.getElementById('planned-prev').addEventListener('click', () => {
+    _plannedMonth.setMonth(_plannedMonth.getMonth() - 1);
+    renderPlannedTab();
+  });
+  document.getElementById('planned-next').addEventListener('click', () => {
+    _plannedMonth.setMonth(_plannedMonth.getMonth() + 1);
+    renderPlannedTab();
+  });
+
+  document.getElementById('btn-add-planned').addEventListener('click', () => {
+    document.getElementById('planned-form').reset();
+    document.getElementById('planned-form').elements.id.value = '';
+    document.getElementById('planned-form-title').textContent = '予定支出を追加';
+    document.getElementById('planned-modal').hidden = false;
+  });
+
+  document.getElementById('btn-cancel-planned').addEventListener('click', () => {
+    document.getElementById('planned-modal').hidden = true;
+  });
+
+  document.getElementById('planned-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.hidden = true;
+  });
+
+  document.getElementById('planned-frequency').addEventListener('change', e => {
+    const showDay = ['monthly', 'quarterly'].includes(e.target.value);
+    document.getElementById('planned-day-wrap').hidden = !showDay;
+  });
+
+  document.getElementById('planned-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    const id = f.elements.id.value;
+    const payload = {
+      name:        f.elements.name.value.trim(),
+      amount:      parseInt(f.elements.amount.value),
+      category:    f.elements.category.value,
+      frequency:   f.elements.frequency.value,
+      billing_day: f.elements.billingDay.value ? parseInt(f.elements.billingDay.value) : null,
+      start_date:  f.elements.startDate.value  || null,
+      end_date:    f.elements.endDate.value     || null,
+      note:        f.elements.note.value.trim() || null,
+    };
+    if (id) {
+      await db.from('planned_expenses').update(payload).eq('id', id);
+    } else {
+      await db.from('planned_expenses').insert([payload]);
+    }
+    document.getElementById('planned-modal').hidden = true;
+    renderPlannedTab();
+  });
+}
+
+// ============================================================
 // 初期表示
 // ============================================================
 renderDashboard();
+initPlannedTab();
+renderPlannedTab();

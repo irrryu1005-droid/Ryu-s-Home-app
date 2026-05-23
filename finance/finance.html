@@ -34,6 +34,10 @@
         <span class="nav-icon">🏦</span>
         <span class="nav-label">口座</span>
       </button>
+      <button class="nav-btn" data-tab="planned">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">予定支出</span>
+      </button>
     </nav>
 
     <!-- ======== 入力タブ ======== -->
@@ -147,6 +151,89 @@
       <div id="accounts-list">
         <div class="empty-msg">データを読み込み中...</div>
       </div>
+    </main>
+
+    <!-- ======== 予定支出タブ ======== -->
+    <main id="tab-planned" class="tab-content">
+
+      <div class="planned-header">
+        <div class="month-nav">
+          <button id="planned-prev">＜</button>
+          <h2 id="planned-month-label"></h2>
+          <button id="planned-next">＞</button>
+        </div>
+        <button id="btn-add-planned" class="btn-primary-sm">＋ 追加</button>
+      </div>
+
+      <div class="planned-total-card">
+        <span class="planned-total-label">今月の予定支出合計</span>
+        <span class="planned-total-val" id="planned-total">¥0</span>
+      </div>
+
+      <div id="planned-list"></div>
+
+      <!-- 追加・編集モーダル -->
+      <div id="planned-modal" hidden>
+        <div class="form-card planned-modal-card">
+          <h3 id="planned-form-title">予定支出を追加</h3>
+          <form id="planned-form" novalidate>
+            <div class="form-group">
+              <label>名前</label>
+              <input type="text" name="name" placeholder="定期代・奨学金返済など" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>金額 (¥)</label>
+                <input type="number" name="amount" min="1" placeholder="15000" required>
+              </div>
+              <div class="form-group">
+                <label>カテゴリ</label>
+                <select name="category">
+                  <option value="transport">🚃 交通</option>
+                  <option value="loan">💴 ローン・返済</option>
+                  <option value="utility">💡 光熱費・通信</option>
+                  <option value="other">📦 その他</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>頻度</label>
+                <select name="frequency" id="planned-frequency">
+                  <option value="monthly">毎月</option>
+                  <option value="yearly">毎年</option>
+                  <option value="quarterly">3ヶ月ごと</option>
+                  <option value="once">一回のみ</option>
+                </select>
+              </div>
+              <div class="form-group" id="planned-day-wrap">
+                <label>引き落とし日</label>
+                <input type="number" name="billingDay" min="1" max="31" placeholder="25">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>開始日</label>
+                <input type="date" name="startDate">
+              </div>
+              <div class="form-group">
+                <label>終了日（任意）</label>
+                <input type="date" name="endDate">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>メモ（任意）</label>
+              <input type="text" name="note" placeholder="備考など">
+            </div>
+            <div class="form-btns">
+              <button type="button" id="btn-cancel-planned" class="btn-cancel">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+            <input type="hidden" name="id">
+          </form>
+        </div>
+      </div>
+
     </main>
 
   </div>
