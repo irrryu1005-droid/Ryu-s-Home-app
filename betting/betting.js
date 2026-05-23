@@ -1537,6 +1537,8 @@ function gcalGetEventId(title, dateStr, startUtc) {
   return gcalStoreGet()[gcalEntryKey(title, dateStr, startUtc)] || null;
 }
 
+const GCAL_AUTOLOGIN_KEY = 'gcal_betting_autologin';
+
 function initGcalBetting() {
   if (gcTokenClientBet) return;
   if (typeof google === 'undefined' || !google.accounts) { setTimeout(initGcalBetting, 300); return; }
@@ -1546,13 +1548,16 @@ function initGcalBetting() {
     callback:       (resp) => {
       if (resp.error) return;
       gcalTokenBet = resp.access_token;
+      localStorage.setItem(GCAL_AUTOLOGIN_KEY, '1');
       const btn = document.getElementById('gcal-login-btn');
       if (btn) { btn.textContent = '✅ 接続済み'; btn.classList.add('connected'); }
       findSportsCalendar();
     },
     error_callback: () => {},
   });
-  gcTokenClientBet.requestAccessToken({ prompt: 'none' });
+  if (localStorage.getItem(GCAL_AUTOLOGIN_KEY)) {
+    gcTokenClientBet.requestAccessToken({ prompt: '' });
+  }
 }
 
 window.onGoogleLibraryLoad = initGcalBetting;

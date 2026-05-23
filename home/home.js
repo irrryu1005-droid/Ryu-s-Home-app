@@ -16,6 +16,8 @@ const GC_SCOPE     = 'https://www.googleapis.com/auth/calendar.events https://ww
 let gcTokenClient = null;
 let gcalToken     = null;
 
+const GCAL_AUTOLOGIN_KEY_HOME = 'gcal_home_autologin';
+
 function initGcalHome() {
   if (typeof google === 'undefined' || !google.accounts) {
     setTimeout(initGcalHome, 300);
@@ -27,12 +29,16 @@ function initGcalHome() {
     callback:  (resp) => {
       if (resp.error) { loadTodaySchedule(); return; }
       gcalToken = resp.access_token;
-      loadTodaySchedule();
+      localStorage.setItem(GCAL_AUTOLOGIN_KEY_HOME, '1');
       gcalFetchCalendars().then(cals => { gcCalendars = cals; populateCalendarSelect(cals); loadTodaySchedule(); });
     },
     error_callback: () => { loadTodaySchedule(); },
   });
-  gcTokenClient.requestAccessToken({ prompt: 'none' });
+  if (localStorage.getItem(GCAL_AUTOLOGIN_KEY_HOME)) {
+    gcTokenClient.requestAccessToken({ prompt: '' });
+  } else {
+    loadTodaySchedule();
+  }
 }
 
 window.onGoogleLibraryLoad = initGcalHome;
