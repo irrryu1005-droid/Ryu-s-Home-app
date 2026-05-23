@@ -567,13 +567,9 @@ function populateCampaignSelect(currentId = '') {
 }
 
 function updateFreebetToggle() {
-  const sel  = document.getElementById('form-campaign-select');
-  const wrap = document.getElementById('freebet-toggle-wrap');
-  const cb   = document.getElementById('input-is-freebet');
-  if (!sel || !wrap) return;
-  const hasCampaign = !!sel.value;
-  wrap.hidden = !hasCampaign;
-  if (hasCampaign && cb && !cb.dataset.userSet) cb.checked = true;
+  const sel = document.getElementById('form-campaign-select');
+  const cb  = document.getElementById('input-is-freebet');
+  if (sel && cb && sel.value && !cb.dataset.userSet) cb.checked = true;
 }
 
 function renderCampaigns() {
@@ -1703,7 +1699,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const combinedOdds = Math.round(legs.reduce((acc, l) => acc * l.odds, 1) * 100) / 100;
       const comboBoost   = parseFloat(document.getElementById('input-combo-boost').value) || null;
       const campaignIdP  = f.elements.campaignId.value || null;
-      const isFreebetP   = campaignIdP ? document.getElementById('input-is-freebet').checked : false;
+      const isFreebetP   = document.getElementById('input-is-freebet').checked;
       bet = { type: 'parlay', date: f.elements.date.value, legs, combinedOdds, comboBoost,
               stake: parseInt(f.elements.stake.value), isFreebet: isFreebetP,
               campaignId: campaignIdP,
@@ -1713,7 +1709,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const sport      = f.elements.sport.value;
       const leagueSel  = document.getElementById('single-league-select');
       const campaignId = f.elements.campaignId.value || null;
-      const isFreebet  = campaignId ? document.getElementById('input-is-freebet').checked : false;
+      const isFreebet  = document.getElementById('input-is-freebet').checked;
       bet = { type: 'single', date: f.elements.date.value, sport,
               league: (getLeagues()[sport] !== undefined && leagueSel?.value) ? leagueSel.value : null,
               match: null, bet: f.elements.bet.value,
