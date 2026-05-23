@@ -1663,6 +1663,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-cancel').addEventListener('click', () => {
     document.getElementById('form-container').hidden = true;
   });
+  document.getElementById('form-container').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.hidden = true;
+  });
   document.getElementById('btn-add-leg').addEventListener('click', () => addLeg());
   document.getElementById('input-combo-boost').addEventListener('input', updateCombinedOdds);
 

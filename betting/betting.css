@@ -182,12 +182,28 @@ body {
 /* ============================================================
    フォームカード
 ============================================================ */
+/* モーダルオーバーレイ */
+#form-container {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 60px 16px 24px;
+  overflow-y: auto;
+}
+#form-container[hidden] { display: none; }
+
 .form-card {
   background: var(--white);
   border-radius: var(--radius);
   padding: 18px;
   margin-bottom: 14px;
   box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 480px;
 }
 .form-card h3 { font-size: 14px; font-weight: 800; margin-bottom: 14px; }
 
