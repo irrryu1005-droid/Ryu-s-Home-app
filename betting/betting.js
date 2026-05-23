@@ -337,11 +337,16 @@ function renderRecords() {
       ? `<td><span class="badge-parlay">マルチ ${(bet.legs || []).length}連</span>${fbBadge}</td>`
       : `<td>シングル${fbBadge}</td>`;
 
+    const resultOpts = (cur) =>
+      [['pending','⏳'],['win','✅ 勝'],['loss','❌ 負'],['void','➖ 無効']]
+        .map(([v, l]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${l}</option>`).join('');
+
     let detailCell;
     if (isParlay && bet.legs) {
       const legLines = bet.legs.map((l, i) => {
         const legLabel = l.league ? escapeHtml(l.league) : escapeHtml(l.sport || '');
-        return `<small>${i + 1}: <span class="badge-league">${legLabel}</span> ${escapeHtml(l.match || '')} — ${escapeHtml(l.bet || '')} (x${l.odds}) ${resultLabel(l.legResult)}</small>`;
+        const legSel = `<select class="leg-result-select" data-id="${bet.id}" data-leg="${i}">${resultOpts(l.legResult)}</select>`;
+        return `<small>${i + 1}: <span class="badge-league">${legLabel}</span> ${escapeHtml(l.match || '')} — ${escapeHtml(l.bet || '')} (x${l.odds}) ${legSel}</small>`;
       }).join('<br>');
       detailCell = `<td>${legLines}${bet.memo ? `<br><small class="memo">${escapeHtml(bet.memo)}</small>` : ''}</td>`;
     } else {
@@ -360,7 +365,7 @@ function renderRecords() {
       ${detailCell}
       <td>${oddsVal}</td>
       <td>¥${Number(bet.stake).toLocaleString()}</td>
-      <td>${resultLabel(bet.result)}</td>
+      <td><select class="result-select" data-id="${bet.id}">${resultOpts(bet.result)}</select></td>
       <td class="${pnlClass}">${formatPnl(pnl)}</td>
       <td>
         <button class="small-btn btn-edit"   data-id="${bet.id}">編集</button>
@@ -378,6 +383,24 @@ function renderRecords() {
   container.querySelectorAll('.btn-delete').forEach(btn =>
     btn.addEventListener('click', () => confirmDelete(btn.dataset.id))
   );
+  container.querySelectorAll('.result-select').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const bet = _bets.find(b => String(b.id) === sel.dataset.id);
+      if (!bet) return;
+      await updateBet(sel.dataset.id, { ...bet, result: sel.value });
+      refreshAll();
+    });
+  });
+  container.querySelectorAll('.leg-result-select').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const bet = _bets.find(b => String(b.id) === sel.dataset.id);
+      if (!bet || !bet.legs) return;
+      const legIdx = parseInt(sel.dataset.leg, 10);
+      const updatedLegs = bet.legs.map((l, i) => i === legIdx ? { ...l, legResult: sel.value } : l);
+      await updateBet(sel.dataset.id, { ...bet, legs: updatedLegs });
+      refreshAll();
+    });
+  });
 }
 
 // ============================================================

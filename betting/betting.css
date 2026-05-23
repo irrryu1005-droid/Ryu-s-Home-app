@@ -179,6 +179,19 @@ body {
 .btn-edit:hover   { border-color: var(--purple); color: var(--purple); }
 .btn-delete:hover { border-color: var(--loss);   color: var(--loss);   }
 
+.result-select, .leg-result-select {
+  appearance: none;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 11px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.result-select { font-size: 12px; padding: 3px 8px; }
+.result-select:focus, .leg-result-select:focus { outline: none; border-color: var(--purple); }
+
 /* ============================================================
    フォームカード
 ============================================================ */
