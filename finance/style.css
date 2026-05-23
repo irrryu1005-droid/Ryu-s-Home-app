@@ -544,20 +544,179 @@ h3.section-title {
   margin-left: 4px;
 }
 
-/* 予定支出モーダル */
-#planned-modal {
+/* 予定支出モーダル（共通オーバーレイ） */
+#planned-modal,
+#sub-modal-f,
+#loan-modal {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  background: rgba(0,0,0,0.45);
 }
-#planned-modal[hidden] { display: none; }
+#planned-modal[hidden],
+#sub-modal-f[hidden],
+#loan-modal[hidden] { display: none; }
 .planned-modal-card {
   width: 100%;
   max-width: 480px;
   max-height: calc(100vh - 32px);
   overflow-y: auto;
 }
+
+/* ============================================================
+   サブタブ（予定支出内）
+============================================================ */
+.sub-nav {
+  display: flex;
+  margin-bottom: 18px;
+  border-bottom: 2px solid var(--border);
+}
+.sub-nav-btn {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.sub-nav-btn.active {
+  color: var(--expense);
+  border-bottom-color: var(--expense);
+}
+.sub-title { font-size: 16px; font-weight: 700; }
+
+/* ============================================================
+   サブスク行（Finance内）
+============================================================ */
+.sub-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.sub-summary-item {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 12px 8px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.sub-summary-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.sub-summary-val { font-size: 15px; font-weight: 800; color: var(--expense); }
+
+.sub-row-f {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  box-shadow: var(--shadow);
+}
+.sub-muted-f { opacity: 0.55; }
+.sub-row-f-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.sub-name-f { font-size: 14px; font-weight: 700; }
+.badge-purpose-f {
+  font-size: 11px;
+  background: #EEF2FF;
+  color: #6366F1;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-weight: 600;
+}
+.badge-contract-f {
+  font-size: 11px;
+  background: #E8F4F8;
+  color: #2471A3;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-weight: 600;
+}
+.sub-row-f-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.sub-row-f-right {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sub-cost-f { font-size: 16px; font-weight: 800; }
+.sub-unit-f { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.sub-actions-f { display: flex; gap: 6px; }
+.sub-group-sep-f {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 14px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+/* ============================================================
+   ローンカード
+============================================================ */
+.loan-item {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow);
+}
+.loan-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.loan-name { font-size: 15px; font-weight: 700; }
+.loan-monthly { font-size: 16px; font-weight: 800; color: var(--expense); }
+.loan-item-detail {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.loan-progress-wrap {
+  background: var(--border);
+  border-radius: 4px;
+  height: 6px;
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+.loan-progress-bar {
+  height: 100%;
+  background: var(--profit-pos);
+  border-radius: 4px;
+}
+.loan-progress-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+  margin-bottom: 6px;
+}
+.loan-note { font-size: 12px; color: var(--text-muted); margin-top: 4px; }

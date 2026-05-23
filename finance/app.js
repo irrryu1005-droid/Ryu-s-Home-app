@@ -519,10 +519,11 @@ async function renderPlannedTab() {
   const month = _plannedMonth.getMonth();
   document.getElementById('planned-month-label').textContent = plannedMonthLabel(_plannedMonth);
 
-  // サブスク（Life）+ 予定支出 を並行取得
-  const [subRes, planRes] = await Promise.all([
+  // サブスク（Life）+ 予定支出 + ローン を並行取得
+  const [subRes, planRes, loanRes] = await Promise.all([
     db.from('subscriptions').select('*').eq('status', 'active'),
     db.from('planned_expenses').select('*').order('billing_day'),
+    db.from('loans').select('*'),
   ]);
 
   const usdRate = 150; // 簡易レート（Life と共有不可なため固定）
@@ -559,7 +560,22 @@ async function renderPlannedTab() {
     note:        r.note         || null,
   }));
 
-  const all = [...subItems, ...planItems].filter(it => isActiveInMonth(it, year, month));
+  // ローンを統一フォーマットに変換
+  const loanItems = (loanRes.data || []).map(r => ({
+    id:          r.id,
+    source:      'loan',
+    name:        r.name,
+    amount:      r.monthly_payment,
+    category:    'loan',
+    frequency:   'monthly',
+    billingDay:  r.start_date ? new Date(r.start_date).getDate() : null,
+    billingMonth: null,
+    startDate:   r.start_date || null,
+    endDate:     r.end_date   || null,
+    note:        r.note       || null,
+  }));
+
+  const all = [...subItems, ...planItems, ...loanItems].filter(it => isActiveInMonth(it, year, month));
   all.sort((a, b) => (a.billingDay || 99) - (b.billingDay || 99));
 
   const total = all.reduce((s, it) => s + it.amount, 0);
@@ -595,6 +611,7 @@ async function renderPlannedTab() {
           <div class="planned-item-right">
             <span class="planned-amount">¥${it.amount.toLocaleString()}</span>
             ${it.source === 'planned' ? `<button class="planned-edit-btn" data-id="${it.id}">編集</button>` : ''}
+            ${it.source === 'loan' ? `<span class="badge-sub" style="background:#e8f4e8;color:#27ae60">ローン</span>` : ''}
           </div>
         </div>
       `).join('')}
@@ -682,8 +699,378 @@ function initPlannedTab() {
 }
 
 // ============================================================
+// 予定支出サブタブ切り替え
+// ============================================================
+function initPlannedSubTabs() {
+  document.querySelectorAll('.sub-nav-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      document.querySelectorAll('.sub-nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.sub-content').forEach(c => { c.hidden = true; });
+      btn.classList.add('active');
+      const sub = btn.dataset.sub;
+      document.getElementById(`sub-${sub}`).hidden = false;
+      if (sub === 'subscriptions') { await loadSubsF(); renderSubsF(); }
+      if (sub === 'loans')         { await loadLoans(); renderLoans(); }
+    });
+  });
+}
+
+// ============================================================
+// サブスク管理（Finance 内）
+// ============================================================
+let _subsF = [];
+
+function normalizeSubF(row) {
+  return {
+    id:            row.id,
+    name:          row.name,
+    contractForm:  row.contract_form,
+    costPerMonth:  row.cost_per_month,
+    costPerYear:   row.cost_per_year,
+    status:        row.status         || 'active',
+    startDate:     row.start_date     || '',
+    purpose:       row.purpose        || '',
+    paymentMethod: row.payment_method || '',
+    note:          row.note           || '',
+    currency:      row.currency       || 'JPY',
+  };
+}
+
+function subFToRow(sub) {
+  return {
+    name:           sub.name,
+    contract_form:  sub.contractForm,
+    cost_per_month: sub.costPerMonth ? parseInt(sub.costPerMonth) : null,
+    cost_per_year:  sub.costPerYear  ? parseInt(sub.costPerYear)  : null,
+    status:         sub.status,
+    start_date:     sub.startDate     || null,
+    purpose:        sub.purpose       || null,
+    payment_method: sub.paymentMethod || null,
+    note:           sub.note          || null,
+    currency:       sub.currency      || 'JPY',
+  };
+}
+
+async function loadSubsF() {
+  const { data } = await db.from('subscriptions').select('*').order('created_at');
+  _subsF = (data || []).map(normalizeSubF);
+}
+
+function renderSubsF() {
+  const summaryEl = document.getElementById('sub-summary-f');
+  const listEl    = document.getElementById('sub-list-f');
+
+  const active = _subsF.filter(s => s.status === 'active');
+  const monthlyTotal = active.reduce((sum, s) => {
+    return sum + (s.contractForm === 'month'
+      ? (s.costPerMonth || 0)
+      : Math.round((s.costPerYear || 0) / 12));
+  }, 0);
+  const yearlyTotal = active.reduce((sum, s) => {
+    return sum + (s.contractForm === 'year'
+      ? (s.costPerYear || 0)
+      : (s.costPerMonth || 0) * 12);
+  }, 0);
+
+  summaryEl.innerHTML = `
+    <div class="sub-summary-grid">
+      <div class="sub-summary-item">
+        <div class="sub-summary-label">月額換算</div>
+        <div class="sub-summary-val">¥${monthlyTotal.toLocaleString()}</div>
+      </div>
+      <div class="sub-summary-item">
+        <div class="sub-summary-label">年間合計</div>
+        <div class="sub-summary-val">¥${yearlyTotal.toLocaleString()}</div>
+      </div>
+      <div class="sub-summary-item">
+        <div class="sub-summary-label">契約数</div>
+        <div class="sub-summary-val">${active.length}</div>
+      </div>
+    </div>`;
+
+  if (_subsF.length === 0) {
+    listEl.innerHTML = '<div class="empty-msg">サブスクがありません</div>';
+    return;
+  }
+
+  const cancelled = _subsF.filter(s => s.status === 'cancelled');
+  let html = '';
+  if (active.length > 0)    html += renderSubGroupF(active, false);
+  if (cancelled.length > 0) {
+    html += '<div class="sub-group-sep-f">解約済み</div>';
+    html += renderSubGroupF(cancelled, true);
+  }
+  listEl.innerHTML = html;
+
+  listEl.querySelectorAll('.btn-sub-edit-f').forEach(btn => {
+    btn.addEventListener('click', () => openEditSubF(btn.dataset.id));
+  });
+  listEl.querySelectorAll('.btn-sub-del-f').forEach(btn => {
+    btn.addEventListener('click', () => deleteSubF(btn.dataset.id));
+  });
+}
+
+function renderSubGroupF(subs, muted) {
+  return subs.map(s => {
+    const amtKey = s.contractForm === 'month' ? s.costPerMonth : s.costPerYear;
+    const unit   = s.contractForm === 'month' ? '/月' : '/年';
+    const symbol = s.currency === 'USD' ? '$' : '¥';
+    const amtFmt = s.currency === 'USD'
+      ? (amtKey || 0).toFixed(2)
+      : (amtKey || 0).toLocaleString();
+    const contractLabel = s.contractForm === 'month' ? '月払い' : '年払い';
+    const metaParts = [s.paymentMethod, s.note].filter(Boolean).join(' · ');
+    return `
+      <div class="sub-row-f${muted ? ' sub-muted-f' : ''}">
+        <div class="sub-row-f-info">
+          <span class="sub-name-f">${escapeHtmlF(s.name)}</span>
+          ${s.purpose ? `<span class="badge-purpose-f">${escapeHtmlF(s.purpose)}</span>` : ''}
+          <span class="badge-contract-f">${contractLabel}</span>
+        </div>
+        ${metaParts ? `<div class="sub-row-f-meta">${escapeHtmlF(metaParts)}</div>` : ''}
+        <div class="sub-row-f-right">
+          <span class="sub-cost-f">${symbol}${amtFmt}<span class="sub-unit-f">${unit}</span></span>
+          <div class="sub-actions-f">
+            <button class="planned-edit-btn btn-sub-edit-f" data-id="${s.id}">編集</button>
+            <button class="planned-edit-btn btn-sub-del-f"  data-id="${s.id}">削除</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function updateSubCostFieldsF(contractForm) {
+  document.getElementById('sub-cost-month-f').hidden = contractForm === 'year';
+  document.getElementById('sub-cost-year-f').hidden  = contractForm === 'month';
+}
+
+function openAddSubF() {
+  const form = document.getElementById('sub-form-f');
+  form.reset();
+  form.elements.id.value = '';
+  document.getElementById('sub-form-title-f').textContent = 'サブスクを追加';
+  updateSubCostFieldsF('month');
+  document.getElementById('sub-modal-f').hidden = false;
+}
+
+function openEditSubF(id) {
+  const s = _subsF.find(x => x.id === id);
+  if (!s) return;
+  const form = document.getElementById('sub-form-f');
+  form.elements.id.value            = s.id;
+  form.elements.name.value          = s.name;
+  form.elements.contractForm.value  = s.contractForm;
+  form.elements.currency.value      = s.currency;
+  form.elements.costPerMonth.value  = s.costPerMonth || '';
+  form.elements.costPerYear.value   = s.costPerYear  || '';
+  form.elements.purpose.value       = s.purpose;
+  form.elements.startDate.value     = s.startDate;
+  form.elements.paymentMethod.value = s.paymentMethod;
+  form.elements.status.value        = s.status;
+  form.elements.note.value          = s.note;
+  document.getElementById('sub-form-title-f').textContent = '編集';
+  updateSubCostFieldsF(s.contractForm);
+  document.getElementById('sub-modal-f').hidden = false;
+}
+
+async function deleteSubF(id) {
+  const s = _subsF.find(x => x.id === id);
+  if (!s || !confirm(`「${s.name}」を削除しますか？`)) return;
+  await db.from('subscriptions').delete().eq('id', id);
+  _subsF = _subsF.filter(x => x.id !== id);
+  renderSubsF();
+}
+
+function initSubsF() {
+  document.getElementById('btn-add-sub-f').addEventListener('click', openAddSubF);
+
+  document.getElementById('btn-cancel-sub-f').addEventListener('click', () => {
+    document.getElementById('sub-modal-f').hidden = true;
+  });
+  document.getElementById('sub-modal-f').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.hidden = true;
+  });
+  document.getElementById('sub-contract-f').addEventListener('change', e => {
+    updateSubCostFieldsF(e.target.value);
+  });
+
+  document.getElementById('sub-form-f').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    const id = f.elements.id.value;
+    const sub = {
+      name:          f.elements.name.value.trim(),
+      contractForm:  f.elements.contractForm.value,
+      currency:      f.elements.currency.value,
+      costPerMonth:  f.elements.costPerMonth.value || null,
+      costPerYear:   f.elements.costPerYear.value  || null,
+      purpose:       f.elements.purpose.value      || null,
+      startDate:     f.elements.startDate.value    || null,
+      paymentMethod: f.elements.paymentMethod.value || null,
+      status:        f.elements.status.value,
+      note:          f.elements.note.value.trim()  || null,
+    };
+    if (id) {
+      await db.from('subscriptions').update(subFToRow(sub)).eq('id', id);
+    } else {
+      await db.from('subscriptions').insert([subFToRow(sub)]);
+    }
+    document.getElementById('sub-modal-f').hidden = true;
+    await loadSubsF();
+    renderSubsF();
+  });
+}
+
+// ============================================================
+// ローン管理
+// ============================================================
+let _loans = [];
+
+function normalizeLoan(row) {
+  return {
+    id:              row.id,
+    name:            row.name,
+    totalAmount:     row.total_amount,
+    monthlyPayment:  row.monthly_payment,
+    remainingAmount: row.remaining_amount,
+    startDate:       row.start_date || '',
+    endDate:         row.end_date   || '',
+    note:            row.note       || '',
+  };
+}
+
+function loanToRow(loan) {
+  return {
+    name:             loan.name,
+    total_amount:     parseInt(loan.totalAmount),
+    monthly_payment:  parseInt(loan.monthlyPayment),
+    remaining_amount: loan.remainingAmount ? parseInt(loan.remainingAmount) : null,
+    start_date:       loan.startDate || null,
+    end_date:         loan.endDate   || null,
+    note:             loan.note      || null,
+  };
+}
+
+async function loadLoans() {
+  const { data } = await db.from('loans').select('*').order('created_at');
+  _loans = (data || []).map(normalizeLoan);
+}
+
+function renderLoans() {
+  const listEl = document.getElementById('loan-list');
+  if (_loans.length === 0) {
+    listEl.innerHTML = '<div class="empty-msg">ローンがありません。「＋ 追加」から登録してください。</div>';
+    return;
+  }
+  listEl.innerHTML = _loans.map(l => {
+    const progress = (l.remainingAmount != null && l.totalAmount)
+      ? Math.round((1 - l.remainingAmount / l.totalAmount) * 100)
+      : null;
+    return `
+      <div class="loan-item">
+        <div class="loan-item-top">
+          <span class="loan-name">${escapeHtmlF(l.name)}</span>
+          <span class="loan-monthly">月¥${(l.monthlyPayment || 0).toLocaleString()}</span>
+        </div>
+        <div class="loan-item-detail">
+          ${l.remainingAmount != null
+            ? `<span>残高 ¥${l.remainingAmount.toLocaleString()} / ¥${l.totalAmount.toLocaleString()}</span>`
+            : `<span>借入総額 ¥${l.totalAmount.toLocaleString()}</span>`}
+          ${l.endDate ? `<span>〜${l.endDate}</span>` : ''}
+        </div>
+        ${progress != null ? `
+          <div class="loan-progress-wrap">
+            <div class="loan-progress-bar" style="width:${progress}%"></div>
+          </div>
+          <div class="loan-progress-label">返済進捗 ${progress}%</div>` : ''}
+        ${l.note ? `<div class="loan-note">${escapeHtmlF(l.note)}</div>` : ''}
+        <div class="sub-actions-f" style="margin-top:8px">
+          <button class="planned-edit-btn btn-loan-edit" data-id="${l.id}">編集</button>
+          <button class="planned-edit-btn btn-loan-del"  data-id="${l.id}">削除</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('.btn-loan-edit').forEach(btn => {
+    btn.addEventListener('click', () => openEditLoan(btn.dataset.id));
+  });
+  listEl.querySelectorAll('.btn-loan-del').forEach(btn => {
+    btn.addEventListener('click', () => deleteLoan(btn.dataset.id));
+  });
+}
+
+function openAddLoan() {
+  const form = document.getElementById('loan-form');
+  form.reset();
+  form.elements.id.value = '';
+  document.getElementById('loan-form-title').textContent = 'ローンを追加';
+  document.getElementById('loan-modal').hidden = false;
+}
+
+function openEditLoan(id) {
+  const l = _loans.find(x => x.id === id);
+  if (!l) return;
+  const form = document.getElementById('loan-form');
+  form.elements.id.value              = l.id;
+  form.elements.name.value            = l.name;
+  form.elements.totalAmount.value     = l.totalAmount;
+  form.elements.monthlyPayment.value  = l.monthlyPayment;
+  form.elements.remainingAmount.value = l.remainingAmount != null ? l.remainingAmount : '';
+  form.elements.startDate.value       = l.startDate;
+  form.elements.endDate.value         = l.endDate;
+  form.elements.note.value            = l.note;
+  document.getElementById('loan-form-title').textContent = '編集';
+  document.getElementById('loan-modal').hidden = false;
+}
+
+async function deleteLoan(id) {
+  const l = _loans.find(x => x.id === id);
+  if (!l || !confirm(`「${l.name}」を削除しますか？`)) return;
+  await db.from('loans').delete().eq('id', id);
+  _loans = _loans.filter(x => x.id !== id);
+  renderLoans();
+}
+
+function initLoans() {
+  document.getElementById('btn-add-loan').addEventListener('click', openAddLoan);
+
+  document.getElementById('btn-cancel-loan').addEventListener('click', () => {
+    document.getElementById('loan-modal').hidden = true;
+  });
+  document.getElementById('loan-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.hidden = true;
+  });
+
+  document.getElementById('loan-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    const id = f.elements.id.value;
+    const loan = {
+      name:            f.elements.name.value.trim(),
+      totalAmount:     f.elements.totalAmount.value,
+      monthlyPayment:  f.elements.monthlyPayment.value,
+      remainingAmount: f.elements.remainingAmount.value || null,
+      startDate:       f.elements.startDate.value  || null,
+      endDate:         f.elements.endDate.value     || null,
+      note:            f.elements.note.value.trim() || null,
+    };
+    if (id) {
+      await db.from('loans').update(loanToRow(loan)).eq('id', id);
+    } else {
+      await db.from('loans').insert([loanToRow(loan)]);
+    }
+    document.getElementById('loan-modal').hidden = true;
+    await loadLoans();
+    renderLoans();
+  });
+}
+
+// ============================================================
 // 初期表示
 // ============================================================
 renderDashboard();
 initPlannedTab();
+initPlannedSubTabs();
+initSubsF();
+initLoans();
 renderPlannedTab();
