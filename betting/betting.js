@@ -511,10 +511,11 @@ function openEditForm(id) {
   form.elements.id.value         = bet.id;
   form.elements.date.value        = bet.date;
   form.elements.stake.value       = bet.stake;
-  form.elements.isFreebet.checked = bet.isFreebet || false;
-  form.elements.result.value      = bet.result;
-  form.elements.memo.value        = bet.memo || '';
+  form.elements.result.value = bet.result;
+  form.elements.memo.value   = bet.memo || '';
   populateCampaignSelect(bet.campaignId || '');
+  const fbCb = document.getElementById('input-is-freebet');
+  if (fbCb) { fbCb.checked = bet.isFreebet || false; fbCb.dataset.userSet = '1'; }
 
   if (bet.type === 'parlay') {
     form.querySelector('input[name="type"][value="parlay"]').checked = true;
@@ -562,6 +563,17 @@ function populateCampaignSelect(currentId = '') {
     _campaigns.map(c =>
       `<option value="${c.id}" ${c.id === currentId ? 'selected' : ''}>${escapeHtml(c.name)}${c.status === 'completed' ? ' ✅' : ''}</option>`
     ).join('');
+  updateFreebetToggle();
+}
+
+function updateFreebetToggle() {
+  const sel  = document.getElementById('form-campaign-select');
+  const wrap = document.getElementById('freebet-toggle-wrap');
+  const cb   = document.getElementById('input-is-freebet');
+  if (!sel || !wrap) return;
+  const hasCampaign = !!sel.value;
+  wrap.hidden = !hasCampaign;
+  if (hasCampaign && cb && !cb.dataset.userSet) cb.checked = true;
 }
 
 function renderCampaigns() {
@@ -1661,6 +1673,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateLeagueSelect(e.target.value);
   });
 
+  document.getElementById('form-campaign-select').addEventListener('change', () => {
+    const cb = document.getElementById('input-is-freebet');
+    if (cb) { cb.checked = true; delete cb.dataset.userSet; }
+    updateFreebetToggle();
+  });
+
   document.getElementById('btn-add-league').addEventListener('click', () => {
     const sport = document.querySelector('select[name="sport"]').value;
     const name  = prompt(`「${sport}」に追加するリーグ名を入力してください`);
@@ -1682,20 +1700,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       const combinedOdds = Math.round(legs.reduce((acc, l) => acc * l.odds, 1) * 100) / 100;
       const comboBoost   = parseFloat(document.getElementById('input-combo-boost').value) || null;
       const campaignIdP  = f.elements.campaignId.value || null;
+      const isFreebetP   = campaignIdP ? document.getElementById('input-is-freebet').checked : false;
       bet = { type: 'parlay', date: f.elements.date.value, legs, combinedOdds, comboBoost,
-              stake: parseInt(f.elements.stake.value), isFreebet: !!campaignIdP,
+              stake: parseInt(f.elements.stake.value), isFreebet: isFreebetP,
               campaignId: campaignIdP,
               result: f.elements.result.value, memo: f.elements.memo.value.trim() };
     } else {
       if (!f.elements.odds.value) { alert('オッズを入力してください'); return; }
-      const sport     = f.elements.sport.value;
-      const leagueSel = document.getElementById('single-league-select');
+      const sport      = f.elements.sport.value;
+      const leagueSel  = document.getElementById('single-league-select');
+      const campaignId = f.elements.campaignId.value || null;
+      const isFreebet  = campaignId ? document.getElementById('input-is-freebet').checked : false;
       bet = { type: 'single', date: f.elements.date.value, sport,
               league: (getLeagues()[sport] !== undefined && leagueSel?.value) ? leagueSel.value : null,
               match: null, bet: f.elements.bet.value,
               odds: parseFloat(f.elements.odds.value),
-              stake: parseInt(f.elements.stake.value), isFreebet: !!(f.elements.campaignId.value),
-              campaignId: f.elements.campaignId.value || null,
+              stake: parseInt(f.elements.stake.value), isFreebet,
+              campaignId,
               result: f.elements.result.value, memo: f.elements.memo.value.trim() };
     }
 
