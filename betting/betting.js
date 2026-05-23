@@ -778,7 +778,7 @@ function renderGoalProgress() {
 // ============================================================
 // チャート・統計
 // ============================================================
-let pnlChart = null, sportChart = null;
+let pnlChart = null, sportChart = null, balanceChart = null;
 let _statsGroupBy = 'sport'; // 'league' | 'sport'
 let _pnlViewBy    = 'bet';   // 'bet' | 'day'
 
@@ -790,8 +790,51 @@ function getStatKey(sport, league) {
 function renderCharts() {
   const settled = _bets.filter(b => b.result !== 'pending').slice().reverse();
   renderPnlChart(settled);
+  renderBalanceChart(settled);
   renderSportChart();
   renderStatsTable();
+}
+
+function renderBalanceChart(settledBets) {
+  const bankroll = _settings.bankroll || 0;
+  const labels = [], data = [];
+  let balance = bankroll;
+
+  const dayMap = {};
+  for (const bet of settledBets) {
+    const pnl = calcPnl(bet);
+    if (pnl === null) continue;
+    balance += pnl;
+    dayMap[bet.date] = balance;
+  }
+  for (const d of Object.keys(dayMap).sort()) {
+    labels.push(d);
+    data.push(dayMap[d]);
+  }
+
+  const ctx = document.getElementById('chart-balance').getContext('2d');
+  if (balanceChart) balanceChart.destroy();
+  balanceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '残高',
+        data,
+        borderColor: '#3498DB',
+        backgroundColor: 'rgba(52,152,219,0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: false } },
+    },
+  });
 }
 
 function renderPnlChart(settledBets) {
