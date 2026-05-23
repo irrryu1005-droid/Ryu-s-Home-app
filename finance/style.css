@@ -500,24 +500,30 @@ h3.section-title {
   font-size: 12px;
   font-weight: 700;
   color: var(--text-muted);
-  padding: 4px 0 6px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 6px;
+  padding: 4px 0 8px;
+  margin-bottom: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.planned-items-wrap {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
 }
 .planned-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
-  background: var(--card-bg);
-  border-radius: 10px;
-  margin-bottom: 6px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
 }
+.planned-item:last-child { border-bottom: none; }
 .planned-item-left { display: flex; align-items: center; gap: 12px; }
 .planned-day {
   font-size: 13px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--expense);
   min-width: 32px;
   text-align: center;
 }
@@ -542,6 +548,15 @@ h3.section-title {
   padding: 1px 5px;
   font-weight: 700;
   margin-left: 4px;
+}
+.badge-freq {
+  font-size: 10px;
+  background: #E8F4F8;
+  color: #2471A3;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-weight: 700;
+  margin-left: 3px;
 }
 
 /* 予定支出モーダル（共通オーバーレイ） */

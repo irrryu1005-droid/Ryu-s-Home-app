@@ -594,29 +594,35 @@ async function renderPlannedTab() {
     return;
   }
 
-  list.innerHTML = Object.entries(groups).map(([cat, items]) => `
-    <div class="planned-group">
-      <div class="planned-group-title">${PLANNED_CATEGORY_LABEL[cat] || cat}</div>
-      ${items.map(it => `
+  list.innerHTML = Object.entries(groups).map(([cat, items]) => {
+    const rows = items.map(it => {
+      const dayLabel = it.billingDay ? it.billingDay + '日' : '-';
+      const typeBadge = it.source === 'subscription'
+        ? `<span class="badge-sub">サブスク</span><span class="badge-freq">${it.frequency === 'yearly' ? '年' : '月'}</span>`
+        : it.source === 'loan'
+        ? `<span class="badge-sub" style="background:#e8f4e8;color:#27ae60">ローン</span>`
+        : '';
+      return `
         <div class="planned-item">
           <div class="planned-item-left">
-            <span class="planned-day">${it.frequency === 'yearly' && it.billingMonth != null && it.billingDay
-              ? (it.billingMonth + 1) + '/' + it.billingDay
-              : it.billingDay ? it.billingDay + '日' : '-'}</span>
+            <span class="planned-day">${dayLabel}</span>
             <div>
-              <div class="planned-name">${escapeHtmlF(it.name)}${it.source === 'subscription' ? ' <span class="badge-sub">サブスク</span>' : ''}</div>
+              <div class="planned-name">${escapeHtmlF(it.name)} ${typeBadge}</div>
               ${it.note ? `<div class="planned-note">${escapeHtmlF(it.note)}</div>` : ''}
             </div>
           </div>
           <div class="planned-item-right">
             <span class="planned-amount">¥${it.amount.toLocaleString()}</span>
             ${it.source === 'planned' ? `<button class="planned-edit-btn" data-id="${it.id}">編集</button>` : ''}
-            ${it.source === 'loan' ? `<span class="badge-sub" style="background:#e8f4e8;color:#27ae60">ローン</span>` : ''}
           </div>
-        </div>
-      `).join('')}
-    </div>
-  `).join('');
+        </div>`;
+    }).join('');
+    return `
+      <div class="planned-group">
+        <div class="planned-group-title">${PLANNED_CATEGORY_LABEL[cat] || cat}</div>
+        <div class="planned-items-wrap">${rows}</div>
+      </div>`;
+  }).join('');
 
   list.querySelectorAll('.planned-edit-btn').forEach(btn => {
     btn.addEventListener('click', () => openPlannedEditForm(btn.dataset.id, planRes.data));
