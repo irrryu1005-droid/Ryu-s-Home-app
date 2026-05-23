@@ -195,12 +195,30 @@ async function deleteCampaign(id) {
 // ============================================================
 // 試合予定タブ - Google Calendar 設定
 // ============================================================
-const GC_CLIENT_ID_BET = '1053779234925-qc97npjce6q3avsssjkfl3jvldjv4sj1.apps.googleusercontent.com';
-const GC_SCOPE_BET     = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
+const GC_CLIENT_ID_BET  = '1053779234925-qc97npjce6q3avsssjkfl3jvldjv4sj1.apps.googleusercontent.com';
+const GC_SCOPE_BET      = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
+const GCAL_TOKEN_KEY    = 'gcal_bet_token';
+const GCAL_AUTOLOGIN_KEY = 'gcal_betting_autologin';
 
 let gcTokenClientBet    = null;
 let gcalTokenBet        = null;
 let bettingCalendarId   = 'primary'; // Sportsカレンダー取得後に上書き
+
+function gcalTokenSave(token) {
+  gcalTokenBet = token;
+  sessionStorage.setItem(GCAL_TOKEN_KEY, JSON.stringify({ token, exp: Date.now() + 3500 * 1000 }));
+}
+function gcalTokenRestore() {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(GCAL_TOKEN_KEY));
+    if (s && s.exp > Date.now()) { gcalTokenBet = s.token; return true; }
+  } catch {}
+  return false;
+}
+function gcalTokenClear() {
+  gcalTokenBet = null;
+  sessionStorage.removeItem(GCAL_TOKEN_KEY);
+}
 
 // ============================================================
 // 設定・目標 CRUD（Supabase）
@@ -1465,7 +1483,7 @@ async function addMatchToGcal(btn) {
       { method: 'POST', headers: { Authorization: `Bearer ${gcalTokenBet}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
     );
     if (res.status === 401) {
-      gcalTokenBet = null;
+      gcalTokenClear();
       btn.textContent = '📅＋'; btn.disabled = false;
       alert('認証期限切れです。再ログインしてください。');
       return;
@@ -1511,7 +1529,7 @@ async function removeMatchFromGcal(btn) {
       btn.style.color      = '';
       btn.disabled = false;
     } else if (res.status === 401) {
-      gcalTokenBet = null;
+      gcalTokenClear();
       btn.textContent = '🗑 削除'; btn.disabled = false;
       alert('認証期限切れです。再ログインしてください。');
     } else {
@@ -1539,23 +1557,36 @@ function gcalGetEventId(title, dateStr, startUtc) {
 
 const GCAL_AUTOLOGIN_KEY = 'gcal_betting_autologin';
 
+function gcalSetConnected() {
+  const btn = document.getElementById('gcal-login-btn');
+  if (btn) { btn.textContent = '✅ 接続済み'; btn.classList.add('connected'); }
+}
+
 function initGcalBetting() {
   if (gcTokenClientBet) return;
   if (typeof google === 'undefined' || !google.accounts) { setTimeout(initGcalBetting, 300); return; }
+
+  // セッション内にトークンが残っていれば即復元
+  if (gcalTokenRestore()) {
+    gcalSetConnected();
+    findSportsCalendar();
+  }
+
   gcTokenClientBet = google.accounts.oauth2.initTokenClient({
     client_id:      GC_CLIENT_ID_BET,
     scope:          GC_SCOPE_BET,
     callback:       (resp) => {
-      if (resp.error) return;
-      gcalTokenBet = resp.access_token;
+      if (resp.error) { gcalTokenClear(); return; }
+      gcalTokenSave(resp.access_token);
       localStorage.setItem(GCAL_AUTOLOGIN_KEY, '1');
-      const btn = document.getElementById('gcal-login-btn');
-      if (btn) { btn.textContent = '✅ 接続済み'; btn.classList.add('connected'); }
+      gcalSetConnected();
       findSportsCalendar();
     },
     error_callback: () => {},
   });
-  if (localStorage.getItem(GCAL_AUTOLOGIN_KEY)) {
+
+  // セッションに残っていなければ Google に silent リクエスト
+  if (!gcalTokenBet && localStorage.getItem(GCAL_AUTOLOGIN_KEY)) {
     gcTokenClientBet.requestAccessToken({ prompt: '' });
   }
 }

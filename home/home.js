@@ -10,33 +10,57 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ============================================================
 // Google Calendar 連携
 // ============================================================
-const GC_CLIENT_ID = '1053779234925-qc97npjce6q3avsssjkfl3jvldjv4sj1.apps.googleusercontent.com';
-const GC_SCOPE     = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
+const GC_CLIENT_ID            = '1053779234925-qc97npjce6q3avsssjkfl3jvldjv4sj1.apps.googleusercontent.com';
+const GC_SCOPE                = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
+const GCAL_TOKEN_KEY_HOME     = 'gcal_home_token';
+const GCAL_AUTOLOGIN_KEY_HOME = 'gcal_home_autologin';
 
 let gcTokenClient = null;
 let gcalToken     = null;
 
-const GCAL_AUTOLOGIN_KEY_HOME = 'gcal_home_autologin';
+function gcalTokenSaveHome(token) {
+  gcalToken = token;
+  sessionStorage.setItem(GCAL_TOKEN_KEY_HOME, JSON.stringify({ token, exp: Date.now() + 3500 * 1000 }));
+}
+function gcalTokenRestoreHome() {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(GCAL_TOKEN_KEY_HOME));
+    if (s && s.exp > Date.now()) { gcalToken = s.token; return true; }
+  } catch {}
+  return false;
+}
+function gcalTokenClearHome() {
+  gcalToken = null;
+  sessionStorage.removeItem(GCAL_TOKEN_KEY_HOME);
+}
 
 function initGcalHome() {
   if (typeof google === 'undefined' || !google.accounts) {
     setTimeout(initGcalHome, 300);
     return;
   }
+
+  // セッション内にトークンが残っていれば即復元
+  if (gcalTokenRestoreHome()) {
+    gcalFetchCalendars().then(cals => { gcCalendars = cals; populateCalendarSelect(cals); loadTodaySchedule(); });
+    // バックグラウンドで token client も初期化（期限切れ対応）
+  }
+
   gcTokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GC_CLIENT_ID,
     scope:     GC_SCOPE,
     callback:  (resp) => {
-      if (resp.error) { loadTodaySchedule(); return; }
-      gcalToken = resp.access_token;
+      if (resp.error) { if (!gcalToken) loadTodaySchedule(); return; }
+      gcalTokenSaveHome(resp.access_token);
       localStorage.setItem(GCAL_AUTOLOGIN_KEY_HOME, '1');
       gcalFetchCalendars().then(cals => { gcCalendars = cals; populateCalendarSelect(cals); loadTodaySchedule(); });
     },
-    error_callback: () => { loadTodaySchedule(); },
+    error_callback: () => { if (!gcalToken) loadTodaySchedule(); },
   });
-  if (localStorage.getItem(GCAL_AUTOLOGIN_KEY_HOME)) {
+
+  if (!gcalToken && localStorage.getItem(GCAL_AUTOLOGIN_KEY_HOME)) {
     gcTokenClient.requestAccessToken({ prompt: '' });
-  } else {
+  } else if (!gcalToken) {
     loadTodaySchedule();
   }
 }
@@ -57,7 +81,7 @@ async function gcalCreate(summary, date, colorId) {
       colorId: String(colorId),
     }),
   });
-  if (res.status === 401) { gcalToken = null; return null; }
+  if (res.status === 401) { gcalTokenClearHome(); return null; }
   if (!res.ok) return null;
   return (await res.json()).id;
 }
@@ -68,7 +92,7 @@ async function gcalDelete(eventId) {
     `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
     { method: 'DELETE', headers: { Authorization: `Bearer ${gcalToken}` } }
   );
-  if (res.status === 401) { gcalToken = null; }
+  if (res.status === 401) { gcalTokenClearHome(); }
 }
 
 async function gcalFetchToday(calendarId = 'primary') {
@@ -80,7 +104,7 @@ async function gcalFetchToday(calendarId = 'primary') {
     + `?timeMin=${encodeURIComponent(tMin)}&timeMax=${encodeURIComponent(tMax)}`
     + `&singleEvents=true&orderBy=startTime&maxResults=20`;
   const res  = await fetch(url, { headers: { Authorization: `Bearer ${gcalToken}` } });
-  if (res.status === 401) { gcalToken = null; return []; }
+  if (res.status === 401) { gcalTokenClearHome(); return []; }
   if (!res.ok) return [];
   const data = await res.json();
   return data.items || [];
@@ -147,7 +171,7 @@ async function gcalFetchCalendars() {
     'https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer',
     { headers: { Authorization: `Bearer ${gcalToken}` } }
   );
-  if (res.status === 401) { gcalToken = null; return []; }
+  if (res.status === 401) { gcalTokenClearHome(); return []; }
   const data = await res.json();
   return data.items || [];
 }
@@ -172,7 +196,7 @@ async function gcalAddEvent(summary, startISO, endISO, calendarId = 'primary') {
       end:   { dateTime: endISO,   timeZone: tz },
     }),
   });
-  if (res.status === 401) { gcalToken = null; return null; }
+  if (res.status === 401) { gcalTokenClearHome(); return null; }
   return await res.json();
 }
 
