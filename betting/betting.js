@@ -152,7 +152,7 @@ function betToRow(bet) {
     combo_boost:   bet.comboBoost    ?? 0,
     legs:          bet.legs          || null,
     stake:         bet.stake,
-    is_freebet:    !!bet.campaignId,
+    is_freebet:    !!bet.isFreebet,
     campaign_id:   bet.campaignId    || null,
     result:        bet.result,
     memo:          bet.memo          || null,
