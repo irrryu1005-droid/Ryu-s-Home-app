@@ -565,7 +565,8 @@ async function renderPlannedTab() {
     id:          r.id,
     source:      'loan',
     name:        r.name,
-    amount:      r.monthly_payment,
+    amount:      r.min_payment || r.monthly_payment,
+    amountMax:   r.min_payment ? r.monthly_payment : null,
     category:    'loan',
     frequency:   'monthly',
     billingDay:  r.start_date ? new Date(r.start_date).getDate() : null,
@@ -612,7 +613,9 @@ async function renderPlannedTab() {
             </div>
           </div>
           <div class="planned-item-right">
-            <span class="planned-amount">¥${it.amount.toLocaleString()}</span>
+            <span class="planned-amount">${it.amountMax
+              ? `¥${it.amount.toLocaleString()}〜¥${it.amountMax.toLocaleString()}`
+              : `¥${it.amount.toLocaleString()}`}</span>
             ${it.source === 'planned' ? `<button class="planned-edit-btn" data-id="${it.id}">編集</button>` : ''}
           </div>
         </div>`;
@@ -975,6 +978,7 @@ function normalizeLoan(row) {
     name:            row.name,
     totalAmount:     row.total_amount,
     monthlyPayment:  row.monthly_payment,
+    minPayment:      row.min_monthly_payment || null,
     remainingAmount: row.remaining_amount,
     startDate:       row.start_date || '',
     endDate:         row.end_date   || '',
@@ -987,6 +991,7 @@ function loanToRow(loan) {
     name:             loan.name,
     total_amount:     parseInt(loan.totalAmount),
     monthly_payment:  parseInt(loan.monthlyPayment),
+    min_monthly_payment: loan.minPayment ? parseInt(loan.minPayment) : null,
     remaining_amount: loan.remainingAmount ? parseInt(loan.remainingAmount) : null,
     start_date:       loan.startDate || null,
     end_date:         loan.endDate   || null,
@@ -1013,7 +1018,9 @@ function renderLoans() {
       <div class="loan-item">
         <div class="loan-item-top">
           <span class="loan-name">${escapeHtmlF(l.name)}</span>
-          <span class="loan-monthly">月¥${(l.monthlyPayment || 0).toLocaleString()}</span>
+          <span class="loan-monthly">${l.minPayment
+            ? `¥${l.minPayment.toLocaleString()}〜¥${(l.monthlyPayment||0).toLocaleString()}`
+            : `¥${(l.monthlyPayment||0).toLocaleString()}`}<span class="loan-monthly-unit">/月</span></span>
         </div>
         <div class="loan-item-detail">
           ${l.remainingAmount != null
@@ -1102,6 +1109,7 @@ function openEditLoan(id) {
   form.elements.name.value            = l.name;
   form.elements.totalAmount.value     = l.totalAmount;
   form.elements.monthlyPayment.value  = l.monthlyPayment;
+  form.elements.minPayment.value      = l.minPayment || '';
   form.elements.remainingAmount.value = l.remainingAmount != null ? l.remainingAmount : '';
   form.elements.startDate.value       = l.startDate;
   form.elements.endDate.value         = l.endDate;
@@ -1136,6 +1144,7 @@ function initLoans() {
       name:            f.elements.name.value.trim(),
       totalAmount:     f.elements.totalAmount.value,
       monthlyPayment:  f.elements.monthlyPayment.value,
+      minPayment:      f.elements.minPayment.value  || null,
       remainingAmount: f.elements.remainingAmount.value || null,
       startDate:       f.elements.startDate.value  || null,
       endDate:         f.elements.endDate.value     || null,

@@ -360,8 +360,14 @@
                 <label>借入総額 (¥)</label>
                 <input type="number" name="totalAmount" min="1" placeholder="1000000" required>
               </div>
+            </div>
+            <div class="form-row">
               <div class="form-group">
-                <label>月々の返済額 (¥)</label>
+                <label>最小返済額 (¥・任意)</label>
+                <input type="number" name="minPayment" min="1" placeholder="10000">
+              </div>
+              <div class="form-group">
+                <label>最大返済額 (¥)</label>
                 <input type="number" name="monthlyPayment" min="1" placeholder="15000" required>
               </div>
             </div>
