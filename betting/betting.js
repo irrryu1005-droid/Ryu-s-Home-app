@@ -1555,8 +1555,6 @@ function gcalGetEventId(title, dateStr, startUtc) {
   return gcalStoreGet()[gcalEntryKey(title, dateStr, startUtc)] || null;
 }
 
-const GCAL_AUTOLOGIN_KEY = 'gcal_betting_autologin';
-
 function gcalSetConnected() {
   const btn = document.getElementById('gcal-login-btn');
   if (btn) { btn.textContent = '✅ 接続済み'; btn.classList.add('connected'); }
