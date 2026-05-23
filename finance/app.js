@@ -579,8 +579,11 @@ async function renderPlannedTab() {
   const all = [...subItems, ...planItems, ...loanItems].filter(it => isActiveInMonth(it, year, month));
   all.sort((a, b) => (a.billingDay || 99) - (b.billingDay || 99));
 
-  const total = all.reduce((s, it) => s + it.amount, 0);
-  document.getElementById('planned-total').textContent = '¥' + total.toLocaleString();
+  const totalMin = all.reduce((s, it) => s + it.amount, 0);
+  const totalMax = all.reduce((s, it) => s + (it.amountMax || it.amount), 0);
+  document.getElementById('planned-total').textContent = totalMin !== totalMax
+    ? `¥${totalMin.toLocaleString()}〜¥${totalMax.toLocaleString()}`
+    : `¥${totalMin.toLocaleString()}`;
 
   // カテゴリ別グループ
   const groups = {};
