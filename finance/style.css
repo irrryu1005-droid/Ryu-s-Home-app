@@ -595,6 +595,39 @@ h3.section-title {
 }
 .form-row .form-group { flex: 1; }
 
+/* モーダルボタン共通 */
+.form-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+.btn-cancel {
+  flex: 1;
+  padding: 13px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.btn-cancel:hover { border-color: var(--text-muted); }
+.btn-primary {
+  flex: 1;
+  padding: 13px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--expense);
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-primary:hover { opacity: 0.88; }
+
 /* ============================================================
    サブタブ（予定支出内）
 ============================================================ */
