@@ -533,7 +533,7 @@ async function renderPlannedTab() {
     source:      'subscription',
     name:        r.name,
     amount:      r.contract_form === 'year'
-                   ? Math.round((r.currency === 'USD' ? (r.cost_per_year||0)*usdRate : (r.cost_per_year||0)) / 12)
+                   ? Math.round(r.currency === 'USD' ? (r.cost_per_year||0)*usdRate : (r.cost_per_year||0))
                    : (r.currency === 'USD' ? Math.round((r.cost_per_month||0)*usdRate) : (r.cost_per_month||0)),
     category:    'subscription',
     frequency:   r.contract_form === 'year' ? 'yearly' : 'monthly',
