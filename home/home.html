@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="home.css">
+  <link rel="stylesheet" href="../shared/m-nav.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -221,44 +222,67 @@
   ====================================================== -->
   <div id="mobile-home" class="mobile-only">
 
-    <header class="mobile-header">
-      <h1>🏠 HOME</h1>
-    </header>
+    <nav class="m-app-nav" style="display:flex">
+      <a href="home.html"               class="m-app-tab active"><span class="m-app-tab-icon">🏠</span>Home</a>
+      <a href="../study/study.html"     class="m-app-tab"><span class="m-app-tab-icon">📚</span>Study</a>
+      <a href="../tasks/task.html"      class="m-app-tab"><span class="m-app-tab-icon">✅</span>Tasks</a>
+      <a href="../finance/finance.html" class="m-app-tab"><span class="m-app-tab-icon">💰</span>Finance</a>
+      <a href="../betting/betting.html" class="m-app-tab"><span class="m-app-tab-icon">🎯</span>Betting</a>
+    </nav>
 
-    <!-- ToDo -->
+    <!-- 今日の予定 -->
     <section class="m-section">
-      <h2>✅ ToDo</h2>
-      <div id="mobile-todo-list"></div>
-      <form id="mobile-todo-form" class="m-todo-add">
-        <input type="text" id="mobile-todo-input" placeholder="タスクを追加...">
-        <button type="submit">＋</button>
-      </form>
+      <h2>📅 今日の予定</h2>
+      <div id="m-schedule-list" class="m-schedule-list">
+        <div class="schedule-loading">読み込み中...</div>
+      </div>
+      <div class="m-schedule-add-wrap">
+        <button class="m-schedule-add-toggle" id="m-schedule-add-toggle">＋ 予定を追加</button>
+        <form class="m-schedule-add-form hidden" id="m-schedule-add-form">
+          <input type="text" id="m-sch-title" placeholder="タイトル" required>
+          <input type="date" id="m-sch-date" class="m-sch-date-input">
+          <div class="m-sch-time-row">
+            <input type="time" id="m-sch-start">
+            <span class="m-sch-sep">〜</span>
+            <input type="time" id="m-sch-end">
+          </div>
+          <select id="m-sch-calendar" class="m-sch-calendar-select">
+            <option value="primary">読み込み中...</option>
+          </select>
+          <div class="m-sch-btns">
+            <button type="button" id="m-sch-cancel">キャンセル</button>
+            <button type="submit" id="m-sch-submit">追加</button>
+          </div>
+        </form>
+      </div>
     </section>
 
-    <!-- 収支クイック入力 -->
+    <!-- ルーティン -->
     <section class="m-section">
-      <h2>💰 収支入力</h2>
-      <form id="mobile-finance-form">
-        <div class="type-toggle">
-          <button type="button" class="type-btn expense active" data-type="expense">支出</button>
-          <button type="button" class="type-btn income" data-type="income">収入</button>
+      <h2>🔄 今日のルーティン</h2>
+      <div class="routine-items">
+        <label class="routine-item">
+          <input type="checkbox" data-key="ielts">
+          <span class="routine-icon">📖</span>
+          <span>IELTS単語</span>
+        </label>
+        <label class="routine-item">
+          <input type="checkbox" data-key="reading">
+          <span class="routine-icon">📚</span>
+          <span>読書</span>
+        </label>
+        <label class="routine-item">
+          <input type="checkbox" data-key="training">
+          <span class="routine-icon">💪</span>
+          <span>トレーニング</span>
+        </label>
+      </div>
+      <div class="routine-progress-wrap">
+        <div class="routine-progress-track">
+          <div class="routine-progress-fill" id="m-routine-fill"></div>
         </div>
-        <div class="form-group">
-          <label>金額（円）</label>
-          <input type="number" id="m-amount" placeholder="0" min="1" required>
-        </div>
-        <div class="form-group">
-          <label>カテゴリ</label>
-          <select id="m-category" required></select>
-        </div>
-        <div class="form-group">
-          <label>支払科目</label>
-          <select id="m-payment"></select>
-        </div>
-        <button type="submit" id="m-submit" class="submit-btn">登録する</button>
-      </form>
-      <div id="m-message"></div>
-      <a href="../finance/finance.html" class="to-finance-link">収支アプリの詳細 →</a>
+        <div class="routine-count" id="m-routine-count">0 / 3</div>
+      </div>
     </section>
 
   </div><!-- /mobile-home -->

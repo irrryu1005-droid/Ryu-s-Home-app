@@ -5,10 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Study</title>
   <link rel="stylesheet" href="study.css">
+  <link rel="stylesheet" href="../shared/m-nav.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div id="app">
+
+    <nav class="m-app-nav">
+      <a href="../home/home.html"       class="m-app-tab"><span class="m-app-tab-icon">🏠</span>Home</a>
+      <a href="study.html"              class="m-app-tab active"><span class="m-app-tab-icon">📚</span>Study</a>
+      <a href="../tasks/task.html"      class="m-app-tab"><span class="m-app-tab-icon">✅</span>Tasks</a>
+      <a href="../finance/finance.html" class="m-app-tab"><span class="m-app-tab-icon">💰</span>Finance</a>
+      <a href="../betting/betting.html" class="m-app-tab"><span class="m-app-tab-icon">🎯</span>Betting</a>
+    </nav>
 
     <header class="header">
       <a href="../home/home.html" class="home-link">🏠 HOME</a>

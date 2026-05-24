@@ -974,3 +974,40 @@ body {
   .form-row select,
   .form-row input[type="date"] { font-size: 14px; }
 }
+
+/* ============================================================
+   モバイルコンパクト化
+============================================================ */
+@media (max-width: 767px) {
+  .tab-btn        { padding: 9px 6px; font-size: 12px; }
+  .tab-content    { padding: 12px 12px 20px; }
+  .status-filter  { margin-bottom: 6px; }
+  .status-btn     { padding: 4px 12px; font-size: 11px; }
+  .category-filter{ margin-bottom: 8px; gap: 5px; }
+  .cat-btn        { padding: 4px 10px; font-size: 11px; }
+  .todo-item      { padding: 9px 11px; margin-bottom: 5px; }
+  .todo-text      { font-size: 13px; }
+  .todo-meta      { font-size: 11px; }
+  .add-card       { padding: 12px; margin-top: 8px; }
+  .add-card-title { font-size: 13px; margin-bottom: 10px; }
+  #todo-text      { padding: 9px 11px; margin-bottom: 8px; font-size: 13px; }
+  .form-row       { gap: 6px; }
+  .form-row select,
+  .form-row input[type="date"],
+  .form-row input[type="time"] { padding: 8px 9px; font-size: 12px; }
+  .due-row        { flex-wrap: wrap; }
+  .add-btn        { padding: 10px; margin-top: 8px; font-size: 14px; }
+  .schedule-section { margin-top: 8px; }
+  .schedule-row   { gap: 6px; }
+  .schedule-label { font-size: 12px; }
+  .add-schedule-btn { padding: 5px 8px; font-size: 11px; }
+  .routine-block  { padding: 13px; margin-bottom: 10px; }
+  .routine-block-title { font-size: 13px; margin-bottom: 8px; }
+  .routine-item   { padding: 8px 11px; gap: 8px; font-size: 13px; }
+  .habit-chart-card { padding: 13px; margin-top: 2px; }
+  .habit-chart-title { font-size: 13px; }
+  .habit-chart-legend { gap: 10px; margin-bottom: 8px; font-size: 11px; }
+  .tl-controls    { padding: 8px 12px; }
+  .tl-hint        { font-size: 11px; padding: 6px 12px; }
+  .routine-date-header { font-size: 12px; padding: 8px 12px; }
+}

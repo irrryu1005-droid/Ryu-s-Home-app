@@ -902,15 +902,15 @@ body {
 
 .m-section {
   background: var(--white);
-  margin: 0 12px 14px;
+  margin: 0 8px 8px;
   border-radius: var(--radius);
-  padding: 18px 16px;
+  padding: 12px;
   box-shadow: var(--shadow);
 }
 .m-section h2 {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
-  margin-bottom: 14px;
+  margin-bottom: 8px;
 }
 
 /* モバイルToDo */
@@ -1006,4 +1006,87 @@ body {
   font-size: 14px;
   font-weight: 600;
   min-height: 18px;
+}
+
+/* モバイル今日の予定 */
+.m-schedule-list {
+  min-height: 24px;
+}
+.m-schedule-add-wrap {
+  margin-top: 8px;
+}
+.m-schedule-add-toggle {
+  width: 100%;
+  padding: 7px;
+  background: var(--bg);
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.m-schedule-add-toggle:hover {
+  border-color: var(--expense);
+  color: var(--expense);
+}
+.m-schedule-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.m-schedule-add-form.hidden { display: none; }
+.m-schedule-add-form input[type="text"],
+.m-schedule-add-form input[type="date"],
+.m-schedule-add-form select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+}
+.m-schedule-add-form input:focus,
+.m-schedule-add-form select:focus {
+  outline: none;
+  border-color: var(--expense);
+}
+.m-sch-time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.m-sch-time-row input[type="time"] {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--bg);
+}
+.m-sch-sep { color: var(--text-muted); font-weight: 600; }
+.m-sch-btns {
+  display: flex;
+  gap: 8px;
+}
+.m-sch-btns button {
+  flex: 1;
+  padding: 9px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+#m-sch-cancel {
+  background: var(--bg);
+  color: var(--text-muted);
+  border: 1.5px solid var(--border) !important;
+}
+#m-sch-submit {
+  background: var(--expense);
+  color: var(--white);
 }

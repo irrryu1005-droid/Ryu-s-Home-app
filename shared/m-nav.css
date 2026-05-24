@@ -1,0 +1,45 @@
+/* ============================================================
+   モバイルアプリナビ（全ページ共通）768px未満のみ表示
+============================================================ */
+
+.m-app-nav {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .m-app-nav {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background: #fff;
+    border-bottom: 1px solid #E4E9F0;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  }
+
+  /* 各ページのヘッダーはモバイルで非表示 */
+  .header {
+    display: none !important;
+  }
+}
+
+.m-app-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 2px 6px;
+  text-decoration: none;
+  font-size: 10px;
+  color: #8A9BB0;
+  transition: color 0.15s;
+}
+.m-app-tab-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.m-app-tab.active {
+  color: #4A90D9;
+  font-weight: 700;
+}

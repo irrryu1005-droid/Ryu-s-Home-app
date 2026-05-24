@@ -111,22 +111,25 @@ async function gcalFetchToday(calendarId = 'primary') {
 }
 
 async function loadTodaySchedule() {
-  const el = document.getElementById('schedule-list');
-  if (!el) return;
+  const targets_el = [
+    document.getElementById('schedule-list'),
+    document.getElementById('m-schedule-list'),
+  ].filter(Boolean);
+  if (targets_el.length === 0) return;
 
   if (!gcalToken) {
-    el.innerHTML = `<div class="schedule-empty">
+    const loginHTML = `<div class="schedule-empty">
       <button class="gcal-login-btn" id="gcal-schedule-login">Googleでログイン</button>
     </div>`;
+    targets_el.forEach(el => el.innerHTML = loginHTML);
     document.getElementById('gcal-schedule-login')?.addEventListener('click', () => {
       gcTokenClient.requestAccessToken({ prompt: 'consent' });
     });
     return;
   }
 
-  el.innerHTML = '<div class="schedule-loading">読み込み中...</div>';
+  targets_el.forEach(el => el.innerHTML = '<div class="schedule-loading">読み込み中...</div>');
   try {
-    // 全カレンダーを並行取得して結合
     const targets = gcCalendars.length > 0 ? gcCalendars : [{ id: 'primary', backgroundColor: '#4285f4' }];
     const results = await Promise.all(
       targets.map(cal =>
@@ -139,27 +142,27 @@ async function loadTodaySchedule() {
       return ta.localeCompare(tb);
     });
 
-    if (allEvents.length === 0) {
-      el.innerHTML = '<div class="schedule-empty">今日の予定はありません</div>';
-      return;
-    }
-    el.innerHTML = allEvents.map(ev => {
-      let timeStr = '終日';
-      if (ev.start?.dateTime) {
-        const s   = new Date(ev.start.dateTime);
-        const e   = new Date(ev.end.dateTime);
-        const fmt = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        timeStr = `${fmt(s)} – ${fmt(e)}`;
-      }
-      const dot = `<span class="schedule-dot" style="background:${ev._color || '#4285f4'}"></span>`;
-      return `<div class="schedule-item">
-        <div class="schedule-time">${timeStr}</div>
-        ${dot}
-        <div class="schedule-title">${ev.summary || '（タイトルなし）'}</div>
-      </div>`;
-    }).join('');
+    const html = allEvents.length === 0
+      ? '<div class="schedule-empty">今日の予定はありません</div>'
+      : allEvents.map(ev => {
+          let timeStr = '終日';
+          if (ev.start?.dateTime) {
+            const s   = new Date(ev.start.dateTime);
+            const e   = new Date(ev.end.dateTime);
+            const fmt = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            timeStr = `${fmt(s)} – ${fmt(e)}`;
+          }
+          const dot = `<span class="schedule-dot" style="background:${ev._color || '#4285f4'}"></span>`;
+          return `<div class="schedule-item">
+            <div class="schedule-time">${timeStr}</div>
+            ${dot}
+            <div class="schedule-title">${ev.summary || '（タイトルなし）'}</div>
+          </div>`;
+        }).join('');
+
+    targets_el.forEach(el => el.innerHTML = html);
   } catch (e) {
-    el.innerHTML = '<div class="schedule-empty">読み込みに失敗しました</div>';
+    targets_el.forEach(el => el.innerHTML = '<div class="schedule-empty">読み込みに失敗しました</div>');
   }
 }
 
@@ -177,11 +180,13 @@ async function gcalFetchCalendars() {
 }
 
 function populateCalendarSelect(cals) {
-  const select = document.getElementById('sch-calendar');
-  if (!select) return;
-  select.innerHTML = cals.map(cal =>
+  const opts = cals.map(cal =>
     `<option value="${cal.id}" style="background:${cal.backgroundColor || ''}">${cal.summary}</option>`
   ).join('');
+  ['sch-calendar', 'm-sch-calendar'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts;
+  });
 }
 
 async function gcalAddEvent(summary, startISO, endISO, calendarId = 'primary') {
@@ -198,6 +203,73 @@ async function gcalAddEvent(summary, startISO, endISO, calendarId = 'primary') {
   });
   if (res.status === 401) { gcalTokenClearHome(); return null; }
   return await res.json();
+}
+
+function initMobileScheduleForm() {
+  const toggleBtn = document.getElementById('m-schedule-add-toggle');
+  const form      = document.getElementById('m-schedule-add-form');
+  const cancelBtn = document.getElementById('m-sch-cancel');
+  const submitBtn = document.getElementById('m-sch-submit');
+  if (!toggleBtn || !form) return;
+
+  function setDefaultTimes() {
+    const now      = new Date();
+    const startMin = Math.ceil((now.getMinutes() + 1) / 30) * 30;
+    const start    = new Date(now);
+    start.setMinutes(startMin, 0, 0);
+    if (startMin >= 60) { start.setHours(start.getHours() + 1); start.setMinutes(0); }
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    document.getElementById('m-sch-date').value  = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    document.getElementById('m-sch-start').value = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+    document.getElementById('m-sch-end').value   = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+  }
+
+  toggleBtn.addEventListener('click', async () => {
+    form.classList.remove('hidden');
+    toggleBtn.style.display = 'none';
+    setDefaultTimes();
+    if (gcalToken && gcCalendars.length === 0) {
+      gcCalendars = await gcalFetchCalendars();
+      populateCalendarSelect(gcCalendars);
+    }
+    document.getElementById('m-sch-title').focus();
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    form.classList.add('hidden');
+    toggleBtn.style.display = '';
+    form.reset();
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = document.getElementById('m-sch-title').value.trim();
+    const sTime = document.getElementById('m-sch-start').value;
+    const eTime = document.getElementById('m-sch-end').value;
+    if (!title || !sTime || !eTime) return;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '追加中...';
+
+    const date       = document.getElementById('m-sch-date').value || new Date().toISOString().split('T')[0];
+    const startISO   = `${date}T${sTime}:00`;
+    const endISO     = `${date}T${eTime}:00`;
+    const calendarId = document.getElementById('m-sch-calendar')?.value || 'primary';
+
+    const result = await gcalAddEvent(title, startISO, endISO, calendarId);
+    submitBtn.disabled = false;
+    submitBtn.textContent = '追加';
+
+    if (result) {
+      form.classList.add('hidden');
+      toggleBtn.style.display = '';
+      form.reset();
+      await loadTodaySchedule();
+    } else {
+      submitBtn.textContent = '失敗・再試行';
+      setTimeout(() => { submitBtn.textContent = '追加'; }, 2000);
+    }
+  });
 }
 
 function initScheduleAddForm() {
@@ -799,29 +871,51 @@ async function loadRoutine() {
   document.querySelectorAll('.routine-item input[type="checkbox"]').forEach(cb => {
     const key = cb.dataset.key;
     cb.checked = data ? !!data[key] : false;
-    cb.addEventListener('change', () => saveRoutine());
+    cb.addEventListener('change', () => {
+      // 同じ data-key のチェックボックスを同期（PC⇔モバイル）
+      document.querySelectorAll(`.routine-item input[data-key="${key}"]`).forEach(c => {
+        c.checked = cb.checked;
+      });
+      saveRoutine();
+    });
   });
 
   updateRoutineProgress();
 }
 
 function updateRoutineProgress() {
-  const checks = document.querySelectorAll('.routine-item input[type="checkbox"]');
-  const done   = [...checks].filter(cb => cb.checked).length;
-  const pct    = (done / ROUTINE_KEYS.length) * 100;
+  // data-key ごとに1つだけカウント（PC+モバイルで重複するため）
+  const seen = new Set();
+  let done = 0;
+  document.querySelectorAll('.routine-item input[type="checkbox"]').forEach(cb => {
+    if (!seen.has(cb.dataset.key)) {
+      seen.add(cb.dataset.key);
+      if (cb.checked) done++;
+    }
+  });
+  const pct = (done / ROUTINE_KEYS.length) * 100;
 
-  const fill = document.getElementById('routine-progress-fill');
-  const count = document.getElementById('routine-count');
-  if (fill)  fill.style.width = pct + '%';
-  if (count) count.textContent = `${done} / ${ROUTINE_KEYS.length}`;
+  ['routine-progress-fill', 'm-routine-fill'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.width = pct + '%';
+  });
+  ['routine-count', 'm-routine-count'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = `${done} / ${ROUTINE_KEYS.length}`;
+  });
 }
 
 async function saveRoutine() {
   updateRoutineProgress();
   const today   = todayStr();
   const payload = { date: today };
+  // data-key ごとに重複除去して保存
+  const seen = new Set();
   document.querySelectorAll('.routine-item input[type="checkbox"]').forEach(cb => {
-    payload[cb.dataset.key] = cb.checked;
+    if (!seen.has(cb.dataset.key)) {
+      seen.add(cb.dataset.key);
+      payload[cb.dataset.key] = cb.checked;
+    }
   });
   await db.from('routine_logs').upsert([payload], { onConflict: 'date' });
 }
@@ -970,3 +1064,4 @@ loadMobileTodos();
 loadRoutine();
 loadHabitChart();
 initScheduleAddForm();
+initMobileScheduleForm();

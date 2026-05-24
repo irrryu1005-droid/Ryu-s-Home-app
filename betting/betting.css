@@ -975,3 +975,60 @@ tr:last-child td { border-bottom: none; }
 }
 .pnl-profit-body.is-profit { color: #1D4ED8; }
 .pnl-profit-body.is-loss   { color: #B45309; }
+
+/* ============================================================
+   モバイルコンパクト化
+============================================================ */
+@media (max-width: 767px) {
+  .nav-btn        { padding: 7px 3px; gap: 1px; }
+  .nav-icon       { font-size: 18px; }
+  .nav-label      { font-size: 9px; }
+  .summary-bar    { padding: 7px 0; }
+  .s-label        { font-size: 9px; margin-bottom: 1px; }
+  .s-val          { font-size: 13px; }
+  .s-streak       { font-size: 12px; }
+  .tab-content    { padding: 10px 10px 16px; }
+  .tab-header     { margin-bottom: 8px; }
+  .tab-header h2  { font-size: 14px; }
+  .month-nav      { margin-bottom: 10px; gap: 10px; }
+  .month-nav h2   { font-size: 14px; }
+  .month-nav button { padding: 3px 9px; font-size: 12px; }
+  .form-card      { padding: 13px; margin-bottom: 10px; }
+  .form-group     { margin-bottom: 8px; }
+  .form-group label { font-size: 11px; margin-bottom: 3px; }
+  .form-group input,
+  .form-group select,
+  .form-group textarea { padding: 8px 10px; font-size: 12px; }
+  .form-row       { gap: 8px; }
+  .form-btns      { gap: 8px; margin-top: 10px; }
+  .form-btns button { padding: 10px; font-size: 13px; }
+  .leg-item       { padding: 9px; margin-bottom: 6px; }
+  .settings-section { padding: 10px 13px; margin-bottom: 10px; }
+  .settings-section h3 { font-size: 13px; margin-bottom: 8px; }
+  .period-stats-card { padding: 11px; margin-bottom: 10px; }
+  .period-stats-card h3 { font-size: 12px; margin-bottom: 8px; }
+  .period-stats-grid { gap: 7px; }
+  .period-val     { font-size: 14px; }
+  .period-label   { font-size: 10px; }
+  .goal-card      { padding: 10px 13px; margin-bottom: 8px; }
+  .goal-name      { font-size: 13px; }
+  .goal-bar-row   { gap: 6px; margin-bottom: 4px; }
+  .campaign-section { padding: 10px 13px; margin-bottom: 10px; }
+  .campaign-item  { padding: 9px; margin-bottom: 6px; }
+  .chart-card     { padding: 11px; margin-bottom: 10px; }
+  .chart-card h3  { font-size: 12px; margin-bottom: 8px; }
+  .stats-card     { padding: 11px; gap: 10px; }
+  .pnl-section    { margin-bottom: 10px; }
+  .pnl-section-title { padding: 7px 12px; font-size: 12px; }
+  .pnl-row        { padding: 7px 12px; font-size: 12px; }
+  .score-row,
+  .log-row        { padding: 7px 12px; gap: 8px; font-size: 12px; }
+  .league-filters { padding: 5px 10px; gap: 5px; }
+  .league-filter-btn { padding: 3px 10px; font-size: 11px; }
+  .sport-filters  { padding: 5px 10px; gap: 5px; }
+  .sport-btn      { padding: 4px 12px; font-size: 12px; }
+  .event-card     { padding: 9px 11px; margin-bottom: 7px; }
+  .event-title    { font-size: 13px; }
+  .bet-table th,
+  .bet-table td   { padding: 7px 6px; font-size: 11px; }
+}

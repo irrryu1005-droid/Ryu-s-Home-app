@@ -94,12 +94,32 @@ body {
 .nav-icon  { font-size: 20px; line-height: 1; }
 .nav-label { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
 
+/* モバイル: タブを上部に移動 */
+@media (max-width: 767px) {
+  .nav {
+    position: sticky;
+    top: 50px;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    height: auto;
+    border-top: none;
+    border-bottom: 1px solid var(--border);
+    width: 100%;
+    max-width: 100%;
+  }
+  .nav-btn { padding: 8px 4px; }
+}
+
 /* ============================================================
    Tab Contents
 ============================================================ */
 .tab-content {
   display: none;
   padding: 22px 16px calc(var(--nav-h) + 20px);
+}
+@media (max-width: 767px) {
+  .tab-content { padding: 16px 16px 24px; }
 }
 .tab-content.active { display: block; }
 
@@ -1457,3 +1477,75 @@ h3.section-title {
   transition: opacity 0.15s;
 }
 .wl-save-btn:hover { opacity: 0.85; }
+
+/* ============================================================
+   モバイルコンパクト化
+============================================================ */
+@media (max-width: 767px) {
+  .nav-btn        { padding: 6px 3px; gap: 2px; }
+  .nav-icon       { font-size: 18px; }
+  .nav-label      { font-size: 9px; }
+  .type-toggle    { padding: 2px; margin-bottom: 14px; }
+  .type-btn       { padding: 9px; font-size: 14px; }
+  .form-group     { margin-bottom: 10px; }
+  .form-group label { font-size: 11px; margin-bottom: 3px; }
+  .form-group input,
+  .form-group select { padding: 10px 12px; font-size: 15px; }
+  .submit-btn     { padding: 12px; margin-top: 6px; }
+  .summary-cards  { gap: 6px; margin-bottom: 14px; }
+  .card           { padding: 11px 8px; }
+  .card-label     { font-size: 10px; margin-bottom: 4px; }
+  .card-value     { font-size: 14px; }
+  .txn-item       { padding: 10px 12px; margin-bottom: 5px; }
+  .txn-meta       { font-size: 11px; }
+  .txn-category   { font-size: 12px; }
+  .txn-amount     { font-size: 14px; }
+  .account-item   { padding: 11px 13px; margin-bottom: 5px; }
+  .account-name   { font-size: 13px; }
+  .account-balance { font-size: 16px; }
+  .planned-group  { margin-bottom: 12px; }
+  .planned-group-title { font-size: 12px; padding: 5px 12px; }
+  .planned-item   { padding: 9px 12px; margin-bottom: 5px; }
+  .planned-name   { font-size: 13px; }
+  .sub-summary-grid { gap: 6px; margin-bottom: 12px; }
+  .sub-summary-item { padding: 9px 6px; }
+  .sub-summary-item .sub-summary-val { font-size: 14px; }
+  .sub-row-f      { padding: 9px 11px; margin-bottom: 5px; }
+  .sub-name-f     { font-size: 13px; }
+  .loan-item      { padding: 10px 13px; margin-bottom: 6px; }
+  .loan-name      { font-size: 13px; }
+  .wl-table       { font-size: 12px; }
+  .wl-table th    { padding: 6px 4px; font-size: 10px; }
+  .wl-table td    { padding: 8px 4px; }
+  .wl-stars       { font-size: 12px; }
+  .wl-toolbar     { padding: 8px 12px; }
+  .wl-filter-btn  { padding: 3px 11px; font-size: 11px; }
+  .wl-tag-filters { padding: 5px 12px; }
+}
+
+/* 入力タブ：スマホ1画面に収める */
+@media (max-width: 767px) {
+  #tab-input { padding: 8px 12px 10px; }
+
+  #tab-input #transaction-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+
+  /* type-toggle・場所・メモ・submitは全幅 */
+  #tab-input #transaction-form > .type-toggle,
+  #tab-input #transaction-form > .form-group:nth-child(6),
+  #tab-input #transaction-form > .form-group:nth-child(7),
+  #tab-input #transaction-form > #submit-btn { grid-column: span 2; }
+
+  #tab-input .type-toggle  { margin-bottom: 4px; padding: 3px; }
+  #tab-input .type-btn     { padding: 7px; font-size: 13px; }
+
+  #tab-input .form-group   { margin-bottom: 0; }
+  #tab-input .form-group label { font-size: 10px; margin-bottom: 2px; }
+  #tab-input .form-group input,
+  #tab-input .form-group select { padding: 7px 9px; font-size: 14px; border-radius: 10px; }
+
+  #tab-input #submit-btn   { padding: 10px; font-size: 14px; margin-top: 2px; }
+}

@@ -5,11 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>収支管理</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="../shared/m-nav.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div id="app">
+
+    <nav class="m-app-nav">
+      <a href="../home/home.html"       class="m-app-tab"><span class="m-app-tab-icon">🏠</span>Home</a>
+      <a href="../study/study.html"     class="m-app-tab"><span class="m-app-tab-icon">📚</span>Study</a>
+      <a href="../tasks/task.html"      class="m-app-tab"><span class="m-app-tab-icon">✅</span>Tasks</a>
+      <a href="finance.html"            class="m-app-tab active"><span class="m-app-tab-icon">💰</span>Finance</a>
+      <a href="../betting/betting.html" class="m-app-tab"><span class="m-app-tab-icon">🎯</span>Betting</a>
+    </nav>
 
     <header class="header">
       <a href="../home/home.html" class="home-link">🏠 HOME</a>
@@ -47,8 +56,6 @@
     <!-- ======== 入力タブ ======== -->
     <main id="tab-input" class="tab-content active">
       <div class="form-center">
-      <h1>収支入力</h1>
-
       <form id="transaction-form">
         <div class="type-toggle">
           <button type="button" class="type-btn expense active" data-type="expense">支出</button>
