@@ -357,17 +357,18 @@ h3.section-title {
 .txn-amount.expense { color: var(--expense); }
 
 .txn-delete {
-  background: none;
+  background: #FEF2F2;
   border: none;
-  color: var(--border);
+  border-radius: 8px;
+  color: #DC2626;
   cursor: pointer;
-  font-size: 20px;
+  font-size: 16px;
   line-height: 1;
-  padding: 4px;
+  padding: 4px 8px;
   flex-shrink: 0;
-  transition: color 0.15s;
+  transition: opacity 0.15s;
 }
-.txn-delete:hover { color: var(--profit-neg); }
+.txn-delete:hover { opacity: 0.7; }
 
 /* ============================================================
    Accounts
@@ -535,10 +536,17 @@ h3.section-title {
   font-size: 11px;
   padding: 3px 8px;
   border-radius: 6px;
-  border: 1px solid var(--border);
-  background: transparent;
+  border: none;
+  background: #EFF6FF;
   cursor: pointer;
-  color: var(--text-muted);
+  color: var(--expense);
+  font-weight: 600;
+  transition: opacity 0.15s;
+}
+.planned-edit-btn:hover { opacity: 0.75; }
+.btn-sub-del-f, .btn-loan-del {
+  background: #FEF2F2 !important;
+  color: #DC2626 !important;
 }
 .badge-sub {
   font-size: 10px;

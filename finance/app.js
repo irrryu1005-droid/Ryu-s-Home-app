@@ -473,7 +473,7 @@ async function renderList() {
 
   container.querySelectorAll('.txn-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('この記録を削除しますか？')) return;
+      if (!await showConfirm('この記録を削除しますか？')) return;
 
       const { data: txn } = await db
         .from('transactions')
@@ -1231,7 +1231,7 @@ function openEditSubF(id) {
 
 async function deleteSubF(id) {
   const s = _subsF.find(x => x.id === id);
-  if (!s || !confirm(`「${s.name}」を削除しますか？`)) return;
+  if (!s || !await showConfirm(`「${s.name}」を削除しますか？`)) return;
   await db.from('subscriptions').delete().eq('id', id);
   _subsF = _subsF.filter(x => x.id !== id);
   renderSubsF();
@@ -1430,7 +1430,7 @@ function openEditLoan(id) {
 
 async function deleteLoan(id) {
   const l = _loans.find(x => x.id === id);
-  if (!l || !confirm(`「${l.name}」を削除しますか？`)) return;
+  if (!l || !await showConfirm(`「${l.name}」を削除しますか？`)) return;
   await db.from('loans').delete().eq('id', id);
   _loans = _loans.filter(x => x.id !== id);
   renderLoans();
@@ -1635,12 +1635,31 @@ async function saveWlItem(e) {
   renderWishList();
 }
 
-async function deleteWlItem(id) {
+function showConfirm(msg) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('wl-confirm-overlay');
+    document.getElementById('wl-confirm-msg').textContent = msg;
+    overlay.hidden = false;
+    const cleanup = (result) => {
+      overlay.hidden = true;
+      document.getElementById('wl-confirm-ok').onclick = null;
+      document.getElementById('wl-confirm-cancel').onclick = null;
+      resolve(result);
+    };
+    document.getElementById('wl-confirm-ok').onclick     = () => cleanup(true);
+    document.getElementById('wl-confirm-cancel').onclick = () => cleanup(false);
+  });
+}
+
+function deleteWlItem(id) {
   const item = _wlItems.find(i => i.id === id);
-  if (!item || !confirm(`「${item.name}」を削除しますか？`)) return;
-  await db.from('wish_list').delete().eq('id', id);
-  await loadWlItems();
-  renderWishList();
+  if (!item) return;
+  showConfirm(`「${item.name}」を削除しますか？`).then(async ok => {
+    if (!ok) return;
+    await db.from('wish_list').delete().eq('id', id);
+    await loadWlItems();
+    renderWishList();
+  });
 }
 
 function setupWishListUI() {
