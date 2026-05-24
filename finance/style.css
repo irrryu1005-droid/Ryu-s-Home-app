@@ -1256,10 +1256,9 @@ h3.section-title {
 }
 
 /* 操作ボタン */
-.wl-edit-btn, .wl-del-btn {
-  border: none;
+.wl-edit-btn, .wl-delete-btn {
   border-radius: 8px;
-  padding: 4px 8px;
+  padding: 5px 12px;
   font-size: 12px;
   cursor: pointer;
   font-weight: 600;
@@ -1267,14 +1266,16 @@ h3.section-title {
 }
 .wl-edit-btn {
   background: #EFF6FF;
+  border: 1.5px solid #BFDBFE;
   color: var(--expense);
   margin-right: 4px;
 }
-.wl-del-btn {
+.wl-delete-btn {
   background: #FEF2F2;
+  border: 1.5px solid #FECACA;
   color: #DC2626;
 }
-.wl-edit-btn:hover, .wl-del-btn:hover { opacity: 0.75; }
+.wl-edit-btn:hover, .wl-delete-btn:hover { opacity: 0.75; }
 
 /* 空状態 */
 .wl-empty {
