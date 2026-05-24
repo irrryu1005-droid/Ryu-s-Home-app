@@ -1173,6 +1173,7 @@ const ESPN_SOCCER_LEAGUES = [
 
 let scheduleDate   = new Date();
 let scheduleFilter = 'all';
+let leagueFilter   = new Set(); // 空 = すべて表示
 let scheduleCache  = {};
 let scheduledEvs   = [];
 
@@ -1405,7 +1406,27 @@ async function fetchBasketball(dateStr) {
   return [...nba, ...bLeague];
 }
 
-// ---- 🎾 テニス（ESPN ATP/WTA → フォールバック TheSportsDB）----
+// ---- 🎾 テニス（ESPN /events → フォールバック TheSportsDB）----
+// /scoreboard は Grand Slam を1件のトーナメント扱いするため /events を使う
+// /events は選手名が ev.competitors に直接入っており個別試合を返す
+async function fetchESPNTennisEvents(leagueId, dateStr) {
+  try {
+    const d = dateStr.replace(/-/g, '');
+    const url = `https://site.api.espn.com/apis/site/v2/sports/tennis/${leagueId}/events?dates=${d}`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.events || []).map(ev => {
+      const competitors = ev.competitors || ev.competitions?.[0]?.competitors || [];
+      const getName = c => c?.displayName || c?.athlete?.displayName || c?.team?.displayName || '';
+      const names = competitors.map(getName).filter(Boolean);
+      const title = names.length >= 2 ? `${names[0]} vs ${names[1]}` : (ev.name || ev.shortName || '');
+      const tournament = ev.name || null;
+      return { title, startUtc: ev.date || null, dateStr, tournament };
+    });
+  } catch { return []; }
+}
+
 const TENNIS_ESPN = [
   { id: 'atp', label: 'ATP' },
   { id: 'wta', label: 'WTA' },
@@ -1414,8 +1435,8 @@ const TENNIS_ESPN = [
 async function fetchTennis(dateStr) {
   const results = await Promise.all(
     TENNIS_ESPN.map(async ({ id, label }) => {
-      const evs = await fetchESPN('tennis', id, dateStr);
-      return evs.map(ev => ({ ...ev, league: label, sportKey: 'Tennis' }));
+      const evs = await fetchESPNTennisEvents(id, dateStr);
+      return evs.map(ev => ({ ...ev, league: ev.tournament ? `${ev.tournament} (${label})` : label, sportKey: 'Tennis' }));
     })
   );
   const flat = results.flat();
@@ -1461,6 +1482,8 @@ async function loadSportsSchedule() {
 
   if (scheduleCache[dateStr]) {
     scheduledEvs = scheduleCache[dateStr];
+    leagueFilter.clear();
+    renderLeagueFilters();
     renderSportsEvents();
     return;
   }
@@ -1478,11 +1501,18 @@ async function loadSportsSchedule() {
   const [currentEvs, prevEvs] = await Promise.all([fetchAll(dateStr), fetchAll(prevDateStr)]);
 
   // startUtcがある→JSTで dateStr に一致するものだけ / ない→fetchした日が dateStr のものだけ
-  scheduledEvs = [...currentEvs, ...prevEvs].filter(ev =>
-    ev.startUtc ? utcToJSTDateStr(ev.startUtc) === dateStr : ev.dateStr === dateStr
-  );
+  const seen = new Set();
+  scheduledEvs = [...currentEvs, ...prevEvs].filter(ev => {
+    if (!(ev.startUtc ? utcToJSTDateStr(ev.startUtc) === dateStr : ev.dateStr === dateStr)) return false;
+    const key = `${ev.sportKey}|${ev.title}|${ev.startUtc || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   scheduleCache[dateStr] = scheduledEvs;
+  leagueFilter.clear();
+  renderLeagueFilters();
   renderSportsEvents();
   if (gcalTokenBet) syncGcalState(dateStr);
 }
@@ -1508,13 +1538,52 @@ async function syncGcalState(dateStr) {
   } catch { /* ignore */ }
 }
 
+function renderLeagueFilters() {
+  const container = document.getElementById('league-filters');
+  if (!container) return;
+
+  const base = scheduleFilter === 'all'
+    ? scheduledEvs
+    : scheduledEvs.filter(ev => ev.sportKey === scheduleFilter);
+
+  const leagues = [...new Set(base.map(ev => ev.league).filter(Boolean))].sort();
+  if (leagues.length <= 1) { container.innerHTML = ''; leagueFilter.clear(); return; }
+
+  const allActive = leagueFilter.size === 0 ? ' active' : '';
+  container.innerHTML = `<button class="league-filter-btn${allActive}" data-league="all">すべて</button>` +
+    leagues.map(l => {
+      const active = leagueFilter.has(l) ? ' active' : '';
+      return `<button class="league-filter-btn${active}" data-league="${escapeHtml(l)}">${escapeHtml(l)}</button>`;
+    }).join('');
+
+  container.querySelectorAll('.league-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.league === 'all') {
+        leagueFilter.clear();
+      } else {
+        leagueFilter.has(btn.dataset.league)
+          ? leagueFilter.delete(btn.dataset.league)
+          : leagueFilter.add(btn.dataset.league);
+      }
+      // すべてボタンのactive更新
+      container.querySelector('[data-league="all"]').classList.toggle('active', leagueFilter.size === 0);
+      container.querySelectorAll('[data-league]:not([data-league="all"])').forEach(b => {
+        b.classList.toggle('active', leagueFilter.has(b.dataset.league));
+      });
+      renderSportsEvents();
+    });
+  });
+}
+
 function renderSportsEvents() {
   const container = document.getElementById('schedule-events');
   if (!container) return;
 
-  const evs = scheduleFilter === 'all'
+  let evs = scheduleFilter === 'all'
     ? scheduledEvs
     : scheduledEvs.filter(ev => ev.sportKey === scheduleFilter);
+
+  if (leagueFilter.size > 0) evs = evs.filter(ev => leagueFilter.has(ev.league));
 
   if (evs.length === 0) {
     container.innerHTML = '<div class="schedule-empty">この日の試合情報はありません</div>';
@@ -1752,6 +1821,8 @@ function initScheduleTab() {
       document.querySelectorAll('.sport-filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       scheduleFilter = btn.dataset.sport;
+      leagueFilter.clear();
+      renderLeagueFilters();
       renderSportsEvents();
     });
   });
