@@ -1148,27 +1148,27 @@ const SCHEDULE_SPORTS = [
 // ---- サッカーリーグ定義（ESPN）----
 const ESPN_SOCCER_LEAGUES = [
   // リーグ戦
-  { id: 'eng.1',            label: 'プレミアリーグ'     },
-  { id: 'esp.1',            label: 'ラリーガ'           },
-  { id: 'ger.1',            label: 'ブンデスリーガ'     },
-  { id: 'ita.1',            label: 'セリエA'            },
-  { id: 'fra.1',            label: 'リーグアン'         },
-  { id: 'ned.1',            label: 'エールディビジ'     },
-  { id: 'por.1',            label: 'ポルトガル'         },
-  { id: 'jpn.1',            label: 'J1リーグ'           },
+  { id: 'eng.1',            label: 'Premier League'     },
+  { id: 'esp.1',            label: 'La Liga'            },
+  { id: 'ger.1',            label: 'Bundesliga'         },
+  { id: 'ita.1',            label: 'Serie A'            },
+  { id: 'fra.1',            label: 'Ligue 1'            },
+  { id: 'ned.1',            label: 'Eredivisie'         },
+  { id: 'por.1',            label: 'Primeira Liga'      },
+  { id: 'jpn.1',            label: 'J1 League'          },
   { id: 'usa.1',            label: 'MLS'                },
-  { id: 'sau.1',            label: 'サウジリーグ'       },
+  { id: 'sau.1',            label: 'Saudi Pro League'   },
   // 欧州カップ戦
-  { id: 'uefa.champions',   label: 'CL'                 },
-  { id: 'uefa.europa',      label: 'EL'                 },
-  { id: 'uefa.ecl',         label: 'ECL'                },
+  { id: 'uefa.champions',   label: 'Champions League'   },
+  { id: 'uefa.europa',      label: 'Europa League'      },
+  { id: 'uefa.ecl',         label: 'Conference League'  },
   // 五大リーグ国内カップ
-  { id: 'eng.fa',           label: 'FAカップ'           },
-  { id: 'eng.league_cup',   label: 'EFLカップ'          },
-  { id: 'esp.copa_del_rey', label: 'コパ・デル・レイ'   },
-  { id: 'ger.dfb_pokal',    label: 'DFBポカール'        },
-  { id: 'ita.coppa_italia', label: 'コッパ・イタリア'   },
-  { id: 'fra.coupe_de_france', label: 'クープ・ドゥ・フランス' },
+  { id: 'eng.fa',           label: 'FA Cup'             },
+  { id: 'eng.league_cup',   label: 'EFL Cup'            },
+  { id: 'esp.copa_del_rey', label: 'Copa del Rey'       },
+  { id: 'ger.dfb_pokal',    label: 'DFB Pokal'          },
+  { id: 'ita.coppa_italia', label: 'Coppa Italia'       },
+  { id: 'fra.coupe_de_france', label: 'Coupe de France' },
 ];
 
 let scheduleDate   = new Date();
@@ -1391,7 +1391,7 @@ async function fetchBLeagueData(dateStr) {
   // ESPN フォールバック（複数IDを試す）
   for (const id of ['b-league', 'jpn.b-league', 'b.league']) {
     const evs = await fetchESPN('basketball', id, dateStr);
-    if (evs.length > 0) return evs.map(ev => ({ ...ev, league: 'Bリーグ', sportKey: 'Basketball' }));
+    if (evs.length > 0) return evs.map(ev => ({ ...ev, league: 'B.League', sportKey: 'Basketball' }));
   }
   return [];
 }
