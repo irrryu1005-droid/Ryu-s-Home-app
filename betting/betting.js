@@ -362,25 +362,23 @@ function renderPnlStatement() {
 
   const buildSection = (type, label, data, total) => {
     if (total === 0) return '';
-    const allAmounts = Object.values(data).flatMap(Object.values);
-    const maxAmt = Math.max(...allAmounts, 1);
     let rows = '';
     for (const [sport, leagues] of Object.entries(data)) {
       const sportTotal = Object.values(leagues).reduce((a, b) => a + b, 0);
-      const sportPct   = Math.round(sportTotal / maxAmt * 100);
+      const sportPct   = Math.round(sportTotal / total * 100);
       rows += `
         <div class="pnl-row sport">
           <div class="pnl-row-label">${escapeHtml(sport)}</div>
           <div class="pnl-bar-wrap"><div class="pnl-bar" style="width:${sportPct}%"></div></div>
-          <div class="pnl-row-amount">¥${sportTotal.toLocaleString()}</div>
+          <div class="pnl-row-amount">¥${sportTotal.toLocaleString()} <span class="pnl-pct">${sportPct}%</span></div>
         </div>`;
       for (const [league, amt] of Object.entries(leagues)) {
-        const pct = Math.round(amt / maxAmt * 100);
+        const pct = Math.round(amt / total * 100);
         rows += `
           <div class="pnl-row league">
             <div class="pnl-row-label">${escapeHtml(league)}</div>
             <div class="pnl-bar-wrap"><div class="pnl-bar" style="width:${pct}%"></div></div>
-            <div class="pnl-row-amount">¥${amt.toLocaleString()}</div>
+            <div class="pnl-row-amount">¥${amt.toLocaleString()} <span class="pnl-pct">${pct}%</span></div>
           </div>`;
       }
     }
