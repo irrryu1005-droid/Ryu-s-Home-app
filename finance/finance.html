@@ -22,10 +22,6 @@
         <span class="nav-icon">✏️</span>
         <span class="nav-label">入力</span>
       </button>
-      <button class="nav-btn" data-tab="dashboard">
-        <span class="nav-icon">📊</span>
-        <span class="nav-label">ダッシュボード</span>
-      </button>
       <button class="nav-btn" data-tab="list">
         <span class="nav-icon">📋</span>
         <span class="nav-label">一覧</span>
@@ -38,9 +34,9 @@
         <span class="nav-icon">📅</span>
         <span class="nav-label">予定支出</span>
       </button>
-      <button class="nav-btn" data-tab="pnl">
-        <span class="nav-icon">📒</span>
-        <span class="nav-label">損益</span>
+      <button class="nav-btn" data-tab="data">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Data</span>
       </button>
     </nav>
 
@@ -102,43 +98,62 @@
       </div><!-- /.form-center -->
     </main>
 
-    <!-- ======== ダッシュボードタブ ======== -->
-    <main id="tab-dashboard" class="tab-content">
+    <!-- ======== Data タブ ======== -->
+    <main id="tab-data" class="tab-content">
 
-      <div class="month-nav">
-        <button id="dash-prev">＜</button>
-        <h2 id="dash-month-label"></h2>
-        <button id="dash-next">＞</button>
+      <div class="sub-nav">
+        <button class="data-sub-btn active" data-sub="dashboard">📊 Dashboard</button>
+        <button class="data-sub-btn" data-sub="pnl">📒 P/L</button>
       </div>
 
-      <div class="summary-cards">
-        <div class="card income-card">
-          <div class="card-label">収入</div>
-          <div class="card-value" id="dash-income">¥0</div>
+      <!-- Dashboard サブ -->
+      <div id="data-sub-dashboard" class="data-sub-content">
+        <div class="month-nav">
+          <button id="dash-prev">＜</button>
+          <h2 id="dash-month-label"></h2>
+          <button id="dash-next">＞</button>
         </div>
-        <div class="card expense-card">
-          <div class="card-label">支出</div>
-          <div class="card-value" id="dash-expense">¥0</div>
+
+        <div class="summary-cards">
+          <div class="card income-card">
+            <div class="card-label">収入</div>
+            <div class="card-value" id="dash-income">¥0</div>
+          </div>
+          <div class="card expense-card">
+            <div class="card-label">支出</div>
+            <div class="card-value" id="dash-expense">¥0</div>
+          </div>
+          <div class="card profit-card">
+            <div class="card-label">損益</div>
+            <div class="card-value" id="dash-profit">¥0</div>
+          </div>
         </div>
-        <div class="card profit-card">
-          <div class="card-label">損益</div>
-          <div class="card-value" id="dash-profit">¥0</div>
+
+        <div class="chart-container">
+          <canvas id="monthly-chart"></canvas>
         </div>
+
+        <h3 class="section-title">カテゴリ別支出</h3>
+        <table class="data-table">
+          <thead>
+            <tr><th>カテゴリ</th><th>金額</th></tr>
+          </thead>
+          <tbody id="category-tbody">
+            <tr><td colspan="2" class="empty-msg">データを読み込み中...</td></tr>
+          </tbody>
+        </table>
       </div>
 
-      <div class="chart-container">
-        <canvas id="monthly-chart"></canvas>
+      <!-- P/L サブ -->
+      <div id="data-sub-pnl" class="data-sub-content" hidden>
+        <div class="month-nav">
+          <button id="fin-pnl-prev">＜</button>
+          <h2 id="fin-pnl-month-label"></h2>
+          <button id="fin-pnl-next">＞</button>
+        </div>
+        <div id="fin-pnl-container"></div>
       </div>
 
-      <h3 class="section-title">カテゴリ別支出</h3>
-      <table class="data-table">
-        <thead>
-          <tr><th>カテゴリ</th><th>金額</th></tr>
-        </thead>
-        <tbody id="category-tbody">
-          <tr><td colspan="2" class="empty-msg">データを読み込み中...</td></tr>
-        </tbody>
-      </table>
     </main>
 
     <!-- ======== 一覧タブ ======== -->
@@ -420,16 +435,6 @@
     </main>
 
   </div>
-
-    <!-- ======== 損益タブ ======== -->
-    <main id="tab-pnl" class="tab-content">
-      <div class="month-nav">
-        <button id="fin-pnl-prev">＜</button>
-        <h2 id="fin-pnl-month-label"></h2>
-        <button id="fin-pnl-next">＞</button>
-      </div>
-      <div id="fin-pnl-container"></div>
-    </main>
 
   <!-- 編集モーダル -->
   <div id="edit-modal-overlay" class="edit-modal-overlay" style="display:none">

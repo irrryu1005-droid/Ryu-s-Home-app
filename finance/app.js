@@ -129,11 +129,23 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById(`tab-${tab}`).classList.add('active');
 
-    if (tab === 'dashboard') renderDashboard();
-    if (tab === 'list')      renderList();
-    if (tab === 'accounts')  renderAccounts();
-    if (tab === 'planned')   renderPlannedTab();
-    if (tab === 'pnl')       renderFinancePnl();
+    if (tab === 'data')    { renderDashboard(); }
+    if (tab === 'list')    renderList();
+    if (tab === 'accounts') renderAccounts();
+    if (tab === 'planned')  renderPlannedTab();
+  });
+});
+
+// Data タブのサブナビ
+document.querySelectorAll('.data-sub-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.data-sub-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.data-sub-content').forEach(c => { c.hidden = true; });
+    btn.classList.add('active');
+    const sub = btn.dataset.sub;
+    document.getElementById(`data-sub-${sub}`).hidden = false;
+    if (sub === 'dashboard') renderDashboard();
+    if (sub === 'pnl')       renderFinancePnl();
   });
 });
 
