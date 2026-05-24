@@ -102,12 +102,12 @@
     <main id="tab-data" class="tab-content">
 
       <div class="sub-nav">
-        <button class="data-sub-btn active" data-sub="dashboard">📊 Dashboard</button>
-        <button class="data-sub-btn" data-sub="pnl">📒 P/L</button>
+        <button class="data-sub-btn active" data-sub="pnl">📒 P/L</button>
+        <button class="data-sub-btn" data-sub="dashboard">📊 Dashboard</button>
       </div>
 
       <!-- Dashboard サブ -->
-      <div id="data-sub-dashboard" class="data-sub-content">
+      <div id="data-sub-dashboard" class="data-sub-content" hidden>
         <div class="month-nav">
           <button id="dash-prev">＜</button>
           <h2 id="dash-month-label"></h2>
@@ -145,7 +145,7 @@
       </div>
 
       <!-- P/L サブ -->
-      <div id="data-sub-pnl" class="data-sub-content" hidden>
+      <div id="data-sub-pnl" class="data-sub-content">
         <div class="month-nav">
           <button id="fin-pnl-prev">＜</button>
           <h2 id="fin-pnl-month-label"></h2>

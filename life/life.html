@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Life</title>
   <link rel="stylesheet" href="life.css">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div id="app">
@@ -16,11 +15,7 @@
     </header>
 
     <nav class="nav">
-      <button class="nav-btn active" data-tab="subscriptions">
-        <span class="nav-icon">💳</span>
-        <span class="nav-label">サブスク</span>
-      </button>
-      <button class="nav-btn" data-tab="wishlist">
+      <button class="nav-btn active" data-tab="wishlist">
         <span class="nav-icon">⭐</span>
         <span class="nav-label">ほしい物</span>
       </button>
@@ -30,151 +25,8 @@
       </button>
     </nav>
 
-    <!-- 為替レート表示 -->
-    <div class="rate-bar" id="rate-bar">
-      💱 1 USD = ¥<span id="usd-rate-val">…</span>
-    </div>
-
-    <!-- サマリーバー（サブスクタブのみ表示） -->
-    <div class="summary-bar" id="summary-bar">
-      <div class="s-item">
-        <div class="s-label">月額換算</div>
-        <div class="s-val" id="total-monthly">¥0</div>
-      </div>
-      <div class="s-item">
-        <div class="s-label">年間合計</div>
-        <div class="s-val" id="total-yearly">¥0</div>
-      </div>
-      <div class="s-item">
-        <div class="s-label">契約数</div>
-        <div class="s-val" id="total-count">0</div>
-      </div>
-    </div>
-
-    <!-- ======== サブスク管理タブ ======== -->
-    <main id="tab-subscriptions" class="tab-content">
-      <div class="tab-header">
-        <h2>サブスク管理</h2>
-        <button id="btn-add-sub" class="btn-primary">＋ 追加</button>
-      </div>
-
-      <!-- 追加・編集フォーム（モーダル） -->
-      <div id="sub-modal-overlay" class="modal-overlay" hidden>
-      <div id="sub-form-container" class="form-card modal-card">
-        <h3 id="sub-form-title">新規サブスク</h3>
-        <form id="sub-form" novalidate>
-          <div class="form-row">
-            <div class="form-group">
-              <label>サービス名</label>
-              <input type="text" name="name" placeholder="Netflix" required>
-            </div>
-            <div class="form-group">
-              <label>契約形態</label>
-              <select name="contractForm">
-                <option value="month">月払い</option>
-                <option value="year">年払い</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group form-group-sm">
-              <label>通貨</label>
-              <select name="currency">
-                <option value="JPY">¥ 円 (JPY)</option>
-                <option value="USD">$ ドル (USD)</option>
-              </select>
-            </div>
-            <div class="form-group" id="cost-month-wrap">
-              <label>月額</label>
-              <input type="number" name="costPerMonth" step="0.01" min="0" placeholder="980">
-            </div>
-            <div class="form-group" id="cost-year-wrap" hidden>
-              <label>年額</label>
-              <input type="number" name="costPerYear" step="0.01" min="0" placeholder="9800">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>カテゴリ</label>
-              <select name="purpose">
-                <option value="">なし</option>
-                <option value="娯楽">娯楽</option>
-                <option value="勉強">勉強</option>
-                <option value="仕事">仕事</option>
-                <option value="生活必需品">生活必需品</option>
-                <option value="クラウド">クラウド</option>
-                <option value="その他">その他</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>開始日</label>
-              <input type="date" name="startDate">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>支払い方法</label>
-              <select name="paymentMethod">
-                <option value="">未設定</option>
-                <option value="クレジットカード">クレジットカード</option>
-                <option value="デビットカード">デビットカード</option>
-                <option value="銀行口座">銀行口座</option>
-                <option value="キャリア決済">キャリア決済</option>
-                <option value="その他">その他</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>支払い者</label>
-              <select name="payer">
-                <option value="自分">自分</option>
-                <option value="家族">家族</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>ステータス</label>
-              <select name="status">
-                <option value="active">契約中</option>
-                <option value="cancelled">解約済み</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="toggle-lbl" style="padding-top:26px">
-                <input type="checkbox" name="autoRenew" checked>
-                <span class="toggle-switch"></span>
-                <span>自動更新</span>
-              </label>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>メモ</label>
-            <textarea name="note" rows="2" placeholder="備考など..."></textarea>
-          </div>
-          <div class="form-btns">
-            <button type="button" id="btn-cancel-sub" class="btn-cancel">キャンセル</button>
-            <button type="submit" class="btn-primary">保存</button>
-          </div>
-          <input type="hidden" name="id">
-        </form>
-      </div>
-      </div><!-- /modal-overlay -->
-
-      <!-- カテゴリフィルター -->
-      <div class="purpose-filters">
-        <button class="purpose-filter-btn active" data-purpose="all">すべて</button>
-        <button class="purpose-filter-btn" data-purpose="娯楽">娯楽</button>
-        <button class="purpose-filter-btn" data-purpose="勉強">勉強</button>
-        <button class="purpose-filter-btn" data-purpose="仕事">仕事</button>
-        <button class="purpose-filter-btn" data-purpose="生活必需品">生活必需品</button>
-        <button class="purpose-filter-btn" data-purpose="クラウド">クラウド</button>
-      </div>
-
-      <div id="sub-list"></div>
-    </main>
-
     <!-- ======== ほしい物タブ ======== -->
-    <main id="tab-wishlist" class="tab-content" hidden>
+    <main id="tab-wishlist" class="tab-content">
       <h2>ほしい物リスト</h2>
       <div class="coming-soon-card">
         <div class="coming-soon-icon">⭐</div>

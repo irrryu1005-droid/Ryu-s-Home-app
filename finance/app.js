@@ -129,7 +129,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById(`tab-${tab}`).classList.add('active');
 
-    if (tab === 'data')    { renderDashboard(); }
+    if (tab === 'data')    { renderFinancePnl(); }
     if (tab === 'list')    renderList();
     if (tab === 'accounts') renderAccounts();
     if (tab === 'planned')  renderPlannedTab();
@@ -653,12 +653,10 @@ async function renderFinancePnl() {
 
   const buildSection = (type, label, data, total) => {
     if (total === 0) return '';
-    const allAmounts = Object.values(data).flatMap(Object.values);
-    const maxAmt = Math.max(...allAmounts, 1);
     let rows = '';
     for (const [cat, payments] of Object.entries(data)) {
       const catTotal = Object.values(payments).reduce((a, b) => a + b, 0);
-      const catPct   = Math.round(catTotal / maxAmt * 100);
+      const catPct   = Math.round(catTotal / total * 100);
       rows += `
         <div class="pnl-row sport">
           <div class="pnl-row-label">${cat}</div>
@@ -668,7 +666,7 @@ async function renderFinancePnl() {
       const entries = Object.entries(payments);
       if (entries.length > 1) {
         for (const [payment, amt] of entries) {
-          const pct = Math.round(amt / maxAmt * 100);
+          const pct = Math.round(amt / total * 100);
           rows += `
             <div class="pnl-row league">
               <div class="pnl-row-label">${payment}</div>
@@ -1476,7 +1474,7 @@ function initLoans() {
 // 初期表示
 // ============================================================
 fetchUsdRateF();
-renderDashboard();
+renderFinancePnl();
 initPlannedTab();
 initPlannedSubTabs();
 initSubsF();
