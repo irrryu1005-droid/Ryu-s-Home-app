@@ -440,10 +440,100 @@
 
     <!-- ======== Wish List タブ ======== -->
     <main id="tab-wishlist" class="tab-content" hidden>
-      <div class="coming-soon-card">
-        <div style="font-size:2rem">⭐</div>
-        <p>準備中です</p>
+
+      <!-- ツールバー -->
+      <div class="wl-toolbar">
+        <div class="wl-filters">
+          <button class="wl-filter-btn active" data-filter="all">すべて</button>
+          <button class="wl-filter-btn" data-filter="unpurchased">未購入</button>
+          <button class="wl-filter-btn" data-filter="purchased">購入済み</button>
+        </div>
+        <button id="wl-add-btn" class="wl-add-btn">＋ 追加</button>
       </div>
+
+      <!-- タグフィルター -->
+      <div id="wl-tag-filters" class="wl-tag-filters"></div>
+
+      <!-- テーブル -->
+      <div class="wl-table-wrap">
+        <table class="wl-table">
+          <thead>
+            <tr>
+              <th class="wl-th-priority">優先度</th>
+              <th class="wl-th-name">アイテム</th>
+              <th class="wl-th-price">価格帯</th>
+              <th class="wl-th-tags">タグ</th>
+              <th class="wl-th-deadline">期限</th>
+              <th class="wl-th-purchased">購入日</th>
+              <th class="wl-th-actions"></th>
+            </tr>
+          </thead>
+          <tbody id="wl-tbody"></tbody>
+        </table>
+        <div id="wl-empty" class="wl-empty" hidden>アイテムがありません</div>
+      </div>
+
+      <!-- 追加・編集モーダル -->
+      <div id="wl-modal" class="wl-modal-overlay" hidden>
+        <div class="wl-modal-card">
+          <h3 id="wl-modal-title">アイテムを追加</h3>
+          <form id="wl-form" novalidate>
+            <div class="wl-form-row">
+              <div class="wl-form-group wl-form-grow">
+                <label>アイテム名 <span class="required">*</span></label>
+                <input type="text" name="name" placeholder="AirPods Pro" required>
+              </div>
+              <div class="wl-form-group">
+                <label>優先度</label>
+                <div class="wl-star-select" id="wl-star-select">
+                  <button type="button" class="wl-star-btn" data-star="1">☆</button>
+                  <button type="button" class="wl-star-btn" data-star="2">☆</button>
+                  <button type="button" class="wl-star-btn" data-star="3">☆</button>
+                </div>
+                <input type="hidden" name="priority" value="2">
+              </div>
+            </div>
+            <div class="wl-form-row">
+              <div class="wl-form-group">
+                <label>最低価格 (¥)</label>
+                <input type="number" name="price_min" placeholder="30000" min="0">
+              </div>
+              <div class="wl-form-group">
+                <label>最高価格 (¥)</label>
+                <input type="number" name="price_max" placeholder="40000" min="0">
+              </div>
+            </div>
+            <div class="wl-form-row">
+              <div class="wl-form-group wl-form-grow">
+                <label>URL</label>
+                <input type="url" name="url" placeholder="https://...">
+              </div>
+              <div class="wl-form-group">
+                <label>期限</label>
+                <input type="date" name="deadline">
+              </div>
+            </div>
+            <div class="wl-form-group">
+              <label>タグ</label>
+              <div id="wl-tag-checkboxes" class="wl-tag-checkboxes"></div>
+              <div class="wl-add-tag-row">
+                <input type="text" id="wl-new-tag-input" placeholder="新しいタグ" class="wl-new-tag-input">
+                <button type="button" id="wl-new-tag-btn" class="wl-add-tag-btn">＋</button>
+              </div>
+            </div>
+            <div class="wl-form-group">
+              <label>購入日</label>
+              <input type="date" name="purchased_at">
+            </div>
+            <input type="hidden" name="id">
+            <div class="wl-form-btns">
+              <button type="button" id="wl-cancel-btn" class="btn-cancel">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
     </main>
 
   </div>

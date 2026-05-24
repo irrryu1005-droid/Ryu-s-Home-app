@@ -129,10 +129,11 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById(`tab-${tab}`).classList.add('active');
 
-    if (tab === 'data')    { renderFinancePnl(); }
-    if (tab === 'list')    renderList();
+    if (tab === 'data')     { renderFinancePnl(); }
+    if (tab === 'list')     renderList();
     if (tab === 'accounts') renderAccounts();
     if (tab === 'planned')  renderPlannedTab();
+    if (tab === 'wishlist') initWishList();
   });
 });
 
@@ -1472,6 +1473,211 @@ function initLoans() {
 
 // ============================================================
 // 初期表示
+// ============================================================
+// Wish List
+// ============================================================
+let _wlItems   = [];
+let _wlTags    = [];
+let _wlFilter  = 'all';
+let _wlTagFilter = new Set();
+let _wlInited  = false;
+
+async function initWishList() {
+  if (_wlInited) { renderWishList(); return; }
+  _wlInited = true;
+  await Promise.all([loadWlTags(), loadWlItems()]);
+  renderWlTagFilters();
+  renderWishList();
+  setupWishListUI();
+}
+
+async function loadWlTags() {
+  const { data } = await db.from('wish_tags').select('name').order('id');
+  _wlTags = (data || []).map(r => r.name);
+}
+
+async function loadWlItems() {
+  const { data } = await db.from('wish_list').select('*').order('priority', { ascending: false }).order('created_at');
+  _wlItems = data || [];
+}
+
+function renderWlTagFilters() {
+  const wrap = document.getElementById('wl-tag-filters');
+  if (!wrap) return;
+  wrap.innerHTML = _wlTags.map(t => {
+    const active = _wlTagFilter.has(t) ? ' active' : '';
+    return `<button class="wl-tag-filter-btn${active}" data-tag="${escapeHtmlF(t)}">${escapeHtmlF(t)}</button>`;
+  }).join('');
+  wrap.querySelectorAll('.wl-tag-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _wlTagFilter.has(btn.dataset.tag) ? _wlTagFilter.delete(btn.dataset.tag) : _wlTagFilter.add(btn.dataset.tag);
+      btn.classList.toggle('active', _wlTagFilter.has(btn.dataset.tag));
+      renderWishList();
+    });
+  });
+}
+
+function renderWishList() {
+  const tbody = document.getElementById('wl-tbody');
+  const empty = document.getElementById('wl-empty');
+  if (!tbody) return;
+
+  let items = _wlItems;
+  if (_wlFilter === 'unpurchased') items = items.filter(i => !i.purchased_at);
+  if (_wlFilter === 'purchased')   items = items.filter(i =>  i.purchased_at);
+  if (_wlTagFilter.size > 0)       items = items.filter(i => i.tags?.some(t => _wlTagFilter.has(t)));
+
+  if (items.length === 0) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+
+  tbody.innerHTML = items.map(item => {
+    const stars = '★'.repeat(item.priority) + '☆'.repeat(3 - item.priority);
+    const nameCell = item.url
+      ? `<a href="${escapeHtmlF(item.url)}" target="_blank" class="wl-item-link">${escapeHtmlF(item.name)}</a>`
+      : escapeHtmlF(item.name);
+    const price = item.price_min || item.price_max
+      ? [item.price_min ? `¥${item.price_min.toLocaleString()}` : '—',
+         item.price_max ? `¥${item.price_max.toLocaleString()}` : '—'].join(' 〜 ')
+      : '—';
+    const tags = (item.tags || []).map(t => `<span class="wl-tag-badge">${escapeHtmlF(t)}</span>`).join('');
+    const deadline = item.deadline ? item.deadline.slice(0, 7).replace('-', '/') : '—';
+    const purchased = item.purchased_at ? `<span class="wl-purchased-badge">${item.purchased_at.slice(0,10)}</span>` : '—';
+    return `<tr class="${item.purchased_at ? 'wl-row-purchased' : ''}">
+      <td class="wl-td-priority">${stars}</td>
+      <td class="wl-td-name">${nameCell}</td>
+      <td class="wl-td-price">${price}</td>
+      <td class="wl-td-tags">${tags}</td>
+      <td class="wl-td-deadline">${deadline}</td>
+      <td class="wl-td-purchased">${purchased}</td>
+      <td class="wl-td-actions">
+        <button class="small-btn wl-edit-btn" data-id="${item.id}">編集</button>
+        <button class="small-btn wl-delete-btn" data-id="${item.id}">削除</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.wl-edit-btn').forEach(btn =>
+    btn.addEventListener('click', () => openWlModal(btn.dataset.id)));
+  tbody.querySelectorAll('.wl-delete-btn').forEach(btn =>
+    btn.addEventListener('click', () => deleteWlItem(btn.dataset.id)));
+}
+
+function renderWlFormTags(selectedTags = []) {
+  const wrap = document.getElementById('wl-tag-checkboxes');
+  if (!wrap) return;
+  wrap.innerHTML = _wlTags.map(t => {
+    const checked = selectedTags.includes(t) ? 'checked' : '';
+    return `<label class="wl-tag-check"><input type="checkbox" name="tags" value="${escapeHtmlF(t)}" ${checked}> ${escapeHtmlF(t)}</label>`;
+  }).join('');
+}
+
+function setWlStars(n) {
+  document.querySelector('input[name="priority"]').value = n;
+  document.querySelectorAll('#wl-star-select .wl-star-btn').forEach((btn, i) => {
+    const active = i < n;
+    btn.classList.toggle('active', active);
+    btn.textContent = active ? '★' : '☆';
+  });
+}
+
+function openWlModal(id = null) {
+  const form  = document.getElementById('wl-form');
+  const title = document.getElementById('wl-modal-title');
+  form.reset();
+  renderWlFormTags([]);
+  setWlStars(2);
+
+  if (id) {
+    const item = _wlItems.find(i => i.id === id);
+    if (!item) return;
+    title.textContent = 'アイテムを編集';
+    form.elements.id.value           = item.id;
+    form.elements.name.value         = item.name;
+    form.elements.price_min.value    = item.price_min ?? '';
+    form.elements.price_max.value    = item.price_max ?? '';
+    form.elements.url.value          = item.url        ?? '';
+    form.elements.deadline.value     = item.deadline   ?? '';
+    form.elements.purchased_at.value = item.purchased_at ?? '';
+    renderWlFormTags(item.tags || []);
+    setWlStars(item.priority || 2);
+  } else {
+    title.textContent = 'アイテムを追加';
+  }
+  document.getElementById('wl-modal').hidden = false;
+}
+
+async function saveWlItem(e) {
+  e.preventDefault();
+  const f    = e.target;
+  const id   = f.elements.id.value;
+  const tags = [...f.querySelectorAll('input[name="tags"]:checked')].map(cb => cb.value);
+  const payload = {
+    name:         f.elements.name.value.trim(),
+    price_min:    f.elements.price_min.value    ? parseInt(f.elements.price_min.value)    : null,
+    price_max:    f.elements.price_max.value    ? parseInt(f.elements.price_max.value)    : null,
+    priority:     parseInt(f.elements.priority.value) || 2,
+    url:          f.elements.url.value.trim()          || null,
+    deadline:     f.elements.deadline.value            || null,
+    purchased_at: f.elements.purchased_at.value        || null,
+    tags,
+  };
+  if (id) {
+    await db.from('wish_list').update(payload).eq('id', id);
+  } else {
+    await db.from('wish_list').insert(payload);
+  }
+  document.getElementById('wl-modal').hidden = true;
+  await loadWlItems();
+  renderWishList();
+}
+
+async function deleteWlItem(id) {
+  const item = _wlItems.find(i => i.id === id);
+  if (!item || !confirm(`「${item.name}」を削除しますか？`)) return;
+  await db.from('wish_list').delete().eq('id', id);
+  await loadWlItems();
+  renderWishList();
+}
+
+function setupWishListUI() {
+  document.getElementById('wl-add-btn').addEventListener('click', () => openWlModal());
+  document.getElementById('wl-cancel-btn').addEventListener('click', () => {
+    document.getElementById('wl-modal').hidden = true;
+  });
+  document.getElementById('wl-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.hidden = true;
+  });
+  document.getElementById('wl-form').addEventListener('submit', saveWlItem);
+
+  document.querySelectorAll('#wl-star-select button').forEach(btn => {
+    btn.addEventListener('click', () => setWlStars(parseInt(btn.dataset.star)));
+  });
+
+  document.querySelectorAll('.wl-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.wl-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _wlFilter = btn.dataset.filter;
+      renderWishList();
+    });
+  });
+
+  document.getElementById('wl-new-tag-btn').addEventListener('click', async () => {
+    const input = document.getElementById('wl-new-tag-input');
+    const name  = input.value.trim();
+    if (!name || _wlTags.includes(name)) return;
+    await db.from('wish_tags').insert({ name });
+    _wlTags.push(name);
+    input.value = '';
+    renderWlTagFilters();
+    renderWlFormTags([...document.querySelectorAll('input[name="tags"]:checked')].map(cb => cb.value));
+  });
+}
+
 // ============================================================
 fetchUsdRateF();
 renderFinancePnl();

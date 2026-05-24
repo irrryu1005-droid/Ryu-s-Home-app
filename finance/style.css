@@ -1103,3 +1103,348 @@ h3.section-title {
   color: var(--expense);
   border-bottom-color: var(--expense);
 }
+
+/* ============================================================
+   Wish List タブ
+============================================================ */
+
+/* ツールバー */
+.wl-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+}
+.wl-filters {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.wl-filter-btn {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wl-filter-btn.active {
+  background: var(--expense);
+  border-color: var(--expense);
+  color: #fff;
+}
+.wl-add-btn {
+  background: var(--expense);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.wl-add-btn:hover { opacity: 0.85; }
+
+/* タグフィルター */
+.wl-tag-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  min-height: 38px;
+}
+.wl-tag-filter-btn {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wl-tag-filter-btn.active {
+  background: #7C3AED;
+  border-color: #7C3AED;
+  color: #fff;
+}
+
+/* テーブル */
+.wl-table-wrap {
+  padding: 12px 16px;
+  overflow-x: auto;
+}
+.wl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.wl-table th {
+  text-align: left;
+  padding: 8px 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+.wl-table td {
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.wl-row-purchased td {
+  opacity: 0.5;
+}
+.wl-item-link {
+  color: var(--expense);
+  text-decoration: none;
+  font-weight: 600;
+}
+.wl-item-link:hover { text-decoration: underline; }
+.wl-item-name {
+  font-weight: 600;
+}
+
+/* スター */
+.wl-stars {
+  color: #F5A623;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+/* タグバッジ */
+.wl-tag-badge {
+  display: inline-block;
+  background: #EDE9FE;
+  color: #7C3AED;
+  border-radius: 8px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  margin: 1px 2px;
+  white-space: nowrap;
+}
+.wl-purchased-badge {
+  display: inline-block;
+  background: #D1FAE5;
+  color: #065F46;
+  border-radius: 8px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* 操作ボタン */
+.wl-edit-btn, .wl-del-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.15s;
+}
+.wl-edit-btn {
+  background: #EFF6FF;
+  color: var(--expense);
+  margin-right: 4px;
+}
+.wl-del-btn {
+  background: #FEF2F2;
+  color: #DC2626;
+}
+.wl-edit-btn:hover, .wl-del-btn:hover { opacity: 0.75; }
+
+/* 空状態 */
+.wl-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 0;
+  font-size: 14px;
+}
+
+/* モーダル */
+.wl-modal-overlay {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.wl-modal-overlay[hidden] {
+  display: none;
+}
+.wl-modal-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 24px 20px 20px;
+  width: 90%;
+  max-width: 420px;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  position: relative;
+}
+.wl-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+.wl-form-group {
+  margin-bottom: 12px;
+}
+.wl-form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.wl-form-group input[type="text"],
+.wl-form-group input[type="number"],
+.wl-form-group input[type="url"],
+.wl-form-group input[type="date"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.wl-form-group input:focus {
+  border-color: var(--expense);
+}
+.wl-form-row {
+  display: flex;
+  gap: 8px;
+}
+.wl-form-grow {
+  flex: 1;
+}
+
+/* スター選択 */
+.wl-star-select {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.wl-star-btn {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: 24px;
+  cursor: pointer;
+  color: #D1D5DB;
+  line-height: 1;
+  transition: color 0.15s, transform 0.1s;
+}
+.wl-star-btn:hover { transform: scale(1.15); }
+.wl-star-btn.active { color: #F5A623; }
+
+/* タグチェックボックス */
+.wl-tag-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.wl-tag-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wl-tag-check input[type="checkbox"] {
+  width: auto;
+  accent-color: #7C3AED;
+}
+.wl-tag-check:has(input:checked) {
+  background: #EDE9FE;
+  border-color: #7C3AED;
+  color: #7C3AED;
+  font-weight: 600;
+}
+
+/* 新規タグ入力 */
+.wl-add-tag-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.wl-new-tag-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  outline: none;
+}
+.wl-new-tag-input:focus { border-color: #7C3AED; }
+.wl-add-tag-btn {
+  background: #7C3AED;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.wl-add-tag-btn:hover { opacity: 0.85; }
+
+/* モーダルボタン行 */
+.wl-modal-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+.wl-cancel-btn {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.wl-save-btn {
+  background: var(--expense);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.wl-save-btn:hover { opacity: 0.85; }
