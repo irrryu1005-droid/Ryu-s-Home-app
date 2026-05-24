@@ -27,18 +27,26 @@ exports.handler = async (event) => {
 
     const events = [];
     for (const html of (data.topics || [])) {
+
       const liMatches = [...html.matchAll(/<li class="list-item"[^>]*id="\d+">([\s\S]*?)<\/li>/g)];
       for (const [, gameHtml] of liMatches) {
+        // チケットURLから実際の試合日付を取得（YYYYMMDD形式）
+        const ticketMatch = gameHtml.match(/bleague-ticket\.psrv\.jp\/sales\/BL\/(\d{4})(\d{2})(\d{2})/);
+        const gameDate = ticketMatch
+          ? `${ticketMatch[1]}-${ticketMatch[2]}-${ticketMatch[3]}`
+          : null;
+        if (gameDate && gameDate !== date) continue;
+
         const homeMatch = gameHtml.match(/class="team home"[\s\S]*?<span class="team-name">(.*?)<\/span>/);
         const awayMatch = gameHtml.match(/class="team away"[\s\S]*?<span class="team-name">(.*?)<\/span>/);
         const timeMatch = gameHtml.match(/<div class="info-arena">(?:<span>[^<]*<\/span>){2}<span>(\d{2}:\d{2})<\/span>/);
-        const home    = homeMatch?.[1] || '?';
-        const away    = awayMatch?.[1] || '?';
-        const time    = timeMatch?.[1];
+        const home = homeMatch?.[1] || '?';
+        const away = awayMatch?.[1] || '?';
+        const time = timeMatch?.[1];
         events.push({
           title:    `${away} vs ${home}`,
-          startUtc: time ? `${date}T${time}:00+09:00` : null,
-          league:   'Bリーグ',
+          startUtc: time ? `${gameDate || date}T${time}:00+09:00` : null,
+          league:   'B.League',
         });
       }
     }

@@ -1167,13 +1167,13 @@ function renderStatsTable() {
 // 試合予定タブ（ESPN + MLB Stats API + TheSportsDB）
 // ============================================================
 const SCHEDULE_SPORTS = [
-  { key: 'Soccer',      icon: '⚽', label: 'サッカー' },
-  { key: 'Baseball',    icon: '⚾', label: '野球'     },
-  { key: 'Basketball',  icon: '🏀', label: 'バスケ'   },
-  { key: 'Tennis',      icon: '🎾', label: 'テニス'   },
-  { key: 'TableTennis', icon: '🏓', label: '卓球'     },
-  { key: 'Rugby',       icon: '🏉', label: 'ラグビー' },
-  { key: 'Volleyball',  icon: '🏐', label: 'バレー'   },
+  { key: 'Soccer',      icon: '⚽', label: 'Football'   },
+  { key: 'Baseball',    icon: '⚾', label: 'Baseball'   },
+  { key: 'Basketball',  icon: '🏀', label: 'Basketball' },
+  { key: 'Tennis',      icon: '🎾', label: 'Tennis'     },
+  { key: 'TableTennis', icon: '🏓', label: 'Table Tennis' },
+  { key: 'Rugby',       icon: '🏉', label: 'Rugby'      },
+  { key: 'Volleyball',  icon: '🏐', label: 'Volleyball' },
 ];
 
 // ---- サッカーリーグ定義（ESPN）----
@@ -1200,6 +1200,15 @@ const ESPN_SOCCER_LEAGUES = [
   { id: 'ger.dfb_pokal',    label: 'DFB Pokal'          },
   { id: 'ita.coppa_italia', label: 'Coppa Italia'       },
   { id: 'fra.coupe_de_france', label: 'Coupe de France' },
+  // 国際大会
+  { id: 'fifa.world',            label: 'World Cup'          },
+  { id: 'fifa.worldq.afc',       label: 'WC Qual (AFC)'      },
+  { id: 'fifa.worldq.uefa',      label: 'WC Qual (UEFA)'     },
+  { id: 'fifa.worldq.conmebol',  label: 'WC Qual (CONMEBOL)' },
+  { id: 'fifa.worldq.concacaf',  label: 'WC Qual (CONCACAF)' },
+  { id: 'fifa.friendly.m',       label: "Int'l Friendly"     },
+  { id: 'uefa.nations',          label: 'Nations League'     },
+  { id: 'concacaf.nations.l',    label: 'CONCACAF Nations'   },
 ];
 
 let scheduleDate   = new Date();
@@ -1260,22 +1269,28 @@ async function findSportsCalendar() {
 }
 
 // ---- ESPN汎用フェッチ ----
+function parseESPNEvents(data, dateStr) {
+  return (data.events || []).map(ev => {
+    const comp  = ev.competitions?.[0];
+    const home  = comp?.competitors?.find(c => c.homeAway === 'home');
+    const away  = comp?.competitors?.find(c => c.homeAway === 'away');
+    const title = (home && away)
+      ? `${away.team.displayName} vs ${home.team.displayName}`
+      : (ev.name || ev.shortName || '');
+    return { title, startUtc: ev.date || null, dateStr };
+  });
+}
+
 async function fetchESPN(sport, leagueId, dateStr) {
   try {
-    const d   = dateStr.replace(/-/g, '');
-    const url = `https://site.api.espn.com/apis/site/v2/sports/${sport}/${leagueId}/scoreboard?dates=${d}`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.events || []).map(ev => {
-      const comp  = ev.competitions?.[0];
-      const home  = comp?.competitors?.find(c => c.homeAway === 'home');
-      const away  = comp?.competitors?.find(c => c.homeAway === 'away');
-      const title = (home && away)
-        ? `${away.team.displayName} vs ${home.team.displayName}`
-        : (ev.name || ev.shortName || '');
-      return { title, startUtc: ev.date || null, dateStr };
-    });
+    const d    = dateStr.replace(/-/g, '');
+    const base = `https://site.api.espn.com/apis/site/v2/sports/${sport}/${leagueId}`;
+    // scoreboard を試し、4xx なら events にフォールバック（決勝など）
+    const res = await fetch(`${base}/scoreboard?dates=${d}`);
+    if (res.ok) return parseESPNEvents(await res.json(), dateStr);
+    const res2 = await fetch(`${base}/events?dates=${d}`);
+    if (!res2.ok) return [];
+    return parseESPNEvents(await res2.json(), dateStr);
   } catch { return []; }
 }
 
@@ -1296,15 +1311,39 @@ async function fetchTSDB(sport, dateStr) {
   } catch { return []; }
 }
 
-// ---- ⚽ サッカー（ESPN × 13リーグ）----
+// UEFA cup competitions: ノックアウト段階は seasontype=3 を追加で試す
+const UEFA_CUPS = new Set(['uefa.champions', 'uefa.europa', 'uefa.ecl']);
+
+// ---- ⚽ サッカー（ESPN + Netlify function 常時併用）----
 async function fetchSoccer(dateStr) {
-  const results = await Promise.all(
-    ESPN_SOCCER_LEAGUES.map(async ({ id, label }) => {
-      const evs = await fetchESPN('soccer', id, dateStr);
-      return evs.map(ev => ({ ...ev, league: label, sportKey: 'Soccer' }));
-    })
-  );
-  return results.flat();
+  const [espnResults, netlifyEvs] = await Promise.all([
+    // ESPN: 各リーグを並列取得
+    Promise.all(
+      ESPN_SOCCER_LEAGUES.map(async ({ id, label }) => {
+        let evs = await fetchESPN('soccer', id, dateStr);
+        if (evs.length === 0 && UEFA_CUPS.has(id)) {
+          try {
+            const d = dateStr.replace(/-/g, '');
+            const r = await fetch(
+              `https://site.api.espn.com/apis/site/v2/sports/soccer/${id}/scoreboard?dates=${d}&seasontype=3`
+            );
+            if (r.ok) evs = parseESPNEvents(await r.json(), dateStr);
+          } catch {}
+        }
+        return evs.map(ev => ({ ...ev, league: label, sportKey: 'Soccer' }));
+      })
+    ).then(r => r.flat()),
+    // Netlify function: FotMob XML → UEFA → TSDB を常時取得
+    fetch(`/.netlify/functions/soccer-schedule?date=${dateStr}`)
+      .then(r => r.ok ? r.json() : { events: [] })
+      .then(d => (d.events || []).map(ev => ({ ...ev, sportKey: 'Soccer' })))
+      .catch(() => []),
+  ]);
+
+  // 重複除去: タイトルが同じものはESPNを優先
+  const espnTitles = new Set(espnResults.map(e => e.title?.toLowerCase()));
+  const uniqueNetlify = netlifyEvs.filter(e => !espnTitles.has(e.title?.toLowerCase()));
+  return [...espnResults, ...uniqueNetlify];
 }
 
 // ---- ⚾ MLB（公式API）----
@@ -1581,7 +1620,7 @@ function renderLeagueFilters() {
   if (leagues.length <= 1) { container.innerHTML = ''; leagueFilter.clear(); return; }
 
   const allActive = leagueFilter.size === 0 ? ' active' : '';
-  container.innerHTML = `<button class="league-filter-btn${allActive}" data-league="all">すべて</button>` +
+  container.innerHTML = `<button class="league-filter-btn${allActive}" data-league="all">All</button>` +
     leagues.map(l => {
       const active = leagueFilter.has(l) ? ' active' : '';
       return `<button class="league-filter-btn${active}" data-league="${escapeHtml(l)}">${escapeHtml(l)}</button>`;
