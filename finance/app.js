@@ -12,12 +12,33 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ============================================================
 // 定数
 // ============================================================
-const INCOME_CATEGORIES = ['仕送り', 'バイト', 'Sports Betting'];
+let INCOME_CATEGORIES  = [];
+let EXPENSE_CATEGORIES = [];
 
-const EXPENSE_CATEGORIES = [
-  '食費', '交通費', '衣類・アクセサリー', '娯楽費', '旅費',
-  'サブスクリプション', '美容', 'ガジェット', '必需品', '科目変換',
-];
+const DEFAULT_INCOME   = ['仕送り', 'バイト', 'Sports Betting'];
+const DEFAULT_EXPENSE  = ['食費', '交通費', '衣類・アクセサリー', '娯楽費', '旅費', 'サブスクリプション', '美容', 'ガジェット', '必需品', '科目変換'];
+
+async function loadCategories() {
+  const { data, error } = await db.from('finance_categories').select('type,name').order('id');
+  if (error || !data || data.length === 0) {
+    INCOME_CATEGORIES  = [...DEFAULT_INCOME];
+    EXPENSE_CATEGORIES = [...DEFAULT_EXPENSE];
+    return;
+  }
+  INCOME_CATEGORIES  = [];
+  EXPENSE_CATEGORIES = [];
+  for (const row of data) {
+    if (row.type === 'income')  INCOME_CATEGORIES.push(row.name);
+    else                        EXPENSE_CATEGORIES.push(row.name);
+  }
+}
+
+async function saveNewCategory(type, name) {
+  const { error } = await db.from('finance_categories').insert({ type, name });
+  if (error) return;
+  if (type === 'income')  INCOME_CATEGORIES.push(name);
+  else                    EXPENSE_CATEGORIES.push(name);
+}
 
 const PAYMENT_METHODS = [
   'deposit（銀行）', 'cash（現金）', 'PayPay',
@@ -49,6 +70,11 @@ let currentType = 'expense';
 let dashMonth   = new Date();
 let listMonth   = new Date();
 let chart       = null;
+let _listSort   = { key: 'date', asc: false };
+let _editType   = 'expense';
+let _editingId  = null;
+let _finPnlYear  = new Date().getFullYear();
+let _finPnlMonth = new Date().getMonth() + 1;
 
 // ============================================================
 // ユーティリティ
@@ -107,6 +133,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (tab === 'list')      renderList();
     if (tab === 'accounts')  renderAccounts();
     if (tab === 'planned')   renderPlannedTab();
+    if (tab === 'pnl')       renderFinancePnl();
   });
 });
 
@@ -143,8 +170,26 @@ document.getElementById('input-location').addEventListener('change', function ()
 // 今日の日付をデフォルトに
 document.getElementById('input-date').value = new Date().toISOString().split('T')[0];
 
-// カテゴリ初期化
-updateCategoryOptions();
+// カテゴリ初期化（Supabase から追加分を読み込んでから表示）
+loadCategories().then(() => updateCategoryOptions());
+
+// カテゴリ管理ボタン
+document.getElementById('btn-manage-categories').addEventListener('click', () => {
+  const wrap = document.getElementById('new-category-wrap');
+  const isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) document.getElementById('input-new-category').focus();
+});
+
+document.getElementById('btn-save-new-category').addEventListener('click', async () => {
+  const name = document.getElementById('input-new-category').value.trim();
+  if (!name) return;
+  await saveNewCategory(currentType, name);
+  document.getElementById('input-new-category').value = '';
+  document.getElementById('new-category-wrap').style.display = 'none';
+  updateCategoryOptions();
+  document.getElementById('input-category').value = name;
+});
 
 // 収入/支出トグル
 document.querySelectorAll('.type-btn').forEach(btn => {
@@ -353,39 +398,70 @@ async function renderList() {
     .from('transactions')
     .select('*')
     .gte('date', start)
-    .lte('date', end)
-    .order('date', { ascending: false })
-    .order('created_at', { ascending: false });
+    .lte('date', end);
 
   const container = document.getElementById('transaction-list');
 
-  if (!txns || txns.length === 0) {
-    container.innerHTML = '<div class="empty-msg">この月のデータはありません</div>';
-    return;
-  }
+  const sortFn = (a, b) => {
+    const va = _listSort.key === 'date' ? a.date : a.amount;
+    const vb = _listSort.key === 'date' ? b.date : b.amount;
+    if (va < vb) return _listSort.asc ? -1 : 1;
+    if (va > vb) return _listSort.asc ? 1 : -1;
+    return 0;
+  };
 
-  container.innerHTML = txns.map(t => {
-    const sign     = t.type === 'income' ? '+' : '−';
-    const memo     = t.memo     ? ` · ${t.memo}`     : '';
-    const location = t.location ? ` · 📍${t.location}` : '';
-    return `
-      <div class="txn-item">
-        <div class="txn-dot ${t.type}"></div>
-        <div class="txn-info">
-          <div class="txn-category">${t.category}</div>
-          <div class="txn-meta">${t.date} · ${t.payment_method}${location}${memo}</div>
+  const income  = (txns || []).filter(t => t.type === 'income').sort(sortFn);
+  const expense = (txns || []).filter(t => t.type === 'expense').sort(sortFn);
+
+  const buildItems = list => list.length === 0
+    ? '<div class="txn-empty">なし</div>'
+    : list.map(t => {
+        const memo     = t.memo     ? ` · ${t.memo}`     : '';
+        const location = t.location ? ` · 📍${t.location}` : '';
+        return `
+          <div class="txn-item">
+            <div class="txn-info">
+              <div class="txn-category">${t.category}</div>
+              <div class="txn-meta">${t.date}${location}${memo}</div>
+            </div>
+            <div class="txn-amount ${t.type}">${yen(t.amount)}</div>
+            <button class="txn-edit"   data-id="${t.id}" title="編集">✎</button>
+            <button class="txn-delete" data-id="${t.id}" title="削除">×</button>
+          </div>`;
+      }).join('');
+
+  const incomeTotal  = income.reduce((s, t) => s + t.amount, 0);
+  const expenseTotal = expense.reduce((s, t) => s + t.amount, 0);
+
+  container.innerHTML = `
+    <div class="list-columns">
+      <div class="list-col list-col-income">
+        <div class="list-col-header">
+          <span class="list-col-label">収入</span>
+          <span class="list-col-total">${yen(incomeTotal)}</span>
         </div>
-        <div class="txn-amount ${t.type}">${sign}${yen(t.amount)}</div>
-        <button class="txn-delete" data-id="${t.id}" title="削除">×</button>
+        ${buildItems(income)}
       </div>
-    `;
-  }).join('');
+      <div class="list-col list-col-expense">
+        <div class="list-col-header">
+          <span class="list-col-label">支出</span>
+          <span class="list-col-total">${yen(expenseTotal)}</span>
+        </div>
+        ${buildItems(expense)}
+      </div>
+    </div>`;
+
+  container.querySelectorAll('.txn-edit').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const { data: txn } = await db.from('transactions').select('*').eq('id', btn.dataset.id).single();
+      if (txn) openEditModal(txn);
+    });
+  });
 
   container.querySelectorAll('.txn-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!confirm('この記録を削除しますか？')) return;
 
-      // 削除前に取引内容を取得して残高を元に戻す
       const { data: txn } = await db
         .from('transactions')
         .select('type, amount, payment_method')
@@ -398,7 +474,6 @@ async function renderList() {
         .eq('id', btn.dataset.id);
 
       if (!error) {
-        // 削除した取引の逆方向に残高を更新
         if (txn) {
           const reverseType = txn.type === 'income' ? 'expense' : 'income';
           await updateAccountBalance(txn.payment_method, reverseType, txn.amount);
@@ -407,6 +482,227 @@ async function renderList() {
       }
     });
   });
+}
+
+// ============================================================
+// 一覧ソート
+// ============================================================
+document.querySelectorAll('.sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _listSort = { key: btn.dataset.key, asc: btn.dataset.asc === 'true' };
+    renderList();
+  });
+});
+
+// ============================================================
+// 編集モーダル
+// ============================================================
+function updateEditCategoryOptions() {
+  const cats = _editType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  buildOptions(document.querySelector('#edit-form [name="category"]'), cats);
+}
+
+async function openEditModal(txn) {
+  _editingId = txn.id;
+  _editType  = txn.type;
+
+  const f = document.getElementById('edit-form');
+
+  document.querySelectorAll('.edit-type-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === txn.type);
+  });
+
+  f.elements.date.value   = txn.date;
+  f.elements.amount.value = txn.amount;
+  f.elements.memo.value   = txn.memo || '';
+  f.elements.id.value     = txn.id;
+
+  buildOptions(f.elements.payment_method, PAYMENT_METHODS);
+  f.elements.payment_method.value = txn.payment_method;
+
+  updateEditCategoryOptions();
+  f.elements.category.value = txn.category;
+
+  const { data: locs } = await db.from('location_options').select('name').order('sort_order').order('id');
+  const locSel = f.elements.location;
+  locSel.innerHTML = '<option value="">-- 未選択 --</option>'
+    + (locs || []).map(l => `<option value="${l.name}">${l.name}</option>`).join('');
+  locSel.value = txn.location || '';
+
+  const saveBtn = document.getElementById('btn-edit-save');
+  saveBtn.style.background = _editType === 'income' ? 'var(--income)' : 'var(--expense)';
+
+  document.getElementById('edit-modal-overlay').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal-overlay').style.display = 'none';
+  _editingId = null;
+}
+
+document.querySelectorAll('.edit-type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _editType = btn.dataset.type;
+    document.querySelectorAll('.edit-type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    updateEditCategoryOptions();
+    document.getElementById('btn-edit-save').style.background =
+      _editType === 'income' ? 'var(--income)' : 'var(--expense)';
+  });
+});
+
+document.getElementById('btn-edit-cancel').addEventListener('click', closeEditModal);
+
+document.getElementById('edit-modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeEditModal();
+});
+
+document.getElementById('edit-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const id = f.elements.id.value;
+
+  const { data: oldTxn } = await db
+    .from('transactions')
+    .select('type, amount, payment_method')
+    .eq('id', id)
+    .single();
+
+  const newPayload = {
+    date:           f.elements.date.value,
+    type:           _editType,
+    amount:         parseInt(f.elements.amount.value, 10),
+    category:       f.elements.category.value,
+    payment_method: f.elements.payment_method.value,
+    memo:           f.elements.memo.value.trim(),
+    location:       f.elements.location.value || null,
+  };
+
+  const { error } = await db.from('transactions').update(newPayload).eq('id', id);
+
+  if (!error && oldTxn) {
+    const reverseOld = oldTxn.type === 'income' ? 'expense' : 'income';
+    await updateAccountBalance(oldTxn.payment_method, reverseOld, oldTxn.amount);
+    await updateAccountBalance(newPayload.payment_method, newPayload.type, newPayload.amount);
+  }
+
+  closeEditModal();
+  renderList();
+});
+
+// ============================================================
+// 損益計算書
+// ============================================================
+document.getElementById('fin-pnl-prev').addEventListener('click', () => {
+  _finPnlMonth--;
+  if (_finPnlMonth < 1) { _finPnlMonth = 12; _finPnlYear--; }
+  renderFinancePnl();
+});
+document.getElementById('fin-pnl-next').addEventListener('click', () => {
+  _finPnlMonth++;
+  if (_finPnlMonth > 12) { _finPnlMonth = 1; _finPnlYear++; }
+  renderFinancePnl();
+});
+
+async function renderFinancePnl() {
+  const y = _finPnlYear, m = _finPnlMonth;
+  document.getElementById('fin-pnl-month-label').textContent = `${y}年${m}月`;
+
+  const start = `${y}-${String(m).padStart(2, '0')}-01`;
+  const end   = `${y}-${String(m).padStart(2, '0')}-31`;
+
+  const { data: txns } = await db
+    .from('transactions')
+    .select('type, amount, category, payment_method')
+    .gte('date', start)
+    .lte('date', end);
+
+  const expenses = {};
+  const revenues = {};
+
+  for (const t of (txns || [])) {
+    const cat     = t.category       || 'その他';
+    const payment = t.payment_method || '未設定';
+    if (t.type === 'expense') {
+      if (!expenses[cat]) expenses[cat] = {};
+      expenses[cat][payment] = (expenses[cat][payment] || 0) + t.amount;
+    } else {
+      if (!revenues[cat]) revenues[cat] = {};
+      revenues[cat][payment] = (revenues[cat][payment] || 0) + t.amount;
+    }
+  }
+
+  const sum      = obj => Object.values(obj).flatMap(Object.values).reduce((a, b) => a + b, 0);
+  const expTotal = sum(expenses);
+  const revTotal = sum(revenues);
+  const profit   = revTotal - expTotal;
+
+  const buildSection = (type, label, data, total) => {
+    if (total === 0) return '';
+    const allAmounts = Object.values(data).flatMap(Object.values);
+    const maxAmt = Math.max(...allAmounts, 1);
+    let rows = '';
+    for (const [cat, payments] of Object.entries(data)) {
+      const catTotal = Object.values(payments).reduce((a, b) => a + b, 0);
+      const catPct   = Math.round(catTotal / maxAmt * 100);
+      rows += `
+        <div class="pnl-row sport">
+          <div class="pnl-row-label">${cat}</div>
+          <div class="pnl-bar-wrap"><div class="pnl-bar" style="width:${catPct}%"></div></div>
+          <div class="pnl-row-amount">¥${catTotal.toLocaleString()}</div>
+        </div>`;
+      const entries = Object.entries(payments);
+      if (entries.length > 1) {
+        for (const [payment, amt] of entries) {
+          const pct = Math.round(amt / maxAmt * 100);
+          rows += `
+            <div class="pnl-row league">
+              <div class="pnl-row-label">${payment}</div>
+              <div class="pnl-bar-wrap"><div class="pnl-bar" style="width:${pct}%"></div></div>
+              <div class="pnl-row-amount">¥${amt.toLocaleString()}</div>
+            </div>`;
+        }
+      }
+    }
+    return `
+      <div class="pnl-section ${type}">
+        <div class="pnl-sec-header">
+          <span>${label}</span>
+          <span class="pnl-sec-total">¥${total.toLocaleString()}</span>
+        </div>
+        ${rows}
+      </div>`;
+  };
+
+  const profitType  = profit >= 0 ? 'profit' : 'netloss';
+  const profitLabel = profit >= 0 ? '利益' : '損失';
+  const profitSign  = profit >= 0 ? '+' : '';
+  const resultBlock = `
+    <div class="pnl-section ${profitType}">
+      <div class="pnl-sec-header"><span>${profitLabel}</span></div>
+      <div class="pnl-profit-body ${profit >= 0 ? 'is-profit' : 'is-loss'}">${profitSign}¥${Math.abs(profit).toLocaleString()}</div>
+    </div>`;
+
+  const expBlock = buildSection('expense', '費用', expenses, expTotal);
+  const revBlock = buildSection('revenue', '収益', revenues, revTotal);
+
+  if (!expBlock && !revBlock) {
+    document.getElementById('fin-pnl-container').innerHTML =
+      '<div class="empty-msg">この月のデータはありません</div>';
+    return;
+  }
+
+  const leftCol  = profit >= 0 ? `${expBlock}${resultBlock}` : `${expBlock}`;
+  const rightCol = profit >= 0 ? `${revBlock}` : `${revBlock}${resultBlock}`;
+
+  document.getElementById('fin-pnl-container').innerHTML = `
+    <div class="pnl-heading">損益計算書</div>
+    <div class="pnl-columns">
+      <div class="pnl-col">${leftCol}</div>
+      <div class="pnl-col">${rightCol}</div>
+    </div>`;
 }
 
 // ============================================================

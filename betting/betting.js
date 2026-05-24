@@ -900,6 +900,8 @@ function renderGoalProgress() {
     return;
   }
 
+  const today = new Date(); today.setHours(0,0,0,0);
+
   container.innerHTML = goals.map(g => {
     const pnl = _bets
       .filter(b => b.date >= g.goalStart && b.date <= g.goalEnd)
@@ -908,6 +910,14 @@ function renderGoalProgress() {
     const pct   = Math.min(100, Math.max(0, Math.round(pnl / g.goalAmount * 100)));
     const color = pct >= 100 ? '#27AE60' : pct >= 50 ? '#F39C12' : '#9B59B6';
     const done  = pct >= 100 ? ' 🎉 達成！' : '';
+
+    const startD = new Date(g.goalStart); startD.setHours(0,0,0,0);
+    const endD   = new Date(g.goalEnd);   endD.setHours(0,0,0,0);
+    const totalDays = Math.max(1, (endD - startD) / 86400000);
+    const elapsed   = Math.max(0, Math.min(totalDays, (today - startD) / 86400000));
+    const datePct   = Math.round(elapsed / totalDays * 100);
+    const daysLeft  = Math.max(0, Math.ceil((endD - today) / 86400000));
+    const dateLabel = datePct >= 100 ? '期間終了' : `残${daysLeft}日`;
 
     return `<div class="goal-card">
       <div class="goal-header">
@@ -918,10 +928,16 @@ function renderGoalProgress() {
         <span>${g.goalStart} 〜 ${g.goalEnd}</span>
         <span class="${pnl >= 0 ? 'win' : 'loss'}">${(pnl >= 0 ? '+' : '') + '¥' + pnl.toLocaleString()} / ¥${Number(g.goalAmount).toLocaleString()}</span>
       </div>
-      <div class="goal-track">
-        <div class="goal-fill" style="width:${pct}%;background:${color}"></div>
+      <div class="goal-bar-row">
+        <span class="goal-bar-label">損益</span>
+        <div class="goal-track"><div class="goal-fill" style="width:${pct}%;background:${color}"></div></div>
+        <span class="goal-bar-pct">${pct}%${done}</span>
       </div>
-      <div class="goal-pct">${pct}%${done}</div>
+      <div class="goal-bar-row">
+        <span class="goal-bar-label">日付</span>
+        <div class="goal-track"><div class="goal-fill goal-fill-date" style="width:${datePct}%"></div></div>
+        <span class="goal-bar-pct goal-date-label">${dateLabel}</span>
+      </div>
     </div>`;
   }).join('');
 
@@ -1763,7 +1779,8 @@ function initTabs() {
       document.querySelectorAll('.stats-toggle-btn[data-group]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       _statsGroupBy = btn.dataset.group;
-      renderCharts();
+      renderSportChart();
+      renderStatsTable();
       renderPeriodStats();
       renderGoalProgress();
     });

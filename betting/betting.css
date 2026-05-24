@@ -438,14 +438,38 @@ details[open].settings-section > summary::before { content: '▼ '; }
   margin-bottom: 8px;
 }
 .goal-meta span:last-child { font-weight: 700; font-size: 13px; }
+.goal-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.goal-bar-row:last-child { margin-bottom: 0; }
+.goal-bar-label {
+  font-size: 11px;
+  color: var(--muted);
+  width: 28px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.goal-bar-pct {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+  width: 56px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.goal-date-label { color: var(--muted); font-weight: 400; }
 .goal-track {
   height: 10px;
   background: var(--border);
   border-radius: 99px;
   overflow: hidden;
-  margin-bottom: 6px;
+  flex: 1;
 }
 .goal-fill { height: 100%; border-radius: 99px; transition: width 0.4s; }
+.goal-fill-date { background: #94A3B8; }
 .goal-pct  { font-size: 12px; color: var(--muted); font-weight: 700; text-align: right; }
 
 .goal-add-section {
@@ -597,7 +621,9 @@ tr:last-child td { border-bottom: none; }
   border-radius: var(--radius);
   padding: 16px;
   box-shadow: var(--shadow);
+  margin-bottom: 14px;
 }
+.charts-grid .chart-card { margin-bottom: 0; }
 .chart-card h3 { font-size: 13px; font-weight: 800; margin-bottom: 10px; }
 .chart-wrap { height: 180px; }
 .chart-wrap canvas { width: 100% !important; height: 100% !important; }
