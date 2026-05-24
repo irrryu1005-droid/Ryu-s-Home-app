@@ -445,7 +445,7 @@ function renderRecords() {
     const fbBadge  = bet.isFreebet ? ' <span class="badge-fb">FB</span>' : '';
     const typeCell = isParlay
       ? `<td><span class="badge-parlay">マルチ ${(bet.legs || []).length}連</span>${fbBadge}</td>`
-      : `<td>シングル${fbBadge}</td>`;
+      : `<td><span class="badge-single">シングル</span>${fbBadge}</td>`;
 
     const resultOpts = (cur) =>
       [['pending','⏳'],['win','✅ 勝'],['loss','❌ 負'],['void','➖ 無効']]
@@ -848,43 +848,74 @@ function updateSummary() {
 // ============================================================
 // 期間別損益
 // ============================================================
+let _periodDayOfs   = 0;
+let _periodWeekOfs  = 0;
+let _periodMonthOfs = 0;
+
 function renderPeriodStats() {
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const dateStr = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 
-  // 今週の月曜日
-  const now    = new Date();
-  const offset = now.getDay() === 0 ? -6 : 1 - now.getDay();
-  const monday = new Date(now);
-  monday.setDate(monday.getDate() + offset);
-  const weekStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+  // 今日 ± offset
+  const dayDate = new Date(now);
+  dayDate.setDate(dayDate.getDate() + _periodDayOfs);
+  const dayStr   = dateStr(dayDate);
+  const dayLabel = _periodDayOfs === 0 ? '今日' : `${dayDate.getMonth()+1}/${dayDate.getDate()}`;
 
-  // 今月の1日
-  const monthStart = today.slice(0, 8) + '01';
+  // 今週の月曜〜日曜 ± offset週
+  const wOffset = now.getDay() === 0 ? -6 : 1 - now.getDay();
+  const monday  = new Date(now);
+  monday.setDate(monday.getDate() + wOffset + _periodWeekOfs * 7);
+  const sunday  = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const weekStart = dateStr(monday);
+  const weekEnd   = dateStr(sunday);
+  const weekLabel = _periodWeekOfs === 0 ? '今週'
+    : `${monday.getMonth()+1}/${monday.getDate()}〜${sunday.getMonth()+1}/${sunday.getDate()}`;
+
+  // 今月 ± offset月
+  const mBase     = new Date(now.getFullYear(), now.getMonth() + _periodMonthOfs, 1);
+  const mLast     = new Date(mBase.getFullYear(), mBase.getMonth() + 1, 0);
+  const monthStart = dateStr(mBase);
+  const monthEnd   = dateStr(mLast);
+  const monthLabel = _periodMonthOfs === 0 ? '今月' : `${mBase.getFullYear()}/${mBase.getMonth()+1}月`;
 
   const calcPeriod = (start, end) =>
     _bets.filter(b => b.date >= start && b.date <= end)
          .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
 
-  const fmt = (pnl) => (pnl >= 0 ? '+' : '') + '¥' + pnl.toLocaleString();
-  const cls = (pnl) => pnl > 0 ? 'win' : pnl < 0 ? 'loss' : '';
+  const fmt = pnl => (pnl >= 0 ? '+' : '') + '¥' + pnl.toLocaleString();
+  const cls = pnl => pnl > 0 ? 'win' : pnl < 0 ? 'loss' : '';
 
-  const todayPnl = calcPeriod(today, today);
-  const weekPnl  = calcPeriod(weekStart, today);
-  const monthPnl = calcPeriod(monthStart, today);
+  const dayPnl   = calcPeriod(dayStr, dayStr);
+  const weekPnl  = calcPeriod(weekStart, weekEnd);
+  const monthPnl = calcPeriod(monthStart, monthEnd);
 
-  document.getElementById('period-stats').innerHTML = `
+  const item = (label, pnl, type, ofs) => `
     <div class="period-item">
-      <div class="period-label">今日</div>
-      <div class="period-val ${cls(todayPnl)}">${fmt(todayPnl)}</div>
-    </div>
-    <div class="period-item">
-      <div class="period-label">今週</div>
-      <div class="period-val ${cls(weekPnl)}">${fmt(weekPnl)}</div>
-    </div>
-    <div class="period-item">
-      <div class="period-label">今月</div>
-      <div class="period-val ${cls(monthPnl)}">${fmt(monthPnl)}</div>
+      <button class="period-nav" data-type="${type}" data-dir="-1">‹</button>
+      <div class="period-center">
+        <div class="period-label">${label}</div>
+        <div class="period-val ${cls(pnl)}">${fmt(pnl)}</div>
+      </div>
+      <button class="period-nav ${ofs >= 0 ? 'period-nav-disabled' : ''}" data-type="${type}" data-dir="1" ${ofs >= 0 ? 'disabled' : ''}>›</button>
     </div>`;
+
+  document.getElementById('period-stats').innerHTML =
+    item(dayLabel,   dayPnl,   'day',   _periodDayOfs)  +
+    item(weekLabel,  weekPnl,  'week',  _periodWeekOfs) +
+    item(monthLabel, monthPnl, 'month', _periodMonthOfs);
+
+  document.querySelectorAll('#period-stats .period-nav').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const dir = parseInt(btn.dataset.dir);
+      if (btn.dataset.type === 'day')   _periodDayOfs   = Math.min(0, _periodDayOfs   + dir);
+      if (btn.dataset.type === 'week')  _periodWeekOfs  = Math.min(0, _periodWeekOfs  + dir);
+      if (btn.dataset.type === 'month') _periodMonthOfs = Math.min(0, _periodMonthOfs + dir);
+      renderPeriodStats();
+    });
+  });
 }
 
 // ============================================================

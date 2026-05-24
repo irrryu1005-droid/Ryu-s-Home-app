@@ -394,11 +394,37 @@ details[open].settings-section > summary::before { content: '▼ '; }
 .period-item {
   background: var(--bg);
   border-radius: 10px;
-  padding: 12px;
+  padding: 8px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+}
+.period-center {
+  flex: 1;
   text-align: center;
 }
 .period-label { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
 .period-val   { font-size: 16px; font-weight: 800; }
+.period-nav {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+.period-nav:hover:not(:disabled) {
+  background: var(--white);
+  color: var(--text);
+}
+.period-nav-disabled, .period-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
 
 /* ============================================================
    目標進捗（複数対応）
@@ -582,7 +608,8 @@ tr:last-child td { border-bottom: none; }
 .loss { color: var(--loss); font-weight: 700; }
 
 .badge-fb     { background: #EEE8F7; color: var(--purple); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700; margin-left: 4px; }
-.badge-parlay { background: #EBF3FB; color: #2980B9; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
+.badge-parlay  { background: #EBF3FB; color: #2980B9; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
+.badge-single  { background: #F0FDF4; color: #16A34A; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
 .badge-league { background: #EEE8F7; color: var(--purple); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700; }
 
 .stats-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
