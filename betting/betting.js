@@ -370,7 +370,7 @@ function renderPnlStatement() {
         <div class="pnl-row sport">
           <div class="pnl-row-label">${escapeHtml(sport)}</div>
           <div class="pnl-bar-wrap"><div class="pnl-bar" style="width:${sportPct}%"></div></div>
-          <div class="pnl-row-amount">¥${sportTotal.toLocaleString()} <span class="pnl-pct">${sportPct}%</span></div>
+          <div class="pnl-row-amount">¥${sportTotal.toLocaleString()}</div><div class="pnl-row-pct">${sportPct}%</div>
         </div>`;
       for (const [league, amt] of Object.entries(leagues)) {
         const pct = Math.round(amt / total * 100);
@@ -378,7 +378,7 @@ function renderPnlStatement() {
           <div class="pnl-row league">
             <div class="pnl-row-label">${escapeHtml(league)}</div>
             <div class="pnl-bar-wrap"><div class="pnl-bar" style="width:${pct}%"></div></div>
-            <div class="pnl-row-amount">¥${amt.toLocaleString()} <span class="pnl-pct">${pct}%</span></div>
+            <div class="pnl-row-amount">¥${amt.toLocaleString()}</div><div class="pnl-row-pct">${pct}%</div>
           </div>`;
       }
     }
