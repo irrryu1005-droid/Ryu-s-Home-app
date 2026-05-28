@@ -1048,20 +1048,34 @@ function renderCharts() {
 }
 
 function renderBalanceChart(settledBets) {
-  const bankroll = _settings.bankroll || 0;
-  const labels = [], data = [];
-  let balance = bankroll;
+  // 初期残高 = 現在のbankroll - 追加入金の合計
+  const totalDeposited = _deposits.reduce((s, d) => s + d.amount, 0);
+  const initialBankroll = (_settings.bankroll || 0) - totalDeposited;
 
-  const dayMap = {};
+  // 日付ごとに損益と入金額を集計
+  const dayMap = {}; // date -> { pnl, deposit }
   for (const bet of settledBets) {
     const pnl = calcPnl(bet);
     if (pnl === null) continue;
-    balance += pnl;
-    dayMap[bet.date] = balance;
+    if (!dayMap[bet.date]) dayMap[bet.date] = { pnl: 0, deposit: 0 };
+    dayMap[bet.date].pnl += pnl;
   }
+  for (const dep of _deposits) {
+    const d = dep.deposit_date;
+    if (!dayMap[d]) dayMap[d] = { pnl: 0, deposit: 0 };
+    dayMap[d].deposit += dep.amount;
+  }
+
+  const labels = [], data = [], pointColors = [], pointRadii = [];
+  let balance = initialBankroll;
   for (const d of Object.keys(dayMap).sort()) {
+    const ev = dayMap[d];
+    balance += ev.deposit + ev.pnl;
     labels.push(d);
-    data.push(dayMap[d]);
+    data.push(balance);
+    // 入金日はオレンジの大きい点、それ以外は青
+    pointColors.push(ev.deposit > 0 ? '#F59E0B' : '#3498DB');
+    pointRadii.push(ev.deposit > 0 ? 6 : 3);
   }
 
   const ctx = document.getElementById('chart-balance').getContext('2d');
@@ -1077,13 +1091,26 @@ function renderBalanceChart(settledBets) {
         backgroundColor: 'rgba(52,152,219,0.1)',
         fill: true,
         tension: 0.3,
-        pointRadius: 3,
+        pointRadius: pointRadii,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            afterLabel: (item) => {
+              const d = labels[item.dataIndex];
+              const dep = dayMap[d]?.deposit;
+              return dep > 0 ? `入金: +¥${dep.toLocaleString()}` : '';
+            },
+          },
+        },
+      },
       scales: { y: { beginAtZero: false } },
     },
   });
