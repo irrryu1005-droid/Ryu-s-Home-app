@@ -1031,8 +1031,9 @@ function renderGoalProgress() {
 // チャート・統計
 // ============================================================
 let pnlChart = null, sportChart = null, balanceChart = null;
-let _statsGroupBy = 'sport'; // 'league' | 'sport'
-let _pnlViewBy    = 'bet';   // 'bet' | 'day'
+let _statsGroupBy  = 'sport'; // 'league' | 'sport'
+let _pnlViewBy     = 'bet';   // 'bet' | 'day'
+let _balanceViewBy = 'bet';   // 'bet' | 'day'
 
 function getStatKey(sport, league) {
   if (_statsGroupBy === 'sport') return sportDisplay(sport || 'Other');
@@ -1048,34 +1049,58 @@ function renderCharts() {
 }
 
 function renderBalanceChart(settledBets) {
-  // 初期残高 = 現在のbankroll - 追加入金の合計
   const totalDeposited = _deposits.reduce((s, d) => s + d.amount, 0);
   const initialBankroll = (_settings.bankroll || 0) - totalDeposited;
 
-  // 日付ごとに損益と入金額を集計
-  const dayMap = {}; // date -> { pnl, deposit }
-  for (const bet of settledBets) {
-    const pnl = calcPnl(bet);
-    if (pnl === null) continue;
-    if (!dayMap[bet.date]) dayMap[bet.date] = { pnl: 0, deposit: 0 };
-    dayMap[bet.date].pnl += pnl;
-  }
-  for (const dep of _deposits) {
-    const d = dep.deposit_date;
-    if (!dayMap[d]) dayMap[d] = { pnl: 0, deposit: 0 };
-    dayMap[d].deposit += dep.amount;
-  }
-
-  const labels = [], data = [], pointColors = [], pointRadii = [];
+  const labels = [], data = [], pointColors = [], pointRadii = [], tooltipDeposits = [];
   let balance = initialBankroll;
-  for (const d of Object.keys(dayMap).sort()) {
-    const ev = dayMap[d];
-    balance += ev.deposit + ev.pnl;
-    labels.push(d);
-    data.push(balance);
-    // 入金日はオレンジの大きい点、それ以外は青
-    pointColors.push(ev.deposit > 0 ? '#F59E0B' : '#3498DB');
-    pointRadii.push(ev.deposit > 0 ? 6 : 3);
+
+  if (_balanceViewBy === 'bet') {
+    // ベット別: ベットと入金を日付順にマージして1点ずつプロット
+    const events = [];
+    for (const bet of settledBets) {
+      const pnl = calcPnl(bet);
+      if (pnl === null) continue;
+      events.push({ date: bet.date, pnl, deposit: 0 });
+    }
+    for (const dep of _deposits) {
+      events.push({ date: dep.deposit_date, pnl: 0, deposit: dep.amount });
+    }
+    // 同日は入金→ベットの順、次に created_at 順（ここでは index順で近似）
+    events.sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return b.deposit - a.deposit; // 入金を先に
+    });
+    for (const ev of events) {
+      balance += ev.deposit + ev.pnl;
+      labels.push(ev.date);
+      data.push(balance);
+      pointColors.push(ev.deposit > 0 ? '#F59E0B' : '#3498DB');
+      pointRadii.push(ev.deposit > 0 ? 6 : 3);
+      tooltipDeposits.push(ev.deposit);
+    }
+  } else {
+    // 日別: 同じ日のベット損益・入金をまとめて1点
+    const dayMap = {};
+    for (const bet of settledBets) {
+      const pnl = calcPnl(bet);
+      if (pnl === null) continue;
+      if (!dayMap[bet.date]) dayMap[bet.date] = { pnl: 0, deposit: 0 };
+      dayMap[bet.date].pnl += pnl;
+    }
+    for (const dep of _deposits) {
+      if (!dayMap[dep.deposit_date]) dayMap[dep.deposit_date] = { pnl: 0, deposit: 0 };
+      dayMap[dep.deposit_date].deposit += dep.amount;
+    }
+    for (const d of Object.keys(dayMap).sort()) {
+      const ev = dayMap[d];
+      balance += ev.deposit + ev.pnl;
+      labels.push(d);
+      data.push(balance);
+      pointColors.push(ev.deposit > 0 ? '#F59E0B' : '#3498DB');
+      pointRadii.push(ev.deposit > 0 ? 6 : 3);
+      tooltipDeposits.push(ev.deposit);
+    }
   }
 
   const ctx = document.getElementById('chart-balance').getContext('2d');
@@ -1104,8 +1129,7 @@ function renderBalanceChart(settledBets) {
         tooltip: {
           callbacks: {
             afterLabel: (item) => {
-              const d = labels[item.dataIndex];
-              const dep = dayMap[d]?.deposit;
+              const dep = tooltipDeposits[item.dataIndex];
               return dep > 0 ? `入金: +¥${dep.toLocaleString()}` : '';
             },
           },
@@ -2008,6 +2032,16 @@ function initTabs() {
       _pnlViewBy = btn.dataset.pnl;
       const settled = _bets.filter(b => b.result !== 'pending').slice().reverse();
       renderPnlChart(settled);
+    });
+  });
+
+  document.querySelectorAll('.stats-toggle-btn[data-balance]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.stats-toggle-btn[data-balance]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _balanceViewBy = btn.dataset.balance;
+      const settled = _bets.filter(b => b.result !== 'pending').slice().reverse();
+      renderBalanceChart(settled);
     });
   });
 
