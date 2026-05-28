@@ -55,6 +55,7 @@ let _bets      = [];
 let _campaigns = [];
 let _settings  = { bankroll: null };
 let _goals     = [];
+let _deposits  = [];
 
 const _now = new Date();
 let _pnlYear  = _now.getFullYear();
@@ -104,16 +105,18 @@ function normalizeCampaign(row) {
 }
 
 async function loadAll() {
-  const [betsRes, campsRes, settingsRes, goalsRes] = await Promise.all([
+  const [betsRes, campsRes, settingsRes, goalsRes, depositsRes] = await Promise.all([
     db.from('bets').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
     db.from('bet_campaigns').select('*').order('created_at'),
     db.from('bet_settings').select('*').eq('id', 1).single(),
     db.from('bet_goals').select('*').order('created_at'),
+    db.from('bet_deposits').select('*').order('deposit_date', { ascending: false }),
   ]);
   _bets      = (betsRes.data     || []).map(normalizeBet);
   _campaigns = (campsRes.data    || []).map(normalizeCampaign);
   _settings  =  settingsRes.data || { bankroll: null };
   _goals     = (goalsRes.data    || []).map(normalizeGoal);
+  _deposits  =  depositsRes.data || [];
 }
 
 function getAllBets()      { return _bets; }
@@ -262,17 +265,62 @@ function initSettings() {
   document.getElementById('btn-deposit').addEventListener('click', async () => {
     const amount = parseInt(document.getElementById('settings-deposit').value);
     if (!amount || amount <= 0) return;
+    const dateVal = document.getElementById('settings-deposit-date').value;
+    const depositDate = dateVal || new Date().toISOString().slice(0, 10);
+
+    // bankroll を更新
     const current = _settings.bankroll || 0;
     const newBankroll = current + amount;
     await saveBankroll(newBankroll);
-    document.getElementById('settings-bankroll').value = newBankroll;
-    document.getElementById('settings-deposit').value  = '';
+
+    // 入金履歴をDBに保存
+    const { data, error } = await db.from('bet_deposits').insert([{
+      amount, deposit_date: depositDate,
+    }]).select().single();
+    if (!error && data) _deposits.unshift(data);
+
+    document.getElementById('settings-bankroll').value    = newBankroll;
+    document.getElementById('settings-deposit').value     = '';
+    document.getElementById('settings-deposit-date').value = '';
+    renderDepositHistory();
     refreshAll();
+  });
+
+  renderDepositHistory();
+}
+
+function renderDepositHistory() {
+  const el = document.getElementById('deposit-history');
+  if (!el) return;
+  if (_deposits.length === 0) { el.innerHTML = ''; return; }
+  const rows = _deposits.map(d => `
+    <div class="deposit-row">
+      <span class="deposit-date">${d.deposit_date}</span>
+      <span class="deposit-amount">+¥${Number(d.amount).toLocaleString()}</span>
+      <button class="deposit-del-btn" data-id="${d.id}">✕</button>
+    </div>`).join('');
+  el.innerHTML = `<div class="deposit-history-label">入金履歴</div>${rows}`;
+
+  el.querySelectorAll('.deposit-del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = Number(btn.dataset.id);
+      const dep = _deposits.find(d => d.id === id);
+      if (!dep) return;
+      // bankroll から差し引き
+      const newBankroll = (_settings.bankroll || 0) - dep.amount;
+      await saveBankroll(newBankroll);
+      await db.from('bet_deposits').delete().eq('id', id);
+      _deposits = _deposits.filter(d => d.id !== id);
+      document.getElementById('settings-bankroll').value = newBankroll;
+      renderDepositHistory();
+      refreshAll();
+    });
   });
 }
 
 function populateSettings() {
   if (_settings.bankroll) document.getElementById('settings-bankroll').value = _settings.bankroll;
+  renderDepositHistory();
 }
 
 // ============================================================

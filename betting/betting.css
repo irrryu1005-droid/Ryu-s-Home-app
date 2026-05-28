@@ -375,6 +375,31 @@ details[open].settings-section > summary::before { content: '▼ '; }
 }
 .btn-deposit:hover { opacity: 0.88; }
 
+.deposit-history { margin-top: 14px; }
+.deposit-history-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.deposit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.deposit-row:last-child { border-bottom: none; }
+.deposit-date { flex: 1; color: var(--muted); }
+.deposit-amount { font-weight: 600; color: var(--win); font-variant-numeric: tabular-nums; }
+.deposit-del-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.deposit-del-btn:hover { color: var(--loss); background: #FEE2E2; }
+
 /* ============================================================
    期間別損益
 ============================================================ */
