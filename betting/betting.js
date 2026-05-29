@@ -61,6 +61,11 @@ const _now = new Date();
 let _pnlYear  = _now.getFullYear();
 let _pnlMonth = _now.getMonth() + 1;
 
+function todayJST() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 function normalizeBet(row) {
   return {
     id:           row.id,
@@ -266,7 +271,7 @@ function initSettings() {
     const amount = parseInt(document.getElementById('settings-deposit').value);
     if (!amount || amount <= 0) return;
     const dateVal = document.getElementById('settings-deposit-date').value;
-    const depositDate = dateVal || new Date().toISOString().slice(0, 10);
+    const depositDate = dateVal || todayJST();
 
     // bankroll を更新
     const current = _settings.bankroll || 0;
@@ -692,7 +697,7 @@ function openAddForm() {
   const form = document.getElementById('bet-form');
   form.reset();
   form.elements.id.value   = '';
-  form.elements.date.value = new Date().toISOString().slice(0, 10);
+  form.elements.date.value = todayJST();
   document.getElementById('form-title').textContent  = '新規ベット';
   document.getElementById('legs-container').innerHTML = '';
   setFormType('single');
@@ -807,7 +812,7 @@ function renderCampaigns() {
 async function completeCampaign(id) {
   const c = _campaigns.find(c => c.id === id);
   if (!c || !confirm(`「${c.name}」を達成済みにしますか？`)) return;
-  await updateCampaign(id, { status: 'completed', completedDate: new Date().toISOString().slice(0, 10) });
+  await updateCampaign(id, { status: 'completed', completedDate: todayJST() });
   refreshAll();
 }
 
@@ -2167,11 +2172,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       startDate:     f.elements.campaignStart.value,
     });
     f.reset();
-    f.elements.campaignStart.value = new Date().toISOString().slice(0, 10);
+    f.elements.campaignStart.value = todayJST();
     refreshAll();
   });
-  document.querySelector('#campaign-add-form [name="campaignStart"]').value =
-    new Date().toISOString().slice(0, 10);
+  document.querySelector('#campaign-add-form [name="campaignStart"]').value = todayJST();
 
   // 目標追加フォーム
   document.getElementById('goal-add-form').addEventListener('submit', async e => {
