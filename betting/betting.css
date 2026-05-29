@@ -646,6 +646,10 @@ tr:last-child td { border-bottom: none; }
   background: transparent; color: var(--muted); transition: all 0.15s;
 }
 .stats-toggle-btn.active { background: var(--white); color: var(--purple); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+.mode-opt { cursor: pointer; user-select: none; color: var(--muted); font-weight: 400; }
+.mode-opt.active { color: var(--text); font-weight: 700; }
+.mode-opt:hover:not(.active) { opacity: 0.6; }
+.mode-sep { color: var(--muted); font-weight: 400; }
 
 .league-row { display: flex; gap: 6px; align-items: center; }
 .league-row select { flex: 1; }

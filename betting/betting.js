@@ -1036,9 +1036,10 @@ function renderGoalProgress() {
 // チャート・統計
 // ============================================================
 let pnlChart = null, sportChart = null, balanceChart = null;
-let _statsGroupBy  = 'sport'; // 'league' | 'sport'
-let _pnlViewBy     = 'bet';   // 'bet' | 'day'
-let _balanceViewBy = 'bet';   // 'bet' | 'day'
+let _statsGroupBy   = 'sport'; // 'league' | 'sport'
+let _statsChartMode = 'count'; // 'count' | 'amount'
+let _pnlViewBy      = 'bet';   // 'bet' | 'day'
+let _balanceViewBy  = 'bet';   // 'bet' | 'day'
 
 function getStatKey(sport, league) {
   if (_statsGroupBy === 'sport') return sportDisplay(sport || 'Other');
@@ -1167,33 +1168,125 @@ function renderPnlChart(settledBets) {
       data.push(cum);
     }
   }
-  const lastVal = data[data.length - 1] ?? 0;
-  const color   = lastVal >= 0 ? '#27AE60' : '#E74C3C';
-  const bg      = lastVal >= 0 ? 'rgba(39,174,96,0.1)' : 'rgba(231,76,60,0.1)';
-  const ctx     = document.getElementById('chart-pnl').getContext('2d');
+  // ゼロ交差点を補間してセグメントが正負をまたがないようにする
+  const iLabels = [], iData = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i > 0 && data[i-1] !== 0 && data[i] !== 0 && Math.sign(data[i-1]) !== Math.sign(data[i])) {
+      const t = data[i-1] / (data[i-1] - data[i]);
+      iLabels.push(labels[i-1] + (labels[i] !== labels[i-1] ? '→' + labels[i] : ''));
+      iData.push(0);
+    }
+    iLabels.push(labels[i]);
+    iData.push(data[i]);
+  }
+
+  const GREEN = '#27AE60', RED = '#E74C3C';
+  const GREEN_BG = 'rgba(39,174,96,0.15)', RED_BG = 'rgba(231,76,60,0.15)';
+  const segColor = c => c.p1.parsed.y >= 0 ? GREEN : RED;
+
+  // y=0を境にcanvasクリッピングで上は緑・下は赤を塗り分けるプラグイン
+  // fill:true を使うと Chart.js が borderColor(緑)でfill枠をストロークするため使わない
+  const greenRedFill = {
+    id: 'greenRedFill',
+    beforeDatasetDraw(chart, args) {
+      const { ctx, chartArea, scales: { y } } = chart;
+      const pts = args.meta.data;
+      if (!pts.length) return;
+      const yZero = Math.max(chartArea.top, Math.min(chartArea.bottom, y.getPixelForValue(0)));
+
+      const tracePath = () => {
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          const p = pts[i - 1], c = pts[i];
+          ctx.bezierCurveTo(
+            p.cp2x ?? p.x, p.cp2y ?? p.y,
+            c.cp1x ?? c.x, c.cp1y ?? c.y,
+            c.x, c.y
+          );
+        }
+        ctx.lineTo(pts[pts.length - 1].x, yZero);
+        ctx.lineTo(pts[0].x, yZero);
+        ctx.closePath();
+      };
+
+      for (const [color, clipTop, clipBottom] of [
+        [GREEN_BG, chartArea.top, yZero],
+        [RED_BG, yZero, chartArea.bottom],
+      ]) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(chartArea.left, clipTop, chartArea.width, clipBottom - clipTop);
+        ctx.clip();
+        ctx.beginPath();
+        tracePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.restore();
+      }
+    },
+  };
+
+  const ctx = document.getElementById('chart-pnl').getContext('2d');
   if (pnlChart) pnlChart.destroy();
   pnlChart = new Chart(ctx, {
     type: 'line',
-    data: { labels, datasets: [{ label: '累計損益', data, borderColor: color, backgroundColor: bg, fill: true, tension: 0.3, pointRadius: 3 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false } } },
+    data: {
+      labels: iLabels,
+      datasets: [{
+        label: '累計損益',
+        data: iData,
+        borderColor: GREEN,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.3,
+        pointRadius: iData.map(v => v === 0 ? 0 : 3),
+        pointBackgroundColor: iData.map(v => v >= 0 ? GREEN : RED),
+        pointBorderColor: iData.map(v => v >= 0 ? GREEN : RED),
+        segment: { borderColor: segColor },
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { filter: item => iData[item.dataIndex] !== 0 } },
+      scales: { y: { beginAtZero: false } },
+    },
+    plugins: [greenRedFill],
   });
 }
 
 function renderSportChart() {
   const sportMap = {};
-  const count = (key, result) => {
-    if (result !== 'win' && result !== 'loss') return;
-    if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
-    sportMap[key][result]++;
-  };
-  for (const bet of _bets) {
-    if (bet.type === 'parlay' && Array.isArray(bet.legs)) {
-      for (const leg of bet.legs) count(getStatKey(leg.sport, leg.league), leg.legResult);
-    } else {
-      count(getStatKey(bet.sport, bet.league), bet.result);
+  const isAmount = _statsChartMode === 'amount';
+
+  if (!isAmount) {
+    const count = (key, result) => {
+      if (result !== 'win' && result !== 'loss') return;
+      if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
+      sportMap[key][result]++;
+    };
+    for (const bet of _bets) {
+      if (bet.type === 'parlay' && Array.isArray(bet.legs)) {
+        for (const leg of bet.legs) count(getStatKey(leg.sport, leg.league), leg.legResult);
+      } else {
+        count(getStatKey(bet.sport, bet.league), bet.result);
+      }
+    }
+  } else {
+    for (const bet of _bets) {
+      const pnl = calcPnl(bet);
+      if (pnl === null) continue;
+      const key = (bet.type === 'parlay' && Array.isArray(bet.legs) && bet.legs[0])
+        ? getStatKey(bet.legs[0].sport, bet.legs[0].league)
+        : getStatKey(bet.sport, bet.league);
+      if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
+      if (pnl > 0) sportMap[key].win  += pnl;
+      else if (pnl < 0) sportMap[key].loss += Math.abs(pnl);
     }
   }
-  document.getElementById('chart-sport-title').textContent = '勝敗数';
+
+  document.querySelectorAll('.mode-opt').forEach(el => {
+    el.classList.toggle('active', el.dataset.mode === (isAmount ? 'amount' : 'count'));
+  });
   const sports = Object.keys(sportMap);
   const ctx    = document.getElementById('chart-sport').getContext('2d');
   if (sportChart) sportChart.destroy();
@@ -1202,13 +1295,26 @@ function renderSportChart() {
     data: {
       labels: sports,
       datasets: [
-        { label: '勝', data: sports.map(s => sportMap[s].win),  backgroundColor: 'rgba(39,174,96,0.8)' },
-        { label: '負', data: sports.map(s => sportMap[s].loss), backgroundColor: 'rgba(231,76,60,0.8)' },
+        { label: isAmount ? '利益' : '勝', data: sports.map(s => sportMap[s].win),  backgroundColor: 'rgba(39,174,96,0.8)' },
+        { label: isAmount ? '損失' : '負', data: sports.map(s => sportMap[s].loss), backgroundColor: 'rgba(231,76,60,0.8)' },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } },
+      scales: {
+        x: { stacked: !isAmount },
+        y: { stacked: !isAmount, beginAtZero: true,
+          ticks: isAmount
+            ? { callback: v => '¥' + v.toLocaleString() }
+            : { stepSize: 1 },
+        },
+      },
+      plugins: {
+        tooltip: { callbacks: isAmount
+          ? { label: ctx => `${ctx.dataset.label}: ¥${ctx.parsed.y.toLocaleString()}` }
+          : {},
+        },
+      },
     },
   });
 }
@@ -2016,7 +2122,14 @@ function refreshAll() {
 }
 
 function initTabs() {
-  // 勝敗数グラフ：リーグ別 / スポーツ別
+  // 勝敗数 / 勝敗額 切り替え
+  document.querySelectorAll('.mode-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _statsChartMode = btn.dataset.mode;
+      renderSportChart();
+    });
+  });
+
   document.querySelectorAll('.stats-toggle-btn[data-group]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.stats-toggle-btn[data-group]').forEach(b => b.classList.remove('active'));
