@@ -1692,14 +1692,13 @@ async function fetchNPB(dateStr) {
     const allCells = row.querySelectorAll('th, td');
     if (allCells.length === 0) continue;
 
-    // 先頭セルが日付パターン(M/D)なら currentDate を更新
+    // 先頭セルが日付パターンなら currentDate を更新（"5/29" と "5月29日" 両形式に対応）
     const firstText = allCells[0].textContent
       .replace(/（[^）]*）|\([^)]*\)/g, '')
       .replace(/／/g, '/')
       .trim();
-    if (/^\d{1,2}\/\d{1,2}$/.test(firstText)) {
-      currentDate = firstText;
-    }
+    const dateMatch = firstText.match(/^(\d{1,2})[\/月](\d{1,2})日?$/);
+    if (dateMatch) currentDate = `${dateMatch[1]}/${dateMatch[2]}`;
 
     if (currentDate !== targetDate) continue;
 
@@ -1708,12 +1707,12 @@ async function fetchNPB(dateStr) {
     if (tds.length < 1) continue;
 
     // チーム名抽出（&nbsp; を空白に正規化してから "-" で分割）
+    // 過去の試合は "チームA 3－2 チームB" のようにスコアが混入するので端の数字を除去する
     const teamRaw = tds[0].textContent.replace(/\xa0/g, ' ').replace(/\s+/g, ' ').trim();
     const teamParts = teamRaw.split(/\s*[－-]\s*/);
-    const away = teamParts[0]?.trim();
-    const home = teamParts[1]?.trim();
-    // チーム名に数字が入る = 試合結果（スコア表示）なのでスキップ
-    if (!away || !home || /\d/.test(away) || /\d/.test(home)) continue;
+    const away = teamParts[0]?.replace(/\s*\d+\s*$/, '').replace(/^\s*\d+\s*/, '').trim();
+    const home = teamParts[teamParts.length - 1]?.replace(/\s*\d+\s*$/, '').replace(/^\s*\d+\s*/, '').trim();
+    if (!away || !home || away === home || /\d/.test(away) || /\d/.test(home)) continue;
 
     // 時刻抽出（tds[1]のテキストから HH:MM を探す）
     let startUtc = null;
