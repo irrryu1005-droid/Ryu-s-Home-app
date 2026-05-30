@@ -32,11 +32,12 @@ async function addLeague(sport, name) {
 // ============================================================
 // ローカルキャッシュ（Supabaseから読み込んだデータを保持）
 // ============================================================
-let _bets      = [];
-let _campaigns = [];
-let _settings  = { bankroll: null };
-let _goals     = [];
-let _deposits  = [];
+let _bets          = [];
+let _campaigns     = [];
+let _settings      = { bankroll: null };
+let _goals         = [];
+let _deposits      = [];
+let _consultations = [];
 
 const _now = new Date();
 let _pnlYear  = _now.getFullYear();
@@ -91,19 +92,21 @@ function normalizeCampaign(row) {
 }
 
 async function loadAll() {
-  const [betsRes, campsRes, settingsRes, goalsRes, depositsRes, leaguesRes] = await Promise.all([
+  const [betsRes, campsRes, settingsRes, goalsRes, depositsRes, leaguesRes, consultRes] = await Promise.all([
     db.from('bets').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
     db.from('bet_campaigns').select('*').order('created_at'),
     db.from('bet_settings').select('*').eq('id', 1).single(),
     db.from('bet_goals').select('*').order('created_at'),
     db.from('bet_deposits').select('*').order('deposit_date', { ascending: false }),
     db.from('bet_leagues').select('*').order('sport').order('sort_order'),
+    db.from('bet_consultations').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
   ]);
-  _bets      = (betsRes.data     || []).map(normalizeBet);
-  _campaigns = (campsRes.data    || []).map(normalizeCampaign);
-  _settings  =  settingsRes.data || { bankroll: null };
-  _goals     = (goalsRes.data    || []).map(normalizeGoal);
-  _deposits  =  depositsRes.data || [];
+  _bets          = (betsRes.data     || []).map(normalizeBet);
+  _campaigns     = (campsRes.data    || []).map(normalizeCampaign);
+  _settings      =  settingsRes.data || { bankroll: null };
+  _goals         = (goalsRes.data    || []).map(normalizeGoal);
+  _deposits      =  depositsRes.data || [];
+  _consultations =  consultRes.data  || [];
   _leaguesMap = {};
   for (const row of (leaguesRes.data || [])) {
     if (!_leaguesMap[row.sport]) _leaguesMap[row.sport] = [];
@@ -356,6 +359,133 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+
+// ============================================================
+// AI分析タブ
+// ============================================================
+function renderAI() {
+  const rows = _consultations;
+  const el   = document.getElementById('ai-container');
+
+  // --- サマリー集計 ---
+  const settled = rows.filter(r => r.result === 'win' || r.result === 'loss');
+  const wins    = settled.filter(r => r.result === 'win').length;
+  const losses  = settled.filter(r => r.result === 'loss').length;
+  const pending = rows.filter(r => r.result === 'pending' || !r.result).length;
+  const hitRate = settled.length > 0 ? Math.round(wins / settled.length * 100) : null;
+  const avgPred = rows.length > 0
+    ? (rows.reduce((s, r) => s + (parseFloat(r.predicted_win_rate) || 0), 0) / rows.length).toFixed(1)
+    : null;
+
+  // --- キャリブレーション（勝率帯ごと）---
+  const BANDS = [
+    { label: '〜60%',  min: 0,  max: 60  },
+    { label: '61〜70%', min: 60, max: 70  },
+    { label: '71〜80%', min: 70, max: 80  },
+    { label: '81%〜',   min: 80, max: 100 },
+  ];
+  const calib = BANDS.map(band => {
+    const inBand  = settled.filter(r => {
+      const p = parseFloat(r.predicted_win_rate);
+      return p > band.min && p <= band.max;
+    });
+    const w = inBand.filter(r => r.result === 'win').length;
+    return { ...band, total: inBand.length, wins: w,
+             actual: inBand.length > 0 ? Math.round(w / inBand.length * 100) : null };
+  });
+
+  const resultSelect = (r, id) => `
+    <select class="consult-result-select result-select" data-id="${id}">
+      <option value="pending" ${(!r || r === 'pending') ? 'selected' : ''}>未</option>
+      <option value="win"     ${r === 'win'  ? 'selected' : ''}>勝</option>
+      <option value="loss"    ${r === 'loss' ? 'selected' : ''}>負</option>
+    </select>`;
+
+  const evColor = ev => {
+    const v = parseFloat(ev);
+    if (isNaN(v)) return '';
+    return v >= 5 ? 'style="color:var(--win);font-weight:700"'
+         : v >= 0 ? 'style="color:var(--text)"'
+         : 'style="color:var(--loss)"';
+  };
+
+  el.innerHTML = `
+    <!-- サマリー -->
+    <div class="ai-summary-row">
+      <div class="ai-s-item"><div class="ai-s-label">相談件数</div><div class="ai-s-val">${rows.length}</div></div>
+      <div class="ai-s-item"><div class="ai-s-label">勝/負/未</div><div class="ai-s-val">${wins}/${losses}/${pending}</div></div>
+      <div class="ai-s-item"><div class="ai-s-label">的中率</div><div class="ai-s-val ${hitRate !== null && hitRate >= 50 ? 'win' : hitRate !== null ? 'loss' : ''}">${hitRate !== null ? hitRate + '%' : '—'}</div></div>
+      <div class="ai-s-item"><div class="ai-s-label">平均予想勝率</div><div class="ai-s-val">${avgPred !== null ? avgPred + '%' : '—'}</div></div>
+    </div>
+
+    <!-- キャリブレーション -->
+    <div class="chart-card" style="margin-bottom:14px">
+      <h3>精度キャリブレーション</h3>
+      ${settled.length < 5
+        ? `<p class="empty-msg" style="padding:10px 0">データが5件以上で集計されます（現在 ${settled.length} 件）</p>`
+        : `<table style="width:100%;font-size:12px">
+            <thead><tr>
+              <th>予想勝率帯</th><th style="text-align:center">件数</th>
+              <th style="text-align:center">予想</th><th style="text-align:center">実際</th>
+              <th style="text-align:center">差</th>
+            </tr></thead>
+            <tbody>
+              ${calib.map(b => {
+                const mid  = b.total > 0 ? ((b.min + b.max) / 2).toFixed(0) : '—';
+                const diff = b.actual !== null ? b.actual - parseInt(mid) : null;
+                const diffStr = diff !== null
+                  ? `<span style="color:${diff >= 0 ? 'var(--win)' : 'var(--loss)'}">${diff >= 0 ? '+' : ''}${diff}%</span>`
+                  : '—';
+                return `<tr>
+                  <td>${b.label}</td>
+                  <td style="text-align:center">${b.total}</td>
+                  <td style="text-align:center">${b.total > 0 ? mid + '%' : '—'}</td>
+                  <td style="text-align:center">${b.actual !== null ? b.actual + '%' : '—'}</td>
+                  <td style="text-align:center">${diffStr}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>`
+      }
+    </div>
+
+    <!-- 履歴テーブル -->
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>日付</th><th>スポーツ</th><th>リーグ</th><th>オッズ</th>
+          <th>必要勝率</th><th>予想勝率</th><th>EV</th><th>推奨</th><th>結果</th>
+        </tr></thead>
+        <tbody>
+          ${rows.length === 0
+            ? `<tr><td colspan="9" class="empty-msg">まだ記録がありません</td></tr>`
+            : rows.map(r => `<tr>
+                <td style="white-space:nowrap">${r.date || ''}</td>
+                <td>${r.sport || ''}</td>
+                <td>${r.league || ''}</td>
+                <td>${r.odds || ''}</td>
+                <td style="text-align:right">${r.required_win_rate ? r.required_win_rate + '%' : '—'}</td>
+                <td style="text-align:right;font-weight:700">${r.predicted_win_rate ? r.predicted_win_rate + '%' : '—'}</td>
+                <td style="text-align:right" ${evColor(r.expected_value)}>${r.expected_value ? r.expected_value + '%' : '—'}</td>
+                <td style="font-size:11px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.recommendation || '—'}</td>
+                <td>${resultSelect(r.result, r.id)}</td>
+              </tr>`).join('')
+          }
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  el.querySelectorAll('.consult-result-select').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const { error } = await db.from('bet_consultations').update({ result: sel.value }).eq('id', sel.dataset.id);
+      if (error) { console.error('consult update error:', error); return; }
+      const row = _consultations.find(r => String(r.id) === sel.dataset.id);
+      if (row) row.result = sel.value;
+      renderAI();
+    });
+  });
+}
 
 // ============================================================
 // 損益計算書
@@ -2477,6 +2607,9 @@ function initTabs() {
       }
       if (btn.dataset.tab === 'pnl') {
         renderPnlStatement();
+      }
+      if (btn.dataset.tab === 'ai') {
+        renderAI();
       }
     });
   });
