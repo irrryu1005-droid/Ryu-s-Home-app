@@ -700,6 +700,24 @@ tr:last-child td { border-bottom: none; }
 .ai-loss    { background: #FEF2F2; color: var(--loss); }
 .ai-pending { background: var(--bg); color: var(--muted); }
 
+.correction-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.correction-card:last-child { margin-bottom: 0; }
+.correction-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
 /* ============================================================
    統計・チャート
 ============================================================ */

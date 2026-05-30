@@ -361,7 +361,7 @@ function escapeHtml(str) {
 
 
 // ============================================================
-// AI分析タブ
+// 分析タブ
 // ============================================================
 function renderAI() {
   const rows = _consultations;
@@ -409,6 +409,67 @@ function renderAI() {
          : 'style="color:var(--loss)"';
   };
 
+  // --- 補正詳細カード ---
+  const withCorr = rows.filter(r => r.corrections_json);
+  const corrCards = withCorr.map(r => {
+    const cj       = r.corrections_json;
+    const isSettled = r.result === 'win' || r.result === 'loss';
+    const badge    = r.result === 'win' ? '<span class="ai-badge ai-win">勝</span>'
+                   : r.result === 'loss' ? '<span class="ai-badge ai-loss">負</span>'
+                   : '<span class="ai-badge ai-pending">未</span>';
+    const factorRows = (cj.factors || []).map((f, i) => {
+      const fbVal  = f.feedback || '';
+      const fbOpts = [
+        ['', '—'],
+        ['accurate', '○ 正確'],
+        ['over',     '△ 過大'],
+        ['under',    '▽ 過小'],
+        ['miss',     '✗ 外れ'],
+      ].map(([v, l]) => `<option value="${v}" ${fbVal === v ? 'selected' : ''}>${l}</option>`).join('');
+      const corrColor = f.correction >= 0 ? 'var(--win)' : 'var(--loss)';
+      return `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:5px 6px;font-weight:600;white-space:nowrap">${f.factor}</td>
+        <td style="padding:5px 6px;font-size:11px">${f.team_a || '—'}</td>
+        <td style="padding:5px 6px;font-size:11px">${f.team_b || '—'}</td>
+        <td style="padding:5px 6px;text-align:center;font-weight:700;color:${corrColor};white-space:nowrap">
+          ${f.correction >= 0 ? '+' : ''}${f.correction}%
+        </td>
+        <td style="padding:5px 6px;text-align:center">
+          <select class="factor-fb-sel result-select"
+            data-consult-id="${r.id}" data-factor-idx="${i}"
+            ${!isSettled ? 'disabled title="結果確定後に評価できます"' : ''}>
+            ${fbOpts}
+          </select>
+        </td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="correction-card">
+      <div class="correction-card-head">
+        <span>${r.date} ${r.sport} / ${r.league || ''}</span>
+        <span>オッズ ${r.odds} &nbsp;|&nbsp; ベース <b>${cj.base_rate}%</b> → 予想 <b>${r.predicted_win_rate}%</b>
+          (EV <span ${evColor(r.expected_value)}>${r.expected_value}%</span>)
+          ${badge}
+        </span>
+      </div>
+      <div class="table-scroll" style="margin-top:6px">
+        <table style="width:100%;font-size:12px;border-collapse:collapse">
+          <thead><tr style="background:var(--bg)">
+            <th style="padding:5px 6px;text-align:left">要素</th>
+            <th style="padding:5px 6px">チームA</th>
+            <th style="padding:5px 6px">チームB</th>
+            <th style="padding:5px 6px;text-align:center">補正値</th>
+            <th style="padding:5px 6px;text-align:center">評価</th>
+          </tr></thead>
+          <tbody>${factorRows}</tbody>
+        </table>
+      </div>
+      ${cj.reliability_items != null
+        ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">取得項目 ${cj.reliability_items}件${cj.reliability_penalty ? ' / 信頼度ペナルティ ' + cj.reliability_penalty + '%' : ''}</div>`
+        : ''}
+    </div>`;
+  }).join('');
+
   el.innerHTML = `
     <!-- サマリー -->
     <div class="ai-summary-row">
@@ -449,6 +510,14 @@ function renderAI() {
       }
     </div>
 
+    <!-- 補正詳細カード -->
+    ${withCorr.length > 0 ? `
+    <div class="chart-card" style="margin-bottom:14px">
+      <h3>補正詳細フィードバック</h3>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px">結果確定後に各補正要素が正しかったか評価してください</p>
+      ${corrCards}
+    </div>` : ''}
+
     <!-- 履歴テーブル -->
     <div class="table-scroll">
       <table>
@@ -476,6 +545,7 @@ function renderAI() {
     </div>
   `;
 
+  // 結果更新
   el.querySelectorAll('.consult-result-select').forEach(sel => {
     sel.addEventListener('change', async () => {
       const { error } = await db.from('bet_consultations').update({ result: sel.value }).eq('id', sel.dataset.id);
@@ -483,6 +553,22 @@ function renderAI() {
       const row = _consultations.find(r => String(r.id) === sel.dataset.id);
       if (row) row.result = sel.value;
       renderAI();
+    });
+  });
+
+  // 補正要素フィードバック更新
+  el.querySelectorAll('.factor-fb-sel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const consultId = sel.dataset.consultId;
+      const factorIdx = parseInt(sel.dataset.factorIdx);
+      const row = _consultations.find(r => String(r.id) === consultId);
+      if (!row || !row.corrections_json) return;
+      const updated = JSON.parse(JSON.stringify(row.corrections_json));
+      updated.factors[factorIdx].feedback = sel.value || null;
+      const { error } = await db.from('bet_consultations')
+        .update({ corrections_json: updated }).eq('id', consultId);
+      if (error) { console.error('factor feedback error:', error); return; }
+      row.corrections_json = updated;
     });
   });
 }
