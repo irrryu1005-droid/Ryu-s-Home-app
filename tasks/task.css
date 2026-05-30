@@ -30,6 +30,9 @@ body {
   margin: 0 auto;
   padding-bottom: 40px;
 }
+@media (min-width: 768px) {
+  #app { max-width: 1000px; }
+}
 
 /* ============================================================
    ヘッダー

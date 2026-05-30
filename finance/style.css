@@ -450,14 +450,14 @@ h3.section-title {
    PC Layout (768px+)
 ============================================================ */
 @media (min-width: 768px) {
-  #app { max-width: 860px; }
+  #app { max-width: 1000px; }
 
   .nav {
     position: sticky;
     top: 0; bottom: auto;
     border-top: none;
     border-bottom: 1px solid var(--border);
-    max-width: 860px;
+    max-width: 1000px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   }
   .nav-btn {
