@@ -1122,6 +1122,29 @@ tr:last-child td { border-bottom: none; }
   flex-wrap: wrap;
 }
 
+.picker-league-filters {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.picker-league-btn {
+  padding: 3px 9px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 20px;
+  font-size: 11px;
+  cursor: pointer;
+  background: none;
+  color: var(--text, #333);
+  white-space: nowrap;
+}
+.picker-league-btn.active {
+  background: var(--accent, #e8ecff);
+  border-color: var(--primary, #4f6ef7);
+  color: var(--primary, #4f6ef7);
+  font-weight: 600;
+}
+
 .picker-filter-btn {
   padding: 4px 10px;
   border: 1px solid var(--border, #ddd);

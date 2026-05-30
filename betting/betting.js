@@ -1853,12 +1853,14 @@ const SPORT_KEY_TO_FORM = {
 
 let pickerDate         = new Date();
 let pickerSportFilter  = 'all';
+let pickerLeagueFilter = 'all';
 let pickerCallback     = null;
 
 function openMatchPicker(initialDate, callback) {
-  pickerDate        = initialDate || new Date();
-  pickerCallback    = callback;
-  pickerSportFilter = 'all';
+  pickerDate         = initialDate || new Date();
+  pickerCallback     = callback;
+  pickerSportFilter  = 'all';
+  pickerLeagueFilter = 'all';
   document.getElementById('match-picker-backdrop').removeAttribute('hidden');
   document.getElementById('match-picker').removeAttribute('hidden');
   loadPickerEvents();
@@ -1875,7 +1877,9 @@ async function loadPickerEvents() {
   document.getElementById('picker-date-display').textContent = schedDateLabel(pickerDate);
   document.getElementById('picker-events').innerHTML = '<div class="picker-loading">読み込み中...</div>';
   const evs = await fetchEventsForDate(dateStr);
+  pickerLeagueFilter = 'all';
   renderPickerSportFilters(evs);
+  renderPickerLeagueFilters(evs);
   renderPickerEvents(evs);
 }
 
@@ -1895,8 +1899,33 @@ function renderPickerSportFilters(evs) {
 
   container.querySelectorAll('.picker-filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      pickerSportFilter = btn.dataset.key;
+      pickerSportFilter  = btn.dataset.key;
+      pickerLeagueFilter = 'all';
       renderPickerSportFilters(evs);
+      renderPickerLeagueFilters(evs);
+      renderPickerEvents(evs);
+    });
+  });
+}
+
+function renderPickerLeagueFilters(evs) {
+  const container = document.getElementById('picker-league-filters');
+  const base      = pickerSportFilter === 'all' ? evs : evs.filter(e => e.sportKey === pickerSportFilter);
+  const leagues   = [...new Set(base.map(e => e.league).filter(Boolean))].sort();
+
+  if (leagues.length <= 1) { container.innerHTML = ''; return; }
+
+  const allActive = pickerLeagueFilter === 'all' ? ' active' : '';
+  container.innerHTML = `<button class="picker-league-btn${allActive}" data-league="all">すべて</button>` +
+    leagues.map(l => {
+      const active = pickerLeagueFilter === l ? ' active' : '';
+      return `<button class="picker-league-btn${active}" data-league="${escapeHtml(l)}">${escapeHtml(l)}</button>`;
+    }).join('');
+
+  container.querySelectorAll('.picker-league-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pickerLeagueFilter = btn.dataset.league;
+      renderPickerLeagueFilters(evs);
       renderPickerEvents(evs);
     });
   });
@@ -1904,7 +1933,8 @@ function renderPickerSportFilters(evs) {
 
 function renderPickerEvents(evs) {
   const container = document.getElementById('picker-events');
-  const filtered  = pickerSportFilter === 'all' ? evs : evs.filter(e => e.sportKey === pickerSportFilter);
+  let filtered    = pickerSportFilter === 'all' ? evs : evs.filter(e => e.sportKey === pickerSportFilter);
+  if (pickerLeagueFilter !== 'all') filtered = filtered.filter(e => e.league === pickerLeagueFilter);
 
   if (filtered.length === 0) {
     container.innerHTML = '<div class="picker-empty">この日の試合情報はありません</div>';
