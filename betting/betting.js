@@ -11,14 +11,6 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // 定数
 // ============================================================
 const SPORTS = ['Football', 'Baseball', 'Basketball', 'Tennis', 'Other'];
-const LEAGUES_KEY = 'betting-leagues';
-const DEFAULT_LEAGUES = {
-  'Football':   ['Premier League', 'La Liga', 'Bundesliga', 'Serie A', 'Ligue 1', 'Other'],
-  'Baseball':   ['NPB', 'MLB'],
-  'Basketball': ['NBA', 'B.League'],
-  'Tennis':     [],
-};
-
 // 旧日本語キー → 英語へのマッピング（既存データ互換）
 const SPORT_JP_TO_EN = {
   'サッカー': 'Football', '野球': 'Baseball',
@@ -26,26 +18,15 @@ const SPORT_JP_TO_EN = {
 };
 function sportDisplay(s) { return SPORT_JP_TO_EN[s] || s; }
 
-function getLeagues() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(LEAGUES_KEY));
-    if (stored && typeof stored === 'object') {
-      // 旧日本語キーを英語キーに移行
-      const migrated = {};
-      for (const [k, v] of Object.entries(stored)) {
-        migrated[SPORT_JP_TO_EN[k] || k] = v;
-      }
-      return migrated;
-    }
-  } catch {}
-  return JSON.parse(JSON.stringify(DEFAULT_LEAGUES));
-}
+// リーグはSupabaseのbet_leaguesテーブルで管理（sport → [name, ...] のキャッシュ）
+let _leaguesMap = {};
+function getLeagues() { return _leaguesMap; }
 
-function addLeagueToStorage(sport, name) {
-  const leagues = getLeagues();
-  if (!leagues[sport]) leagues[sport] = [];
-  if (!leagues[sport].includes(name)) leagues[sport].push(name);
-  localStorage.setItem(LEAGUES_KEY, JSON.stringify(leagues));
+async function addLeague(sport, name) {
+  if (!_leaguesMap[sport]) _leaguesMap[sport] = [];
+  if (_leaguesMap[sport].includes(name)) return;
+  const { error } = await db.from('bet_leagues').insert([{ sport, name }]);
+  if (!error) _leaguesMap[sport].push(name);
 }
 
 // ============================================================
@@ -110,18 +91,24 @@ function normalizeCampaign(row) {
 }
 
 async function loadAll() {
-  const [betsRes, campsRes, settingsRes, goalsRes, depositsRes] = await Promise.all([
+  const [betsRes, campsRes, settingsRes, goalsRes, depositsRes, leaguesRes] = await Promise.all([
     db.from('bets').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
     db.from('bet_campaigns').select('*').order('created_at'),
     db.from('bet_settings').select('*').eq('id', 1).single(),
     db.from('bet_goals').select('*').order('created_at'),
     db.from('bet_deposits').select('*').order('deposit_date', { ascending: false }),
+    db.from('bet_leagues').select('*').order('sport').order('sort_order'),
   ]);
   _bets      = (betsRes.data     || []).map(normalizeBet);
   _campaigns = (campsRes.data    || []).map(normalizeCampaign);
   _settings  =  settingsRes.data || { bankroll: null };
   _goals     = (goalsRes.data    || []).map(normalizeGoal);
   _deposits  =  depositsRes.data || [];
+  _leaguesMap = {};
+  for (const row of (leaguesRes.data || [])) {
+    if (!_leaguesMap[row.sport]) _leaguesMap[row.sport] = [];
+    _leaguesMap[row.sport].push(row.name);
+  }
 }
 
 function getAllBets()      { return _bets; }
@@ -562,6 +549,7 @@ function renderRecords() {
       refreshAll();
     });
   });
+
 }
 
 // ============================================================
@@ -1082,13 +1070,19 @@ function renderGoalProgress() {
 // チャート・統計
 // ============================================================
 let pnlChart = null, sportChart = null, balanceChart = null;
-let _statsGroupBy   = 'sport'; // 'league' | 'sport'
-let _statsChartMode = 'count'; // 'count' | 'amount'
-let _pnlViewBy      = 'bet';   // 'bet' | 'day'
-let _balanceViewBy  = 'bet';   // 'bet' | 'day'
+let _statsGroupBy      = 'sport'; // 'league' | 'sport'  ← グラフ用
+let _statsTableGroupBy = 'sport'; // 'league' | 'sport'  ← テーブル用（独立）
+let _statsChartMode    = 'count'; // 'count' | 'amount'
+let _pnlViewBy         = 'bet';   // 'bet' | 'day'
+let _balanceViewBy     = 'bet';   // 'bet' | 'day'
 
 function getStatKey(sport, league) {
   if (_statsGroupBy === 'sport') return sportDisplay(sport || 'Other');
+  return league || sportDisplay(sport) || 'Other';
+}
+
+function getTableKey(sport, league) {
+  if (_statsTableGroupBy === 'sport') return sportDisplay(sport || 'Other');
   return league || sportDisplay(sport) || 'Other';
 }
 
@@ -1321,12 +1315,34 @@ function renderSportChart() {
     for (const bet of _bets) {
       const pnl = calcPnl(bet);
       if (pnl === null) continue;
-      const key = (bet.type === 'parlay' && Array.isArray(bet.legs) && bet.legs[0])
-        ? getStatKey(bet.legs[0].sport, bet.legs[0].league)
-        : getStatKey(bet.sport, bet.league);
-      if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
-      if (pnl > 0) sportMap[key].win  += pnl;
-      else if (pnl < 0) sportMap[key].loss += Math.abs(pnl);
+
+      if (bet.type === 'parlay' && Array.isArray(bet.legs) && bet.legs.length > 0) {
+        if (pnl < 0) {
+          // 負け: 非的中レッグで損失を均等分配
+          const nonWinLegs = bet.legs.filter(l => l.legResult !== 'win');
+          const targets = nonWinLegs.length > 0 ? nonWinLegs : bet.legs;
+          const share = Math.abs(pnl) / targets.length;
+          for (const leg of targets) {
+            const key = getStatKey(leg.sport, leg.league);
+            if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
+            sportMap[key].loss += share;
+          }
+        } else if (pnl > 0) {
+          // 勝ち: 全レッグで利益を均等分配
+          const share = pnl / bet.legs.length;
+          for (const leg of bet.legs) {
+            const key = getStatKey(leg.sport, leg.league);
+            if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
+            sportMap[key].win += share;
+          }
+        }
+        // void (pnl = 0): 何もしない
+      } else {
+        const key = getStatKey(bet.sport, bet.league);
+        if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
+        if (pnl > 0) sportMap[key].win  += pnl;
+        else if (pnl < 0) sportMap[key].loss += Math.abs(pnl);
+      }
     }
   }
 
@@ -1369,17 +1385,39 @@ function renderStatsTable() {
   const sportMap = {};
   for (const bet of _bets) {
     if (bet.type === 'parlay' && Array.isArray(bet.legs)) {
+      // 勝敗数: 各レッグごとに計上
       for (const leg of bet.legs) {
-        const key = getStatKey(leg.sport, leg.league);
+        const key = getTableKey(leg.sport, leg.league);
         if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0, void: 0, pending: 0, pnl: 0, stake: 0 };
         sportMap[key][leg.legResult || 'pending']++;
       }
-      const mainKey = bet.legs[0] ? getStatKey(bet.legs[0].sport, bet.legs[0].league) : 'その他';
-      if (!sportMap[mainKey]) sportMap[mainKey] = { win: 0, loss: 0, void: 0, pending: 0, pnl: 0, stake: 0 };
+      // 損益: グラフと同じ分配ロジック
       const pnl = calcPnl(bet);
-      if (pnl !== null) { sportMap[mainKey].pnl += pnl; sportMap[mainKey].stake += bet.stake; }
+      if (pnl !== null && bet.legs.length > 0) {
+        if (pnl < 0) {
+          const nonWinLegs = bet.legs.filter(l => l.legResult !== 'win');
+          const targets = nonWinLegs.length > 0 ? nonWinLegs : bet.legs;
+          const share = pnl / targets.length;
+          const stakeShare = bet.stake / targets.length;
+          for (const leg of targets) {
+            const key = getTableKey(leg.sport, leg.league);
+            if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0, void: 0, pending: 0, pnl: 0, stake: 0 };
+            sportMap[key].pnl   += share;
+            sportMap[key].stake += stakeShare;
+          }
+        } else if (pnl > 0) {
+          const share = pnl / bet.legs.length;
+          const stakeShare = bet.stake / bet.legs.length;
+          for (const leg of bet.legs) {
+            const key = getTableKey(leg.sport, leg.league);
+            if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0, void: 0, pending: 0, pnl: 0, stake: 0 };
+            sportMap[key].pnl   += share;
+            sportMap[key].stake += stakeShare;
+          }
+        }
+      }
     } else {
-      const key = getStatKey(bet.sport, bet.league);
+      const key = getTableKey(bet.sport, bet.league);
       if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0, void: 0, pending: 0, pnl: 0, stake: 0 };
       const s = sportMap[key];
       s[bet.result]++;
@@ -1388,7 +1426,7 @@ function renderStatsTable() {
     }
   }
   document.getElementById('stats-table-title').textContent =
-    (_statsGroupBy === 'sport' ? 'スポーツ別' : 'リーグ別') + ' 内訳';
+    (_statsTableGroupBy === 'sport' ? 'スポーツ別' : 'リーグ別') + ' 内訳';
   const sports = Object.keys(sportMap);
   if (sports.length === 0) {
     document.getElementById('stats-table').innerHTML = '<div class="empty-msg">データがありません</div>';
@@ -1756,17 +1794,57 @@ const TENNIS_ESPN = [
   { id: 'wta', label: 'WTA' },
 ];
 
+async function fetchSofascoreTennis(dateStr) {
+  try {
+    const res = await fetch(
+      `https://api.sofascore.com/api/v1/sport/tennis/scheduled-events/${dateStr}`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.events || []).map(ev => {
+      const home = ev.homeTeam?.name || '';
+      const away = ev.awayTeam?.name || '';
+      const title = home && away ? `${home} vs ${away}` : (ev.slug || '');
+      const cat = ev.tournament?.category?.name || 'Tennis';
+      const tournName = ev.tournament?.name || '';
+      // カテゴリを5種類に集約
+      const simpleCat = /^ATP/i.test(cat) ? 'ATP' : /^WTA/i.test(cat) ? 'WTA'
+        : /^Challenger/i.test(cat) ? 'Challenger' : /^ITF/i.test(cat) ? 'ITF'
+        : /^UTR/i.test(cat) ? 'UTR' : 'Other';
+      // Grand Slam は大会名を正規化して付加
+      const gsName = /french open|roland.garros/i.test(tournName) ? 'Roland Garros'
+        : /wimbledon/i.test(tournName) ? 'Wimbledon'
+        : /us open/i.test(tournName) ? 'US Open'
+        : /australian open/i.test(tournName) ? 'Australian Open' : null;
+      const league = gsName ? `${simpleCat} - ${gsName}` : simpleCat;
+      const startUtc = ev.startTimestamp ? new Date(ev.startTimestamp * 1000).toISOString() : null;
+      return { title, league, startUtc, dateStr, sportKey: 'Tennis' };
+    }).filter(ev => ev.title);
+  } catch { return []; }
+}
+
 async function fetchTennis(dateStr) {
-  const results = await Promise.all(
-    TENNIS_ESPN.map(async ({ id, label }) => {
-      const evs = await fetchESPNTennisEvents(id, dateStr);
-      return evs.map(ev => ({ ...ev, league: ev.tournament ? `${ev.tournament} (${label})` : label, sportKey: 'Tennis' }));
-    })
-  );
-  const flat = results.flat();
-  if (flat.length > 0) return flat;
-  const tsdb = await fetchTSDB('Tennis', dateStr);
-  return tsdb.map(ev => ({ ...ev, sportKey: 'Tennis' }));
+  const [espnResults, tsdbEvs, sofaEvs] = await Promise.all([
+    Promise.all(
+      TENNIS_ESPN.map(async ({ id, label }) => {
+        const evs = await fetchESPNTennisEvents(id, dateStr);
+        return evs.map(ev => ({ ...ev, league: ev.tournament ? `${ev.tournament} (${label})` : label, sportKey: 'Tennis' }));
+      })
+    ),
+    fetchTSDB('Tennis', dateStr),
+    fetchSofascoreTennis(dateStr),
+  ]);
+  const espnFlat  = espnResults.flat();
+  const tsdbFlat  = tsdbEvs.map(ev => ({ ...ev, sportKey: 'Tennis' }));
+  // ESPN優先、次にSofascore・TSDB でタイトル重複を除いて追加
+  const seen = new Set(espnFlat.map(e => e.title));
+  const extra = [...sofaEvs, ...tsdbFlat].filter(e => {
+    if (seen.has(e.title)) return false;
+    seen.add(e.title);
+    return true;
+  });
+  return [...espnFlat, ...extra];
 }
 
 // ---- 🏓 卓球（TheSportsDB）----
@@ -1980,15 +2058,10 @@ function renderPickerEvents(evs) {
   });
 }
 
-function applyMatchToSingleForm({ title, sportKey, league }) {
+function applyMatchToSingleForm({ title, sportKey }) {
   const formSport = SPORT_KEY_TO_FORM[sportKey] || 'Other';
   document.querySelector('[name="sport"]').value = formSport;
-  if (league) {
-    addLeagueToStorage(formSport, league);
-    updateLeagueSelect(formSport, league);
-  } else {
-    updateLeagueSelect(formSport);
-  }
+  updateLeagueSelect(formSport);
   document.getElementById('single-match-input').value = title;
   const disp = document.getElementById('single-match-display');
   disp.textContent = title;
@@ -2002,9 +2075,8 @@ function applyMatchToLeg(legItem, { title, sportKey, league }) {
   sportSel.value  = formSport;
   const leagueSel  = legItem.querySelector('[data-field="league"]');
   const leagueWrap = legItem.querySelectorAll('.form-row > .form-group')[0];
-  if (league) {
-    addLeagueToStorage(formSport, league);
-    leagueSel.innerHTML = leagueOptions(formSport, league);
+  if (getLeagues()[formSport]) {
+    leagueSel.innerHTML = leagueOptions(formSport);
     leagueWrap.style.visibility = '';
   }
   legItem.querySelector('[data-field="match"]').value = title;
@@ -2355,9 +2427,17 @@ function initTabs() {
       btn.classList.add('active');
       _statsGroupBy = btn.dataset.group;
       renderSportChart();
-      renderStatsTable();
       renderPeriodStats();
       renderGoalProgress();
+    });
+  });
+
+  document.querySelectorAll('.stats-toggle-btn[data-table-group]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.stats-toggle-btn[data-table-group]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _statsTableGroupBy = btn.dataset.tableGroup;
+      renderStatsTable();
     });
   });
 
@@ -2470,11 +2550,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('picker-cancel').addEventListener('click', closeMatchPicker);
   document.getElementById('match-picker-backdrop').addEventListener('click', closeMatchPicker);
 
-  document.getElementById('btn-add-league').addEventListener('click', () => {
+  document.getElementById('btn-add-league').addEventListener('click', async () => {
     const sport = document.querySelector('select[name="sport"]').value;
     const name  = prompt(`「${sport}」に追加するリーグ名を入力してください`);
     if (!name || !name.trim()) return;
-    addLeagueToStorage(sport, name.trim());
+    await addLeague(sport, name.trim());
     updateLeagueSelect(sport, name.trim());
   });
 
@@ -2504,7 +2584,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const isFreebet  = document.getElementById('input-is-freebet').checked;
       bet = { type: 'single', date: f.elements.date.value, sport,
               league: (getLeagues()[sport] !== undefined && leagueSel?.value) ? leagueSel.value : null,
-              match: null, bet: f.elements.bet.value,
+              match: f.elements.match_name?.value?.trim() || null, bet: f.elements.bet.value,
               odds: parseFloat(f.elements.odds.value),
               stake: parseInt(f.elements.stake.value), isFreebet,
               campaignId,
