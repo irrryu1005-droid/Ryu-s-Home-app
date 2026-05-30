@@ -621,6 +621,7 @@ function createLegHtml(idx, leg = {}) {
   const leagueEl  = hasLeague
     ? `<div class="form-group"><label>リーグ</label><select data-field="league">${leagueOptions(sport, leg.league || '')}</select></div>`
     : `<div class="form-group" style="visibility:hidden"><label>リーグ</label><select data-field="league"></select></div>`;
+  const matchVal = leg.match ? escapeHtml(leg.match) : '';
   return `<div class="leg-item" data-idx="${idx}">
     <div class="leg-header">
       <strong>レッグ ${idx + 1}</strong>
@@ -632,6 +633,15 @@ function createLegHtml(idx, leg = {}) {
     </div>
     <div class="form-row">
       ${leagueEl}
+    </div>
+    <div class="form-group">
+      <label>試合（任意）</label>
+      <div class="match-select-row">
+        <span class="leg-match-display ${matchVal ? '' : 'match-none-label'}">${matchVal || '未選択'}</span>
+        <button type="button" class="btn-secondary btn-sm btn-pick-match-leg">試合から選ぶ</button>
+        <button type="button" class="btn-sm btn-clear-match btn-clear-match-leg" ${matchVal ? '' : 'hidden'}>✕</button>
+      </div>
+      <input type="hidden" data-field="match" value="${matchVal}">
     </div>
     <div class="form-group"><label>ベット内容</label><input type="text" data-field="bet" placeholder="ホーム勝利など" value="${escapeHtml(leg.bet || '')}"></div>
     <div class="form-group"><label>このレッグの結果</label><select data-field="legResult">${legResultOptions(leg.legResult)}</select></div>
@@ -663,6 +673,24 @@ function rebindLegs() {
         leagueSel.innerHTML = '';
         leagueWrap.style.visibility = 'hidden';
       }
+    };
+  });
+  document.querySelectorAll('.btn-pick-match-leg').forEach(btn => {
+    btn.onclick = () => {
+      const legItem = btn.closest('.leg-item');
+      const betDate = document.querySelector('[name="date"]').value;
+      const d = betDate ? new Date(betDate + 'T00:00:00') : new Date();
+      openMatchPicker(d, match => applyMatchToLeg(legItem, match));
+    };
+  });
+  document.querySelectorAll('.btn-clear-match-leg').forEach(btn => {
+    btn.onclick = () => {
+      const legItem = btn.closest('.leg-item');
+      legItem.querySelector('[data-field="match"]').value = '';
+      const disp = legItem.querySelector('.leg-match-display');
+      disp.textContent = '未選択';
+      disp.classList.add('match-none-label');
+      btn.setAttribute('hidden', '');
     };
   });
 }
@@ -703,7 +731,16 @@ function openAddForm() {
   setFormType('single');
   updateLeagueSelect(form.elements.sport.value);
   populateCampaignSelect();
+  clearSingleMatchDisplay();
   document.getElementById('form-container').hidden = false;
+}
+
+function clearSingleMatchDisplay() {
+  document.getElementById('single-match-input').value = '';
+  const disp = document.getElementById('single-match-display');
+  disp.textContent = '未選択';
+  disp.classList.add('match-none-label');
+  document.getElementById('btn-clear-match-single').setAttribute('hidden', '');
 }
 
 function openEditForm(id) {
@@ -733,6 +770,15 @@ function openEditForm(id) {
     updateLeagueSelect(bet.sport, bet.league || '');
     form.elements.bet.value  = bet.bet   || '';
     form.elements.odds.value = bet.odds  || '';
+    if (bet.match) {
+      document.getElementById('single-match-input').value = bet.match;
+      const disp = document.getElementById('single-match-display');
+      disp.textContent = bet.match;
+      disp.classList.remove('match-none-label');
+      document.getElementById('btn-clear-match-single').removeAttribute('hidden');
+    } else {
+      clearSingleMatchDisplay();
+    }
   }
   document.getElementById('form-title').textContent = '編集';
   document.getElementById('form-container').hidden  = false;
@@ -1751,6 +1797,31 @@ const SPORT_FETCHERS = {
   Volleyball:  fetchVolleyball,
 };
 
+// 全スポーツを1日分フェッチ（生データ）
+function fetchAllRaw(dateStr) {
+  return Promise.all(
+    SCHEDULE_SPORTS.map(s => SPORT_FETCHERS[s.key](dateStr).catch(() => []))
+  ).then(r => r.flat());
+}
+
+// 日付文字列の試合一覧を取得（JST補正・キャッシュ込み）
+async function fetchEventsForDate(dateStr) {
+  if (scheduleCache[dateStr]) return scheduleCache[dateStr];
+  const prevDate    = new Date(new Date(dateStr + 'T00:00:00').getTime() - 24 * 60 * 60 * 1000);
+  const prevDateStr = schedDateStr(prevDate);
+  const [curr, prev] = await Promise.all([fetchAllRaw(dateStr), fetchAllRaw(prevDateStr)]);
+  const seen = new Set();
+  const evs = [...curr, ...prev].filter(ev => {
+    if (!(ev.startUtc ? utcToJSTDateStr(ev.startUtc) === dateStr : ev.dateStr === dateStr)) return false;
+    const key = `${ev.sportKey}|${ev.title}|${ev.startUtc || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  scheduleCache[dateStr] = evs;
+  return evs;
+}
+
 async function loadSportsSchedule() {
   const dateStr   = schedDateStr(scheduleDate);
   const container = document.getElementById('schedule-events');
@@ -1768,31 +1839,149 @@ async function loadSportsSchedule() {
 
   container.innerHTML = '<div class="schedule-loading">読み込み中...</div>';
 
-  // JSTの1日はUTC前日15:00〜当日15:00のため、前日UTC分も取得してJSTでフィルタ
-  const prevDate    = new Date(scheduleDate.getTime() - 24 * 60 * 60 * 1000);
-  const prevDateStr = schedDateStr(prevDate);
-
-  const fetchAll = (d) => Promise.all(
-    SCHEDULE_SPORTS.map(s => SPORT_FETCHERS[s.key](d).catch(() => []))
-  ).then(r => r.flat());
-
-  const [currentEvs, prevEvs] = await Promise.all([fetchAll(dateStr), fetchAll(prevDateStr)]);
-
-  // startUtcがある→JSTで dateStr に一致するものだけ / ない→fetchした日が dateStr のものだけ
-  const seen = new Set();
-  scheduledEvs = [...currentEvs, ...prevEvs].filter(ev => {
-    if (!(ev.startUtc ? utcToJSTDateStr(ev.startUtc) === dateStr : ev.dateStr === dateStr)) return false;
-    const key = `${ev.sportKey}|${ev.title}|${ev.startUtc || ''}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  scheduleCache[dateStr] = scheduledEvs;
+  scheduledEvs = await fetchEventsForDate(dateStr);
   leagueFilter.clear();
   renderLeagueFilters();
   renderSportsEvents();
   if (gcalTokenBet) syncGcalState(dateStr);
+}
+
+// ---- 試合ピッカー ----
+const SPORT_KEY_TO_FORM = {
+  Soccer: 'Football', Baseball: 'Baseball', Basketball: 'Basketball', Tennis: 'Tennis',
+};
+
+let pickerDate         = new Date();
+let pickerSportFilter  = 'all';
+let pickerCallback     = null;
+
+function openMatchPicker(initialDate, callback) {
+  pickerDate        = initialDate || new Date();
+  pickerCallback    = callback;
+  pickerSportFilter = 'all';
+  document.getElementById('match-picker-backdrop').removeAttribute('hidden');
+  document.getElementById('match-picker').removeAttribute('hidden');
+  loadPickerEvents();
+}
+
+function closeMatchPicker() {
+  document.getElementById('match-picker-backdrop').setAttribute('hidden', '');
+  document.getElementById('match-picker').setAttribute('hidden', '');
+  pickerCallback = null;
+}
+
+async function loadPickerEvents() {
+  const dateStr = schedDateStr(pickerDate);
+  document.getElementById('picker-date-display').textContent = schedDateLabel(pickerDate);
+  document.getElementById('picker-events').innerHTML = '<div class="picker-loading">読み込み中...</div>';
+  const evs = await fetchEventsForDate(dateStr);
+  renderPickerSportFilters(evs);
+  renderPickerEvents(evs);
+}
+
+function renderPickerSportFilters(evs) {
+  const presentKeys = [...new Set(evs.map(e => e.sportKey))];
+  const container   = document.getElementById('picker-sport-filters');
+  if (presentKeys.length <= 1) { container.innerHTML = ''; return; }
+
+  const allActive = pickerSportFilter === 'all' ? ' active' : '';
+  container.innerHTML = `<button class="picker-filter-btn${allActive}" data-key="all">すべて</button>` +
+    SCHEDULE_SPORTS
+      .filter(s => presentKeys.includes(s.key))
+      .map(s => {
+        const active = pickerSportFilter === s.key ? ' active' : '';
+        return `<button class="picker-filter-btn${active}" data-key="${s.key}">${s.icon}</button>`;
+      }).join('');
+
+  container.querySelectorAll('.picker-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pickerSportFilter = btn.dataset.key;
+      renderPickerSportFilters(evs);
+      renderPickerEvents(evs);
+    });
+  });
+}
+
+function renderPickerEvents(evs) {
+  const container = document.getElementById('picker-events');
+  const filtered  = pickerSportFilter === 'all' ? evs : evs.filter(e => e.sportKey === pickerSportFilter);
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="picker-empty">この日の試合情報はありません</div>';
+    return;
+  }
+
+  const groups = {};
+  for (const ev of filtered) {
+    if (!groups[ev.sportKey]) groups[ev.sportKey] = [];
+    groups[ev.sportKey].push(ev);
+  }
+
+  let html = '';
+  for (const { key, icon, label } of SCHEDULE_SPORTS.filter(s => groups[s.key])) {
+    const sorted = groups[key].sort((a, b) => {
+      if (!a.startUtc && !b.startUtc) return 0;
+      if (!a.startUtc) return 1;
+      if (!b.startUtc) return -1;
+      return a.startUtc.localeCompare(b.startUtc);
+    });
+    html += `<div class="picker-sport-label">${icon} ${label}</div>`;
+    for (const ev of sorted) {
+      const time = utcToJSTDisplay(ev.startUtc);
+      html += `<button type="button" class="picker-match-btn"
+        data-title="${escapeHtml(ev.title)}"
+        data-sport="${ev.sportKey}"
+        data-league="${escapeHtml(ev.league || '')}">
+        <span class="picker-match-main">
+          ${ev.league ? `<span class="picker-league">${escapeHtml(ev.league)}</span>` : ''}
+          <span class="picker-teams">${escapeHtml(ev.title)}</span>
+        </span>
+        ${time ? `<span class="picker-time">${time}</span>` : ''}
+      </button>`;
+    }
+  }
+  container.innerHTML = html;
+
+  container.querySelectorAll('.picker-match-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pickerCallback?.({ title: btn.dataset.title, sportKey: btn.dataset.sport, league: btn.dataset.league });
+      closeMatchPicker();
+    });
+  });
+}
+
+function applyMatchToSingleForm({ title, sportKey, league }) {
+  const formSport = SPORT_KEY_TO_FORM[sportKey] || 'Other';
+  document.querySelector('[name="sport"]').value = formSport;
+  if (league) {
+    addLeagueToStorage(formSport, league);
+    updateLeagueSelect(formSport, league);
+  } else {
+    updateLeagueSelect(formSport);
+  }
+  document.getElementById('single-match-input').value = title;
+  const disp = document.getElementById('single-match-display');
+  disp.textContent = title;
+  disp.classList.remove('match-none-label');
+  document.getElementById('btn-clear-match-single').removeAttribute('hidden');
+}
+
+function applyMatchToLeg(legItem, { title, sportKey, league }) {
+  const formSport = SPORT_KEY_TO_FORM[sportKey] || 'Other';
+  const sportSel  = legItem.querySelector('[data-field="sport"]');
+  sportSel.value  = formSport;
+  const leagueSel  = legItem.querySelector('[data-field="league"]');
+  const leagueWrap = legItem.querySelectorAll('.form-row > .form-group')[0];
+  if (league) {
+    addLeagueToStorage(formSport, league);
+    leagueSel.innerHTML = leagueOptions(formSport, league);
+    leagueWrap.style.visibility = '';
+  }
+  legItem.querySelector('[data-field="match"]').value = title;
+  const disp = legItem.querySelector('.leg-match-display');
+  disp.textContent = title;
+  disp.classList.remove('match-none-label');
+  legItem.querySelector('.btn-clear-match-leg').removeAttribute('hidden');
 }
 
 async function syncGcalState(dateStr) {
@@ -2226,6 +2415,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (cb) { cb.checked = true; delete cb.dataset.userSet; }
     updateFreebetToggle();
   });
+
+  // 試合ピッカー
+  document.getElementById('btn-pick-match-single').addEventListener('click', () => {
+    const betDate = document.querySelector('[name="date"]').value;
+    const d = betDate ? new Date(betDate + 'T00:00:00') : new Date();
+    openMatchPicker(d, applyMatchToSingleForm);
+  });
+  document.getElementById('btn-clear-match-single').addEventListener('click', () => {
+    document.getElementById('single-match-input').value = '';
+    const disp = document.getElementById('single-match-display');
+    disp.textContent = '未選択';
+    disp.classList.add('match-none-label');
+    document.getElementById('btn-clear-match-single').setAttribute('hidden', '');
+  });
+  document.getElementById('picker-prev').addEventListener('click', () => {
+    pickerDate.setDate(pickerDate.getDate() - 1);
+    loadPickerEvents();
+  });
+  document.getElementById('picker-next').addEventListener('click', () => {
+    pickerDate.setDate(pickerDate.getDate() + 1);
+    loadPickerEvents();
+  });
+  document.getElementById('picker-cancel').addEventListener('click', closeMatchPicker);
+  document.getElementById('match-picker-backdrop').addEventListener('click', closeMatchPicker);
 
   document.getElementById('btn-add-league').addEventListener('click', () => {
     const sport = document.querySelector('select[name="sport"]').value;

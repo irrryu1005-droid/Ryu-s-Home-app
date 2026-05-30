@@ -1063,3 +1063,190 @@ tr:last-child td { border-bottom: none; }
   .bet-table th,
   .bet-table td   { padding: 7px 6px; font-size: 11px; }
 }
+
+/* ============================================================
+   試合ピッカー
+============================================================ */
+#match-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 200;
+}
+
+#match-picker {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 201;
+  background: var(--card-bg, #fff);
+  border-radius: 14px;
+  width: min(480px, 95vw);
+  max-height: 75vh;
+  flex-direction: column;
+  padding: 16px;
+  gap: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+}
+#match-picker:not([hidden]) {
+  display: flex;
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.picker-nav-btn {
+  background: none;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text, #333);
+}
+.picker-nav-btn:hover { background: var(--hover-bg, #f0f0f0); }
+
+.picker-sport-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.picker-filter-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  background: none;
+  color: var(--text, #333);
+}
+.picker-filter-btn.active {
+  background: var(--primary, #4f6ef7);
+  border-color: var(--primary, #4f6ef7);
+  color: #fff;
+}
+
+.picker-events {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.picker-sport-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 8px 0 4px;
+  padding: 0 2px;
+}
+
+.picker-match-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 9px;
+  cursor: pointer;
+  background: none;
+  color: var(--text, #333);
+  gap: 8px;
+}
+.picker-match-btn:hover { background: var(--hover-bg, #f5f5f5); }
+
+.picker-match-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-league {
+  font-size: 10px;
+  color: var(--primary, #4f6ef7);
+  font-weight: 600;
+}
+
+.picker-teams {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.picker-time {
+  font-size: 11px;
+  color: var(--muted, #888);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.picker-loading,
+.picker-empty {
+  text-align: center;
+  color: var(--muted, #888);
+  padding: 24px 0;
+  font-size: 14px;
+}
+
+.picker-cancel-btn {
+  align-self: flex-end;
+  padding: 6px 16px;
+  font-size: 13px;
+}
+
+/* フォーム内の試合選択行 */
+.match-select-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 30px;
+}
+
+.match-none-label {
+  color: var(--muted, #999);
+  font-size: 13px;
+  flex: 1;
+}
+
+#single-match-display:not(.match-none-label),
+.leg-match-display:not(.match-none-label) {
+  font-size: 13px;
+  flex: 1;
+  font-weight: 500;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.btn-clear-match {
+  background: none;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  color: var(--muted, #888);
+  cursor: pointer;
+  line-height: 1;
+}
+.btn-clear-match:hover { color: var(--loss, #e53e3e); border-color: var(--loss, #e53e3e); }

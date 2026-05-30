@@ -100,6 +100,15 @@
               </div>
             </div>
             <div class="form-group">
+              <label>試合（任意）</label>
+              <div class="match-select-row">
+                <span id="single-match-display" class="match-none-label">未選択</span>
+                <button type="button" id="btn-pick-match-single" class="btn-secondary btn-sm">試合から選ぶ</button>
+                <button type="button" id="btn-clear-match-single" class="btn-sm btn-clear-match" hidden>✕</button>
+              </div>
+              <input type="hidden" name="match_name" id="single-match-input">
+            </div>
+            <div class="form-group">
               <label>ベット内容</label>
               <input type="text" name="bet" placeholder="ホーム勝利、ハンデなど">
             </div>
@@ -355,5 +364,18 @@
 
   </div>
   <script src="betting.js"></script>
+
+  <!-- 試合ピッカーモーダル -->
+  <div id="match-picker-backdrop" hidden></div>
+  <div id="match-picker" hidden>
+    <div class="picker-header">
+      <button type="button" id="picker-prev" class="picker-nav-btn">‹</button>
+      <span id="picker-date-display"></span>
+      <button type="button" id="picker-next" class="picker-nav-btn">›</button>
+    </div>
+    <div id="picker-sport-filters" class="picker-sport-filters"></div>
+    <div id="picker-events" class="picker-events"></div>
+    <button type="button" id="picker-cancel" class="btn-cancel picker-cancel-btn">キャンセル</button>
+  </div>
 </body>
 </html>
