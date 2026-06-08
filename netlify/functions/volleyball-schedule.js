@@ -22,35 +22,41 @@ exports.handler = async (event) => {
   if (!date)   return { statusCode: 400, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: 'no-date' }) };
   if (!apiKey) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: 'no-api-key' }) };
 
-  // 過去日付は status=FT（終了済み）も指定して取得
-  const today = new Date().toISOString().slice(0, 10);
-  const url   = date < today
-    ? `https://v1.volleyball.api-sports.io/games?date=${date}&status=FT`
-    : `https://v1.volleyball.api-sports.io/games?date=${date}`;
+  const BASE = 'https://v1.volleyball.api-sports.io/games';
+  const fetchGames = (url) =>
+    fetch(url, { headers: { 'x-apisports-key': apiKey }, signal: AbortSignal.timeout(10000) })
+      .then(r => r.ok ? r.json() : { response: [] })
+      .catch(() => ({ response: [] }));
 
   try {
-    const res = await fetch(url,
-      {
-        headers: {
-          'x-apisports-key': apiKey,
-        },
-        signal: AbortSignal.timeout(10000),
+    // デフォルト（未来/ライブ）と status=FT（終了済み）を両方取得してマージ
+    // 今日の日付でも終了済み試合が漏れないよう常に両方リクエスト
+    const [defData, ftData] = await Promise.all([
+      fetchGames(`${BASE}?date=${date}`),
+      fetchGames(`${BASE}?date=${date}&status=FT`),
+    ]);
+
+    const toEvent = (g) => {
+      const home     = g.teams?.home?.name || '';
+      const away     = g.teams?.away?.name || '';
+      const title    = home && away ? `${home} vs ${away}` : '';
+      const league   = mapLeague(g.league?.name || '');
+      const startUtc = g.date || null;
+      return { id: g.id, title, league, startUtc, dateStr: date };
+    };
+
+    const seen = new Set();
+    const events = [];
+    for (const g of [...(defData.response || []), ...(ftData.response || [])]) {
+      if (!seen.has(g.id)) {
+        seen.add(g.id);
+        const ev = toEvent(g);
+        if (ev.title) events.push(ev);
       }
-    );
+    }
 
-    if (!res.ok) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: `api-${res.status}` }) };
-
-    const data   = await res.json();
-    const events = (data.response || []).map(g => {
-      const home      = g.teams?.home?.name || '';
-      const away      = g.teams?.away?.name || '';
-      const title     = home && away ? `${home} vs ${away}` : '';
-      const league    = mapLeague(g.league?.name || '');
-      const startUtc  = g.date || null;
-      return { title, league, startUtc, dateStr: date };
-    }).filter(ev => ev.title);
-
-    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events, debug: `ok-${events.length}` }) };
+    const debugInfo = `ok-${events.length}(def:${(defData.response||[]).length},ft:${(ftData.response||[]).length})`;
+    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events, debug: debugInfo }) };
   } catch (e) {
     return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: `catch: ${e?.message || e}` }) };
   }
