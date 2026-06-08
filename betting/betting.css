@@ -467,6 +467,36 @@ details[open].settings-section > summary::before { content: '▼ '; }
 .goals-section-header h3 { font-size: 14px; font-weight: 800; }
 .goals-empty { opacity: 0.6; font-size: 12px; padding: 4px 0 10px; }
 
+.goal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.goal-nav-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.goal-nav-label small {
+  font-weight: 400;
+  color: var(--text-light);
+}
+.goal-nav-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--text);
+  line-height: 1;
+}
+.goal-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
 .goal-card {
   background: var(--white);
   border-radius: var(--radius);

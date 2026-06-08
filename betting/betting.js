@@ -1233,42 +1233,49 @@ function renderPeriodStats() {
 }
 
 // ============================================================
-// 目標進捗（複数対応）
+// 目標進捗（ナビゲーション付き）
 // ============================================================
-function renderGoalProgress(showExpired = false) {
+let _goalIdx = 0;
+
+function renderGoalProgress() {
   const container = document.getElementById('goals-list');
   if (!container) return;
-
-  const todayStr  = todayJST();
-  const active    = _goals.filter(g => g.goalEnd >= todayStr);
-  const expired   = _goals.filter(g => g.goalEnd <  todayStr);
-  const goals     = showExpired ? _goals : active;
 
   if (_goals.length === 0) {
     container.innerHTML = '<p class="goals-empty">目標がありません。「＋ 目標を追加」から設定してください。</p>';
     return;
   }
 
+  // goalEnd 降順（新しい順）
+  const sorted = [..._goals].sort((a, b) => b.goalEnd.localeCompare(a.goalEnd));
+  _goalIdx = Math.max(0, Math.min(_goalIdx, sorted.length - 1));
+  const g = sorted[_goalIdx];
+
   const today = new Date(); today.setHours(0,0,0,0);
 
-  container.innerHTML = goals.map(g => {
-    const pnl = _bets
-      .filter(b => b.date >= g.goalStart && b.date <= g.goalEnd)
-      .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
+  const pnl = _bets
+    .filter(b => b.date >= g.goalStart && b.date <= g.goalEnd)
+    .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
 
-    const pct   = Math.min(100, Math.max(0, Math.round(pnl / g.goalAmount * 100)));
-    const color = pct >= 100 ? '#27AE60' : pct >= 50 ? '#F39C12' : '#9B59B6';
-    const done  = pct >= 100 ? ' 🎉 達成！' : '';
+  const pct   = Math.min(100, Math.max(0, Math.round(pnl / g.goalAmount * 100)));
+  const color = pct >= 100 ? '#27AE60' : pct >= 50 ? '#F39C12' : '#9B59B6';
+  const done  = pct >= 100 ? ' 🎉 達成！' : '';
 
-    const startD = new Date(g.goalStart); startD.setHours(0,0,0,0);
-    const endD   = new Date(g.goalEnd);   endD.setHours(0,0,0,0);
-    const totalDays = Math.max(1, (endD - startD) / 86400000);
-    const elapsed   = Math.max(0, Math.min(totalDays, (today - startD) / 86400000));
-    const datePct   = Math.round(elapsed / totalDays * 100);
-    const daysLeft  = Math.max(0, Math.ceil((endD - today) / 86400000));
-    const dateLabel = datePct >= 100 ? '期間終了' : `残${daysLeft}日`;
+  const startD = new Date(g.goalStart); startD.setHours(0,0,0,0);
+  const endD   = new Date(g.goalEnd);   endD.setHours(0,0,0,0);
+  const totalDays = Math.max(1, (endD - startD) / 86400000);
+  const elapsed   = Math.max(0, Math.min(totalDays, (today - startD) / 86400000));
+  const datePct   = Math.round(elapsed / totalDays * 100);
+  const daysLeft  = Math.max(0, Math.ceil((endD - today) / 86400000));
+  const dateLabel = datePct >= 100 ? '期間終了' : `残${daysLeft}日`;
 
-    return `<div class="goal-card">
+  container.innerHTML = `
+    <div class="goal-nav">
+      <button class="goal-nav-btn" id="btn-goal-prev" ${_goalIdx >= sorted.length - 1 ? 'disabled' : ''}>‹</button>
+      <span class="goal-nav-label">${escapeHtml(g.name)} <small>(${_goalIdx + 1}/${sorted.length})</small></span>
+      <button class="goal-nav-btn" id="btn-goal-next" ${_goalIdx <= 0 ? 'disabled' : ''}>›</button>
+    </div>
+    <div class="goal-card">
       <div class="goal-header">
         <span class="goal-name">${escapeHtml(g.name)}</span>
         <button class="small-btn btn-goal-delete" data-id="${g.id}">削除</button>
@@ -1288,23 +1295,14 @@ function renderGoalProgress(showExpired = false) {
         <span class="goal-bar-pct goal-date-label">${dateLabel}</span>
       </div>
     </div>`;
-  }).join('');
 
-  if (expired.length > 0) {
-    const toggle = document.createElement('button');
-    toggle.className = 'btn-secondary btn-sm';
-    toggle.style.marginTop = '8px';
-    toggle.textContent = showExpired ? '過去の目標を隠す' : `過去の目標を表示（${expired.length}件）`;
-    toggle.addEventListener('click', () => renderGoalProgress(!showExpired));
-    container.appendChild(toggle);
-  }
-
-  container.querySelectorAll('.btn-goal-delete').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('この目標を削除しますか？')) return;
-      await deleteGoal(btn.dataset.id);
-      renderGoalProgress(showExpired);
-    });
+  document.getElementById('btn-goal-prev').addEventListener('click', () => { _goalIdx++; renderGoalProgress(); });
+  document.getElementById('btn-goal-next').addEventListener('click', () => { _goalIdx--; renderGoalProgress(); });
+  container.querySelector('.btn-goal-delete').addEventListener('click', async () => {
+    if (!confirm('この目標を削除しますか？')) return;
+    await deleteGoal(g.id);
+    _goalIdx = Math.max(0, _goalIdx - 1);
+    renderGoalProgress();
   });
 }
 
