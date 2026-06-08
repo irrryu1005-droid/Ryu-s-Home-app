@@ -2100,10 +2100,22 @@ async function fetchRugby(dateStr) {
   return evs.map(ev => ({ ...ev, sportKey: 'Rugby' }));
 }
 
-// ---- 🏐 バレー（TheSportsDB）----
+// ---- 🏐 バレー（Netlify Function → Sofascore + TheSportsDB）----
 async function fetchVolleyball(dateStr) {
-  const evs = await fetchTSDB('Volleyball', dateStr);
-  return evs.map(ev => ({ ...ev, sportKey: 'Volleyball' }));
+  const [netlifyRes, tsdbEvs] = await Promise.all([
+    fetch(`/.netlify/functions/volleyball-schedule?date=${dateStr}`).then(r => r.ok ? r.json() : { events: [] }).catch(() => ({ events: [] })),
+    fetchTSDB('Volleyball', dateStr),
+  ]);
+  const sofaEvs    = (netlifyRes.events || []).map(ev => ({ ...ev, sportKey: 'Volleyball' }));
+  const tsdbMapped = tsdbEvs.map(ev => ({ ...ev, sportKey: 'Volleyball' }));
+  // Netlify(Sofascore)優先、TSDB で重複を除いて追加
+  const seen = new Set(sofaEvs.map(e => e.title));
+  const extra = tsdbMapped.filter(e => {
+    if (seen.has(e.title)) return false;
+    seen.add(e.title);
+    return true;
+  });
+  return [...sofaEvs, ...extra];
 }
 
 const SPORT_FETCHERS = {
