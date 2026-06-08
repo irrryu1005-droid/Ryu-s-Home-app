@@ -43,6 +43,7 @@ let _consultations = [];
 const _now = new Date();
 let _pnlYear  = _now.getFullYear();
 let _pnlMonth = _now.getMonth() + 1;
+let _pnlMode  = 'monthly'; // 'monthly' | 'all'
 
 function todayJST() {
   const d = new Date();
@@ -584,13 +585,24 @@ function renderAI() {
 // ============================================================
 function renderPnlStatement() {
   const y = _pnlYear, m = _pnlMonth;
-  document.getElementById('pnl-month-label').textContent = `${y}年${m}月`;
+  const isAll = _pnlMode === 'all';
 
-  const start = `${y}-${String(m).padStart(2, '0')}-01`;
-  const end   = `${y}-${String(m).padStart(2, '0')}-31`;
-  const filtered = _bets.filter(b =>
-    b.date >= start && b.date <= end && (b.result === 'win' || b.result === 'loss')
-  );
+  document.getElementById('pnl-month-label').textContent = isAll ? '全期間' : `${y}年${m}月`;
+  document.getElementById('pnl-prev').style.visibility = isAll ? 'hidden' : '';
+  document.getElementById('pnl-next').style.visibility = isAll ? 'hidden' : '';
+
+  // モード切替ボタンのアクティブ状態を更新
+  document.querySelectorAll('.pnl-mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === _pnlMode);
+  });
+
+  const filtered = isAll
+    ? _bets.filter(b => b.result === 'win' || b.result === 'loss')
+    : (() => {
+        const start = `${y}-${String(m).padStart(2, '0')}-01`;
+        const end   = `${y}-${String(m).padStart(2, '0')}-31`;
+        return _bets.filter(b => b.date >= start && b.date <= end && (b.result === 'win' || b.result === 'loss'));
+      })();
 
   const expenses = {};
   const revenues = {};
@@ -2745,6 +2757,12 @@ function initTabs() {
     _pnlMonth++;
     if (_pnlMonth > 12) { _pnlMonth = 1; _pnlYear++; }
     renderPnlStatement();
+  });
+  document.querySelectorAll('.pnl-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _pnlMode = btn.dataset.mode;
+      renderPnlStatement();
+    });
   });
 }
 
