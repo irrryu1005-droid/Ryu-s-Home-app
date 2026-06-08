@@ -22,9 +22,14 @@ exports.handler = async (event) => {
   if (!date)   return { statusCode: 400, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: 'no-date' }) };
   if (!apiKey) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: 'no-api-key' }) };
 
+  // 過去日付は status=FT（終了済み）も指定して取得
+  const today = new Date().toISOString().slice(0, 10);
+  const url   = date < today
+    ? `https://v1.volleyball.api-sports.io/games?date=${date}&status=FT`
+    : `https://v1.volleyball.api-sports.io/games?date=${date}`;
+
   try {
-    const res = await fetch(
-      `https://v1.volleyball.api-sports.io/games?date=${date}`,
+    const res = await fetch(url,
       {
         headers: {
           'x-apisports-key': apiKey,
