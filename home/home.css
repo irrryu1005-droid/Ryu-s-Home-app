@@ -710,6 +710,37 @@ body {
 .chart-wrap { height: 180px; }
 .chart-wrap canvas { width: 100% !important; height: 100% !important; }
 
+/* スケジュール日付ナビ */
+.card-title-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.card-title-nav .card-title {
+  margin-bottom: 0;
+  flex: 1;
+}
+.sch-nav-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--muted);
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+.sch-nav-btn:hover { color: var(--text); background: var(--border); }
+.m-sch-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.m-sch-nav-row h2 { flex: 1; text-align: center; margin: 0; }
+
 /* スケジュールリスト */
 .schedule-list {
   flex: 1;

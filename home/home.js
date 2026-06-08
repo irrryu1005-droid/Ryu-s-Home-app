@@ -95,11 +95,36 @@ async function gcalDelete(eventId) {
   if (res.status === 401) { gcalTokenClearHome(); }
 }
 
-async function gcalFetchToday(calendarId = 'primary') {
+let _schedDayOffset = 0;
+
+function schedDateStr() {
+  const d = new Date();
+  d.setDate(d.getDate() + _schedDayOffset);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function updateScheduleTitle() {
+  let label;
+  if (_schedDayOffset === 0) label = '今日';
+  else if (_schedDayOffset === 1) label = '明日';
+  else if (_schedDayOffset === -1) label = '昨日';
+  else {
+    const d = new Date();
+    d.setDate(d.getDate() + _schedDayOffset);
+    const days = ['日', '月', '火', '水', '木', '金', '土'];
+    label = `${d.getMonth() + 1}月${d.getDate()}日（${days[d.getDay()]}）`;
+  }
+  ['sch-date-label', 'm-sch-date-label'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = `📅 ${label}の予定`;
+  });
+}
+
+async function gcalFetchToday(calendarId = 'primary', dateStr = null) {
   if (!gcalToken) return [];
-  const now  = new Date();
-  const tMin = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const tMax = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+  const base = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
+  const tMin = new Date(base.getFullYear(), base.getMonth(), base.getDate()).toISOString();
+  const tMax = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59).toISOString();
   const url  = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`
     + `?timeMin=${encodeURIComponent(tMin)}&timeMax=${encodeURIComponent(tMax)}`
     + `&singleEvents=true&orderBy=startTime&maxResults=20`;
@@ -129,11 +154,13 @@ async function loadTodaySchedule() {
   }
 
   targets_el.forEach(el => el.innerHTML = '<div class="schedule-loading">読み込み中...</div>');
+  updateScheduleTitle();
   try {
+    const dateStr = schedDateStr();
     const targets = gcCalendars.length > 0 ? gcCalendars : [{ id: 'primary', backgroundColor: '#4285f4' }];
     const results = await Promise.all(
       targets.map(cal =>
-        gcalFetchToday(cal.id).then(evs => evs.map(ev => ({ ...ev, _color: cal.backgroundColor })))
+        gcalFetchToday(cal.id, dateStr).then(evs => evs.map(ev => ({ ...ev, _color: cal.backgroundColor })))
       )
     );
     const allEvents = results.flat().sort((a, b) => {
@@ -142,8 +169,9 @@ async function loadTodaySchedule() {
       return ta.localeCompare(tb);
     });
 
+    const noEvMsg = _schedDayOffset === 0 ? '今日の予定はありません' : 'この日の予定はありません';
     const html = allEvents.length === 0
-      ? '<div class="schedule-empty">今日の予定はありません</div>'
+      ? `<div class="schedule-empty">${noEvMsg}</div>`
       : allEvents.map(ev => {
           let timeStr = '終日';
           if (ev.start?.dateTime) {
@@ -219,7 +247,7 @@ function initMobileScheduleForm() {
     start.setMinutes(startMin, 0, 0);
     if (startMin >= 60) { start.setHours(start.getHours() + 1); start.setMinutes(0); }
     const end = new Date(start.getTime() + 60 * 60 * 1000);
-    document.getElementById('m-sch-date').value  = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    document.getElementById('m-sch-date').value  = schedDateStr();
     document.getElementById('m-sch-start').value = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
     document.getElementById('m-sch-end').value   = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
   }
@@ -279,7 +307,7 @@ function initScheduleAddForm() {
   const submitBtn = document.getElementById('sch-submit');
   if (!toggleBtn || !form) return;
 
-  // デフォルト日時：今日 + 次の30分刻み
+  // デフォルト日時：表示中の日付 + 次の30分刻み
   function setDefaultTimes() {
     const now      = new Date();
     const startMin = Math.ceil((now.getMinutes() + 1) / 30) * 30;
@@ -287,7 +315,7 @@ function initScheduleAddForm() {
     start.setMinutes(startMin, 0, 0);
     if (startMin >= 60) { start.setHours(start.getHours() + 1); start.setMinutes(0); }
     const end = new Date(start.getTime() + 60 * 60 * 1000);
-    document.getElementById('sch-date').value  = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    document.getElementById('sch-date').value  = schedDateStr();
     document.getElementById('sch-start').value = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
     document.getElementById('sch-end').value   = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
   }
@@ -1065,3 +1093,11 @@ loadRoutine();
 loadHabitChart();
 initScheduleAddForm();
 initMobileScheduleForm();
+
+// 予定ナビゲーション
+['sch-prev', 'm-sch-prev'].forEach(id => {
+  document.getElementById(id)?.addEventListener('click', () => { _schedDayOffset--; loadTodaySchedule(); });
+});
+['sch-next', 'm-sch-next'].forEach(id => {
+  document.getElementById(id)?.addEventListener('click', () => { _schedDayOffset++; loadTodaySchedule(); });
+});

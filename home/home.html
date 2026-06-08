@@ -36,7 +36,11 @@
 
       <!-- 今日の予定 -->
       <div class="pc-card schedule-card">
-        <div class="card-title">📅 今日の予定</div>
+        <div class="card-title-nav">
+          <button class="sch-nav-btn" id="sch-prev">‹</button>
+          <span class="card-title" id="sch-date-label">📅 今日の予定</span>
+          <button class="sch-nav-btn" id="sch-next">›</button>
+        </div>
         <div id="schedule-list" class="schedule-list">
           <div class="schedule-loading">読み込み中...</div>
         </div>
@@ -232,7 +236,11 @@
 
     <!-- 今日の予定 -->
     <section class="m-section">
-      <h2>📅 今日の予定</h2>
+      <div class="m-sch-nav-row">
+        <button class="sch-nav-btn" id="m-sch-prev">‹</button>
+        <h2 id="m-sch-date-label">📅 今日の予定</h2>
+        <button class="sch-nav-btn" id="m-sch-next">›</button>
+      </div>
       <div id="m-schedule-list" class="m-schedule-list">
         <div class="schedule-loading">読み込み中...</div>
       </div>
