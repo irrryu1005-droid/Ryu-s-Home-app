@@ -24,13 +24,20 @@ exports.handler = async (event) => {
       `https://api.sofascore.com/api/v1/sport/volleyball/scheduled-events/${date}`,
       {
         headers: {
-          'Accept':     'application/json',
-          'User-Agent': 'Mozilla/5.0',
+          'Accept':           'application/json, text/plain, */*',
+          'Accept-Language':  'en-US,en;q=0.9',
+          'Accept-Encoding':  'gzip, deflate, br',
+          'User-Agent':       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+          'Referer':          'https://www.sofascore.com/',
+          'Origin':           'https://www.sofascore.com',
+          'sec-fetch-site':   'same-site',
+          'sec-fetch-mode':   'cors',
+          'sec-fetch-dest':   'empty',
         },
         signal: AbortSignal.timeout(10000),
       }
     );
-    if (!res.ok) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [] }) };
+    if (!res.ok) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: `sofascore ${res.status}` }) };
 
     const data   = await res.json();
     const events = (data.events || []).map(ev => {
