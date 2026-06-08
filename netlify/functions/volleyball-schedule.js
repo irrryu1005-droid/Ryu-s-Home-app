@@ -52,7 +52,7 @@ exports.handler = async (event) => {
     }).filter(ev => ev.title);
 
     return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events }) };
-  } catch {
-    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [] }) };
+  } catch (e) {
+    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: `catch: ${e?.message || e}` }) };
   }
 };
