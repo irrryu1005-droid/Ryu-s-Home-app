@@ -2833,8 +2833,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               campaignId: campaignIdP,
               result: f.elements.result.value, memo: f.elements.memo.value.trim() };
     } else {
-      if (!f.elements.bet.value.trim())  { alert('ベット内容を入力してください'); return; }
-      if (!f.elements.odds.value)        { alert('オッズを入力してください'); return; }
+      if (!f.elements.odds.value) { alert('オッズを入力してください'); return; }
       const sport      = f.elements.sport.value;
       const leagueSel  = document.getElementById('single-league-select');
       const campaignId = f.elements.campaignId.value || null;
