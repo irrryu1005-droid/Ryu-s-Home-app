@@ -17,8 +17,10 @@ function mapLeague(tournName, cat) {
 
 exports.handler = async (event) => {
   const date = (event.queryStringParameters || {}).date;
-  if (!date) return { statusCode: 400, headers: OK_HEADERS, body: JSON.stringify({ events: [] }) };
+  if (!date) return { statusCode: 400, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: 'no-date' }) };
 
+  let sofaStatus = null;
+  let sofaBody   = null;
   try {
     const res = await fetch(
       `https://api.sofascore.com/api/v1/sport/volleyball/scheduled-events/${date}`,
@@ -26,20 +28,18 @@ exports.handler = async (event) => {
         headers: {
           'Accept':           'application/json, text/plain, */*',
           'Accept-Language':  'en-US,en;q=0.9',
-          'Accept-Encoding':  'gzip, deflate, br',
           'User-Agent':       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
           'Referer':          'https://www.sofascore.com/',
           'Origin':           'https://www.sofascore.com',
-          'sec-fetch-site':   'same-site',
-          'sec-fetch-mode':   'cors',
-          'sec-fetch-dest':   'empty',
         },
         signal: AbortSignal.timeout(10000),
       }
     );
-    if (!res.ok) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: `sofascore ${res.status}` }) };
+    sofaStatus = res.status;
+    if (!res.ok) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: `sofascore-${res.status}` }) };
 
     const data   = await res.json();
+    sofaBody     = Array.isArray(data.events) ? data.events.length : typeof data.events;
     const events = (data.events || []).map(ev => {
       const home      = ev.homeTeam?.name || '';
       const away      = ev.awayTeam?.name || '';
@@ -51,8 +51,8 @@ exports.handler = async (event) => {
       return { title, league, startUtc, dateStr: date };
     }).filter(ev => ev.title);
 
-    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events }) };
+    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events, debug: `ok-${sofaStatus}-raw${sofaBody}` }) };
   } catch (e) {
-    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: `catch: ${e?.message || e}` }) };
+    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: `catch-${sofaStatus}-${e?.message || e}` }) };
   }
 };
