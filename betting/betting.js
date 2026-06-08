@@ -10,7 +10,8 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ============================================================
 // 定数
 // ============================================================
-const SPORTS = ['Football', 'Baseball', 'Basketball', 'Tennis', 'Other'];
+let _sportsOrder = [];
+function getSports() { return _sportsOrder; }
 // 旧日本語キー → 英語へのマッピング（既存データ互換）
 const SPORT_JP_TO_EN = {
   'サッカー': 'Football', '野球': 'Baseball',
@@ -108,10 +109,15 @@ async function loadAll() {
   _deposits      =  depositsRes.data || [];
   _consultations =  consultRes.data  || [];
   _leaguesMap = {};
+  _sportsOrder = [];
   for (const row of (leaguesRes.data || [])) {
-    if (!_leaguesMap[row.sport]) _leaguesMap[row.sport] = [];
+    if (!_leaguesMap[row.sport]) {
+      _leaguesMap[row.sport] = [];
+      _sportsOrder.push(row.sport);
+    }
     _leaguesMap[row.sport].push(row.name);
   }
+  if (!_sportsOrder.includes('Other')) _sportsOrder.push('Other');
 }
 
 function getAllBets()      { return _bets; }
@@ -772,7 +778,14 @@ function renderRecords() {
 // フォーム操作
 // ============================================================
 function sportOptions(selected = 'Football') {
-  return SPORTS.map(s => `<option value="${s}" ${s === selected ? 'selected' : ''}>${s}</option>`).join('');
+  return getSports().map(s => `<option value="${s}" ${s === selected ? 'selected' : ''}>${s}</option>`).join('');
+}
+
+function populateSportSelect() {
+  document.querySelectorAll('select[name="sport"]').forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = sportOptions(cur || 'Football');
+  });
 }
 
 function leagueOptions(sport, selected = '') {
@@ -2847,6 +2860,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // データ読み込みと初期描画
   await loadAll();
+  populateSportSelect();
   populateSettings();
   refreshAll();
 
