@@ -2110,19 +2110,41 @@ async function fetchRugby(dateStr) {
   return evs.map(ev => ({ ...ev, sportKey: 'Rugby' }));
 }
 
-// ---- 🏐 バレー（Netlify Function → Sofascore + TheSportsDB）----
+// ---- 🏐 バレー（Netlify Function → api-sports.io + TheSportsDB）----
+const VBALL_LEAGUE_MAP = [
+  { re: /nations league/i,                         name: 'VNL' },
+  { re: /world champ|world championship|olympic/i, name: 'World Champ / Olympics' },
+  { re: /champions league/i,                       name: 'CEV Champions League' },
+  { re: /superliga|super liga/i,                   name: 'Italian SuperLega' },
+  { re: /sv.?league|v.?league/i,                  name: 'SV.League' },
+];
+function mapVLeague(l) {
+  for (const { re, name } of VBALL_LEAGUE_MAP) { if (re.test(l)) return name; }
+  return l;
+}
+// チーム名を正規化して重複判定（"Volleyball Women" と "W" の表記ゆれに対応）
+function normalizeVTitle(title) {
+  return title.toLowerCase()
+    .replace(/\bvolleyball\b\s*/gi, '')
+    .replace(/\bwomen\b/gi, 'w')
+    .replace(/\bmen\b/gi, 'm')
+    .replace(/\s+/g, ' ').trim();
+}
+
 async function fetchVolleyball(dateStr) {
   const [netlifyRes, tsdbEvs] = await Promise.all([
     fetch(`/.netlify/functions/volleyball-schedule?date=${dateStr}`).then(r => r.ok ? r.json() : { events: [] }).catch(() => ({ events: [] })),
     fetchTSDB('Volleyball', dateStr),
   ]);
   const sofaEvs    = (netlifyRes.events || []).map(ev => ({ ...ev, sportKey: 'Volleyball' }));
-  const tsdbMapped = tsdbEvs.map(ev => ({ ...ev, sportKey: 'Volleyball' }));
-  // Netlify(Sofascore)優先、TSDB で重複を除いて追加
-  const seen = new Set(sofaEvs.map(e => e.title));
+  // TSDB はリーグ名を標準化してから追加
+  const tsdbMapped = tsdbEvs.map(ev => ({ ...ev, league: mapVLeague(ev.league || ''), sportKey: 'Volleyball' }));
+  // api-sports.io 優先、正規化タイトルで重複を除いて TSDB を補完
+  const seen = new Set(sofaEvs.map(e => normalizeVTitle(e.title)));
   const extra = tsdbMapped.filter(e => {
-    if (seen.has(e.title)) return false;
-    seen.add(e.title);
+    const norm = normalizeVTitle(e.title);
+    if (seen.has(norm)) return false;
+    seen.add(norm);
     return true;
   });
   return [...sofaEvs, ...extra];
