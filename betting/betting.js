@@ -2131,23 +2131,45 @@ function normalizeVTitle(title) {
     .replace(/\s+/g, ' ').trim();
 }
 
+async function fetchSofascoreVolleyball(dateStr) {
+  try {
+    const res = await fetch(
+      `https://api.sofascore.com/api/v1/sport/volleyball/scheduled-events/${dateStr}`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.events || []).map(ev => {
+      const home      = ev.homeTeam?.name || '';
+      const away      = ev.awayTeam?.name || '';
+      const title     = home && away ? `${home} vs ${away}` : '';
+      const tournName = ev.tournament?.name || '';
+      const cat       = ev.tournament?.category?.name || '';
+      const league    = mapVLeague(tournName || cat);
+      const startUtc  = ev.startTimestamp ? new Date(ev.startTimestamp * 1000).toISOString() : null;
+      return { title, league, startUtc, dateStr, sportKey: 'Volleyball' };
+    }).filter(ev => ev.title);
+  } catch { return []; }
+}
+
 async function fetchVolleyball(dateStr) {
-  const [netlifyRes, tsdbEvs] = await Promise.all([
+  const [netlifyRes, sofaEvs, tsdbEvs] = await Promise.all([
     fetch(`/.netlify/functions/volleyball-schedule?date=${dateStr}`).then(r => r.ok ? r.json() : { events: [] }).catch(() => ({ events: [] })),
+    fetchSofascoreVolleyball(dateStr),
     fetchTSDB('Volleyball', dateStr),
   ]);
-  const sofaEvs    = (netlifyRes.events || []).map(ev => ({ ...ev, sportKey: 'Volleyball' }));
-  // TSDB はリーグ名を標準化してから追加
+  const apiEvs     = (netlifyRes.events || []).map(ev => ({ ...ev, sportKey: 'Volleyball' }));
   const tsdbMapped = tsdbEvs.map(ev => ({ ...ev, league: mapVLeague(ev.league || ''), sportKey: 'Volleyball' }));
-  // api-sports.io 優先、正規化タイトルで重複を除いて TSDB を補完
-  const seen = new Set(sofaEvs.map(e => normalizeVTitle(e.title)));
-  const extra = tsdbMapped.filter(e => {
+
+  // api-sports.io 優先 → Sofascore(ブラウザ) → TSDB の順で重複除去しながら合成
+  const seen = new Set(apiEvs.map(e => normalizeVTitle(e.title)));
+  const addIfNew = (list) => list.filter(e => {
     const norm = normalizeVTitle(e.title);
     if (seen.has(norm)) return false;
     seen.add(norm);
     return true;
   });
-  return [...sofaEvs, ...extra];
+  return [...apiEvs, ...addIfNew(sofaEvs), ...addIfNew(tsdbMapped)];
 }
 
 const SPORT_FETCHERS = {
