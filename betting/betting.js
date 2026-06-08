@@ -95,7 +95,7 @@ function normalizeCampaign(row) {
 async function loadAll() {
   const [betsRes, campsRes, settingsRes, goalsRes, depositsRes, leaguesRes, consultRes] = await Promise.all([
     db.from('bets').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
-    db.from('bet_campaigns').select('*').order('created_at'),
+    db.from('bet_campaigns').select('*').eq('hidden', false).order('created_at'),
     db.from('bet_settings').select('*').eq('id', 1).single(),
     db.from('bet_goals').select('*').order('created_at'),
     db.from('bet_deposits').select('*').order('deposit_date', { ascending: false }),
@@ -195,7 +195,7 @@ async function updateCampaign(id, updates) {
 }
 
 async function deleteCampaign(id) {
-  const { error } = await db.from('bet_campaigns').delete().eq('id', id);
+  const { error } = await db.from('bet_campaigns').update({ hidden: true }).eq('id', id);
   if (error) { console.error('deleteCampaign error:', error); return; }
   _campaigns = _campaigns.filter(c => c.id !== id);
 }
@@ -1235,12 +1235,16 @@ function renderPeriodStats() {
 // ============================================================
 // 目標進捗（複数対応）
 // ============================================================
-function renderGoalProgress() {
-  const goals = _goals;
+function renderGoalProgress(showExpired = false) {
   const container = document.getElementById('goals-list');
   if (!container) return;
 
-  if (goals.length === 0) {
+  const todayStr  = todayJST();
+  const active    = _goals.filter(g => g.goalEnd >= todayStr);
+  const expired   = _goals.filter(g => g.goalEnd <  todayStr);
+  const goals     = showExpired ? _goals : active;
+
+  if (_goals.length === 0) {
     container.innerHTML = '<p class="goals-empty">目標がありません。「＋ 目標を追加」から設定してください。</p>';
     return;
   }
@@ -1286,11 +1290,20 @@ function renderGoalProgress() {
     </div>`;
   }).join('');
 
+  if (expired.length > 0) {
+    const toggle = document.createElement('button');
+    toggle.className = 'btn-secondary btn-sm';
+    toggle.style.marginTop = '8px';
+    toggle.textContent = showExpired ? '過去の目標を隠す' : `過去の目標を表示（${expired.length}件）`;
+    toggle.addEventListener('click', () => renderGoalProgress(!showExpired));
+    container.appendChild(toggle);
+  }
+
   container.querySelectorAll('.btn-goal-delete').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!confirm('この目標を削除しますか？')) return;
       await deleteGoal(btn.dataset.id);
-      renderGoalProgress();
+      renderGoalProgress(showExpired);
     });
   });
 }
@@ -2808,7 +2821,8 @@ document.addEventListener('DOMContentLoaded', async () => {
               campaignId: campaignIdP,
               result: f.elements.result.value, memo: f.elements.memo.value.trim() };
     } else {
-      if (!f.elements.odds.value) { alert('オッズを入力してください'); return; }
+      if (!f.elements.bet.value.trim())  { alert('ベット内容を入力してください'); return; }
+      if (!f.elements.odds.value)        { alert('オッズを入力してください'); return; }
       const sport      = f.elements.sport.value;
       const leagueSel  = document.getElementById('single-league-select');
       const campaignId = f.elements.campaignId.value || null;
