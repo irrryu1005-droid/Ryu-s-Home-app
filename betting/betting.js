@@ -811,7 +811,7 @@ function buildBetRow(bet) {
   </tr>`;
 }
 
-function renderRecords() {
+function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = null) {
   const container  = document.getElementById('records-list');
   if (_bets.length === 0) {
     container.innerHTML = '<div class="empty-msg">まだ記録がありません。「＋ 追加」から始めましょう。</div>';
@@ -821,10 +821,11 @@ function renderRecords() {
   const todayMonth = todayJST().slice(0, 7);
 
   // 再描画前に開閉状態を保存（初回は空なのでデフォルト動作）
-  const isFirstRender = container.querySelectorAll('details').length === 0;
-  const openMonths = new Set([...container.querySelectorAll('.month-group[open]')].map(el => el.dataset.month));
-  const openWeeks  = new Set([...container.querySelectorAll('.week-group[open]')].map(el => `${el.dataset.month}/${el.dataset.week}`));
-  const openDays   = new Set([...container.querySelectorAll('.day-group[open]')].map(el => el.dataset.date));
+  // preOpen* が渡された場合はそれを優先（drag中のタイミング問題を回避）
+  const isFirstRender = preOpenMonths === null && container.querySelectorAll('details').length === 0;
+  const openMonths = preOpenMonths ?? new Set([...container.querySelectorAll('.month-group[open]')].map(el => el.dataset.month));
+  const openWeeks  = preOpenWeeks  ?? new Set([...container.querySelectorAll('.week-group[open]')].map(el => `${el.dataset.month}/${el.dataset.week}`));
+  const openDays   = preOpenDays   ?? new Set([...container.querySelectorAll('.day-group[open]')].map(el => el.dataset.date));
   const mOpen = (mKey)       => isFirstRender ? mKey === todayMonth : openMonths.has(mKey);
   const wOpen = (mKey, wKey) => isFirstRender ? mKey === todayMonth : openWeeks.has(`${mKey}/${wKey}`);
   const dOpen = (dKey, mKey) => isFirstRender ? mKey === todayMonth : openDays.has(dKey);
@@ -952,8 +953,12 @@ function renderRecords() {
     const targetIdx = _bets.findIndex(b => String(b.id) === _dragOverId);
     _bets.splice(_dragOverPos === 'before' ? targetIdx : targetIdx + 1, 0, dragged);
     const dateBets = _bets.filter(b => b.date === _dragBetDate);
+    // await 前に開閉状態を保存（dragend がawait中に発火してもDOM状態が変わらないよう保全）
+    const savedMonths = new Set([...container.querySelectorAll('.month-group[open]')].map(el => el.dataset.month));
+    const savedWeeks  = new Set([...container.querySelectorAll('.week-group[open]')].map(el => `${el.dataset.month}/${el.dataset.week}`));
+    const savedDays   = new Set([...container.querySelectorAll('.day-group[open]')].map(el => el.dataset.date));
     await saveSortOrders(dateBets);
-    renderRecords();
+    renderRecords(savedMonths, savedWeeks, savedDays);
   }
 
   function updateDropTarget(clientX, clientY) {
