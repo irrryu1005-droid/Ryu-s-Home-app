@@ -1407,7 +1407,12 @@ async function completeCampaign(id) {
 async function endCampaign(id) {
   const c = _campaigns.find(c => String(c.id) === String(id));
   if (!c || !confirm(`「${c.name}」を終了して過去の結果に移動しますか？`)) return;
-  await updateCampaign(id, { status: 'completed', completedDate: todayJST() });
+  const { error } = await db.from('bet_campaigns')
+    .update({ status: 'completed', completed_date: todayJST() })
+    .eq('id', id);
+  if (error) { console.error('endCampaign error:', error); return; }
+  const { data } = await db.from('bet_campaigns').select('*').eq('hidden', false).order('created_at');
+  if (data) _campaigns = data.map(normalizeCampaign);
   refreshAll();
 }
 
