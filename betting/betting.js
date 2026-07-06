@@ -50,6 +50,19 @@ function todayJST() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+function showConfirm(message) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-confirm-overlay';
+    overlay.innerHTML = `<div class="custom-confirm-dialog"><p class="custom-confirm-msg">${escapeHtml(message)}</p><div class="custom-confirm-btns"><button class="custom-confirm-cancel">キャンセル</button><button class="custom-confirm-ok">OK</button></div></div>`;
+    document.body.appendChild(overlay);
+    const close = (val) => { document.body.removeChild(overlay); resolve(val); };
+    overlay.querySelector('.custom-confirm-ok').addEventListener('click', () => close(true));
+    overlay.querySelector('.custom-confirm-cancel').addEventListener('click', () => close(false));
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(false); });
+  });
+}
+
 function normalizeBet(row) {
   return {
     id:           row.id,
@@ -1241,7 +1254,7 @@ async function confirmDelete(id) {
   const label = bet.type === 'parlay'
     ? `マルチ ${(bet.legs || []).length}連 (${bet.date})`
     : `${bet.match || '?'} — ${bet.bet || '?'}`;
-  if (!confirm(`「${label}」を削除しますか？`)) return;
+  if (!await showConfirm(`「${label}」を削除しますか？`)) return;
   await deleteBet(id);
   refreshAll();
 }
@@ -1399,14 +1412,14 @@ function renderCampaigns() {
 
 async function completeCampaign(id) {
   const c = _campaigns.find(c => c.id === id);
-  if (!c || !confirm(`「${c.name}」を達成済みにしますか？`)) return;
+  if (!c || !await showConfirm(`「${c.name}」を達成済みにしますか？`)) return;
   await updateCampaign(id, { status: 'completed', completedDate: todayJST() });
   refreshAll();
 }
 
 async function endCampaign(id) {
   const c = _campaigns.find(c => String(c.id) === String(id));
-  if (!c || !confirm(`「${c.name}」を終了して過去の結果に移動しますか？`)) return;
+  if (!c || !await showConfirm(`「${c.name}」を終了して過去の結果に移動しますか？`)) return;
   const { error } = await db.from('bet_campaigns')
     .update({ status: 'completed', completed_date: todayJST() })
     .eq('id', id);
@@ -1418,7 +1431,7 @@ async function endCampaign(id) {
 
 async function confirmDeleteCampaign(id) {
   const c = _campaigns.find(c => c.id === id);
-  if (!c || !confirm(`「${c.name}」を削除しますか？`)) return;
+  if (!c || !await showConfirm(`「${c.name}」を削除しますか？`)) return;
   await deleteCampaign(id);
   refreshAll();
 }
@@ -1642,7 +1655,7 @@ function renderGoalProgress() {
   document.getElementById('btn-goal-prev').addEventListener('click', () => { _goalIdx++; renderGoalProgress(); });
   document.getElementById('btn-goal-next').addEventListener('click', () => { _goalIdx--; renderGoalProgress(); });
   container.querySelector('.btn-goal-delete').addEventListener('click', async () => {
-    if (!confirm('この目標を削除しますか？')) return;
+    if (!await showConfirm('この目標を削除しますか？')) return;
     await deleteGoal(g.id);
     _goalIdx = Math.max(0, _goalIdx - 1);
     renderGoalProgress();

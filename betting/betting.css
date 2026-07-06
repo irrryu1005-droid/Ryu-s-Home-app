@@ -1455,3 +1455,45 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
 .bet-row-dragging { opacity: 0.4; }
 .bet-row.drop-before { box-shadow: inset 0 2px 0 0 var(--purple); }
 .bet-row.drop-after  { box-shadow: inset 0 -2px 0 0 var(--purple); }
+
+/* カスタム確認ダイアログ */
+.custom-confirm-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+}
+.custom-confirm-dialog {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 24px 20px 20px;
+  width: min(320px, 90vw);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.custom-confirm-msg {
+  margin: 0 0 20px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.custom-confirm-btns {
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+.custom-confirm-cancel {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+}
+.custom-confirm-ok {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  background: var(--purple);
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
