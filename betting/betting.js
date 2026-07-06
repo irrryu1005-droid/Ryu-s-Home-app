@@ -1823,6 +1823,23 @@ function renderBalanceChart(settledBets) {
     }
   }
 
+  // 未確定ベットの賭け金をグラフ末尾に反映（ヘッダー残高と一致させる）
+  const pendingStake = _bets
+    .filter(b => b.result === 'pending' && !b.isFreebet)
+    .reduce((sum, b) => sum + (b.stake || 0), 0);
+  if (pendingStake > 0) {
+    const today = todayJST();
+    if (labels.length > 0 && labels[labels.length - 1] === today) {
+      data[data.length - 1] = balance - pendingStake;
+    } else {
+      labels.push(today);
+      data.push(balance - pendingStake);
+      pointColors.push('#3498DB');
+      pointRadii.push(3);
+      tooltipDeposits.push(0);
+    }
+  }
+
   const ctx = document.getElementById('chart-balance').getContext('2d');
   if (balanceChart) balanceChart.destroy();
   balanceChart = new Chart(ctx, {
