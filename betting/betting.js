@@ -720,67 +720,142 @@ async function saveSortOrders(dateBets) {
   }));
 }
 
+const DAY_NAMES = ['日','月','火','水','木','金','土'];
+
+function buildBetRow(bet) {
+  const pnl      = calcPnl(bet);
+  const pnlClass = pnl === null ? '' : pnl > 0 ? 'win' : pnl < 0 ? 'loss' : '';
+  const isParlay = bet.type === 'parlay';
+  const fbBadge  = bet.isFreebet ? ' <span class="badge-fb">FB</span>' : '';
+  const typeCell = isParlay
+    ? `<td><span class="badge-parlay">マルチ ${(bet.legs || []).length}連</span>${fbBadge}</td>`
+    : `<td><span class="badge-single">シングル</span>${fbBadge}</td>`;
+
+  const resultOpts = (cur) =>
+    [['pending','⏳'],['win','✅ 勝'],['loss','❌ 負'],['void','➖ 無効']]
+      .map(([v, l]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${l}</option>`).join('');
+
+  let detailCell;
+  if (isParlay && bet.legs) {
+    const legLines = bet.legs.map((l, i) => {
+      const legLabel = l.league ? escapeHtml(l.league) : escapeHtml(l.sport || '');
+      const legSel = `<select class="leg-result-select" data-id="${bet.id}" data-leg="${i}">${resultOpts(l.legResult)}</select>`;
+      return `<small>${i + 1}: <span class="badge-league">${legLabel}</span> ${escapeHtml(l.match || '')} — ${escapeHtml(l.bet || '')} (x${l.odds}) ${legSel}</small>`;
+    }).join('<br>');
+    detailCell = `<td>${legLines}${bet.memo ? `<br><small class="memo">${escapeHtml(bet.memo)}</small>` : ''}</td>`;
+  } else {
+    const leagueBadge = bet.league ? `<span class="badge-league">${escapeHtml(bet.league)}</span> ` : '';
+    detailCell = `<td>
+      ${leagueBadge}<strong>${escapeHtml(bet.match || '')}</strong><br>
+      <small>${escapeHtml(bet.bet || '')}</small>
+      ${bet.memo ? `<br><small class="memo">${escapeHtml(bet.memo)}</small>` : ''}
+    </td>`;
+  }
+
+  const oddsVal = isParlay ? calcEffectiveOdds(bet).toFixed(2) : bet.odds;
+  return `<tr class="bet-row" draggable="true" data-id="${bet.id}" data-date="${bet.date}">
+    <td class="drag-handle" title="ドラッグして並び替え">⠿</td>
+    ${typeCell}
+    ${detailCell}
+    <td>${oddsVal}</td>
+    <td>¥${Number(bet.stake).toLocaleString()}</td>
+    <td><select class="result-select" data-id="${bet.id}">${resultOpts(bet.result)}</select></td>
+    <td class="${pnlClass}">${formatPnl(pnl)}</td>
+    <td>
+      <button class="small-btn btn-edit"   data-id="${bet.id}">編集</button>
+      <button class="small-btn btn-delete" data-id="${bet.id}">削除</button>
+    </td>
+  </tr>`;
+}
+
 function renderRecords() {
-  const container = document.getElementById('records-list');
+  const container  = document.getElementById('records-list');
   if (_bets.length === 0) {
     container.innerHTML = '<div class="empty-msg">まだ記録がありません。「＋ 追加」から始めましょう。</div>';
     return;
   }
-  let html = `<div class="table-scroll"><table>
-    <thead><tr>
-      <th class="col-drag"></th>
-      <th>日付</th><th>種別</th><th>試合 / ベット</th>
-      <th>オッズ</th><th>賭け金</th><th>結果</th><th>損益</th><th></th>
-    </tr></thead><tbody>`;
 
+  const todayMonth = todayJST().slice(0, 7);
+
+  // 月 → 週（月内の第N週）→ 日 の3段階グルーピング
+  const monthMap = new Map();
   for (const bet of _bets) {
-    const pnl      = calcPnl(bet);
-    const pnlClass = pnl === null ? '' : pnl > 0 ? 'win' : pnl < 0 ? 'loss' : '';
-    const isParlay = bet.type === 'parlay';
-    const fbBadge  = bet.isFreebet ? ' <span class="badge-fb">FB</span>' : '';
-    const typeCell = isParlay
-      ? `<td><span class="badge-parlay">マルチ ${(bet.legs || []).length}連</span>${fbBadge}</td>`
-      : `<td><span class="badge-single">シングル</span>${fbBadge}</td>`;
-
-    const resultOpts = (cur) =>
-      [['pending','⏳'],['win','✅ 勝'],['loss','❌ 負'],['void','➖ 無効']]
-        .map(([v, l]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${l}</option>`).join('');
-
-    let detailCell;
-    if (isParlay && bet.legs) {
-      const legLines = bet.legs.map((l, i) => {
-        const legLabel = l.league ? escapeHtml(l.league) : escapeHtml(l.sport || '');
-        const legSel = `<select class="leg-result-select" data-id="${bet.id}" data-leg="${i}">${resultOpts(l.legResult)}</select>`;
-        return `<small>${i + 1}: <span class="badge-league">${legLabel}</span> ${escapeHtml(l.match || '')} — ${escapeHtml(l.bet || '')} (x${l.odds}) ${legSel}</small>`;
-      }).join('<br>');
-      detailCell = `<td>${legLines}${bet.memo ? `<br><small class="memo">${escapeHtml(bet.memo)}</small>` : ''}</td>`;
-    } else {
-      const leagueBadge = bet.league ? `<span class="badge-league">${escapeHtml(bet.league)}</span> ` : '';
-      detailCell = `<td>
-        ${leagueBadge}<strong>${escapeHtml(bet.match || '')}</strong><br>
-        <small>${escapeHtml(bet.bet || '')}</small>
-        ${bet.memo ? `<br><small class="memo">${escapeHtml(bet.memo)}</small>` : ''}
-      </td>`;
-    }
-
-    const oddsVal = isParlay ? calcEffectiveOdds(bet).toFixed(2) : bet.odds;
-    html += `<tr class="bet-row" draggable="true" data-id="${bet.id}" data-date="${bet.date}">
-      <td class="drag-handle" title="ドラッグして並び替え">⠿</td>
-      <td>${bet.date}</td>
-      ${typeCell}
-      ${detailCell}
-      <td>${oddsVal}</td>
-      <td>¥${Number(bet.stake).toLocaleString()}</td>
-      <td><select class="result-select" data-id="${bet.id}">${resultOpts(bet.result)}</select></td>
-      <td class="${pnlClass}">${formatPnl(pnl)}</td>
-      <td>
-        <button class="small-btn btn-edit"   data-id="${bet.id}">編集</button>
-        <button class="small-btn btn-delete" data-id="${bet.id}">削除</button>
-      </td>
-    </tr>`;
+    const mKey = bet.date.slice(0, 7);                                   // 'YYYY-MM'
+    const wKey = Math.ceil(parseInt(bet.date.slice(8, 10)) / 7);        // 1〜5
+    const dKey = bet.date;
+    if (!monthMap.has(mKey)) monthMap.set(mKey, new Map());
+    const wMap = monthMap.get(mKey);
+    if (!wMap.has(wKey)) wMap.set(wKey, new Map());
+    const dMap = wMap.get(wKey);
+    if (!dMap.has(dKey)) dMap.set(dKey, []);
+    dMap.get(dKey).push(bet);
   }
 
-  html += '</tbody></table></div>';
+  const sumPnl  = bets => bets.reduce((s, b) => s + (calcPnl(b) ?? 0), 0);
+  const pnlSpan = (pnl) => {
+    const cls = pnl > 0 ? 'win' : pnl < 0 ? 'loss' : '';
+    return `<span class="group-pnl ${cls}">${formatPnl(pnl)}</span>`;
+  };
+
+  let html = '';
+
+  for (const [mKey, wMap] of monthMap) {
+    const [year, monStr] = mKey.split('-');
+    const mon            = parseInt(monStr);
+    const isCurrentMonth = mKey === todayMonth;
+    const allMonthBets   = [...wMap.values()].flatMap(d => [...d.values()].flat());
+    const mPnl           = sumPnl(allMonthBets);
+
+    html += `<details class="month-group" ${isCurrentMonth ? 'open' : ''}>
+      <summary class="group-summary month-summary">
+        <span class="group-arrow">▶</span>
+        <span class="group-label">${year}年${mon}月</span>
+        <span class="group-meta">${allMonthBets.length}件 ${pnlSpan(mPnl)}</span>
+      </summary>`;
+
+    for (const [wKey, dMap] of wMap) {
+      const allWeekBets = [...dMap.values()].flat();
+      const wPnl        = sumPnl(allWeekBets);
+      const sortedDays  = [...dMap.keys()].sort();
+      const wStart      = sortedDays[0];
+      const wEnd        = sortedDays[sortedDays.length - 1];
+      const wLabel      = wStart === wEnd
+        ? `${parseInt(wStart.slice(5,7))}/${parseInt(wStart.slice(8,10))}`
+        : `${parseInt(wStart.slice(5,7))}/${parseInt(wStart.slice(8,10))} 〜 ${parseInt(wEnd.slice(5,7))}/${parseInt(wEnd.slice(8,10))}`;
+
+      html += `<details class="week-group" ${isCurrentMonth ? 'open' : ''}>
+        <summary class="group-summary week-summary">
+          <span class="group-arrow">▶</span>
+          <span class="group-label">${wLabel}</span>
+          <span class="group-meta">${allWeekBets.length}件 ${pnlSpan(wPnl)}</span>
+        </summary>`;
+
+      for (const [dKey, bets] of dMap) {
+        const d      = new Date(dKey + 'T12:00:00');
+        const dLabel = `${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
+        const dPnl   = sumPnl(bets);
+
+        html += `<details class="day-group" ${isCurrentMonth ? 'open' : ''}>
+          <summary class="group-summary day-summary">
+            <span class="group-arrow">▶</span>
+            <span class="group-label">${dLabel}</span>
+            <span class="group-meta">${bets.length}件 ${pnlSpan(dPnl)}</span>
+          </summary>
+          <div class="table-scroll"><table>
+            <thead><tr>
+              <th class="col-drag"></th>
+              <th>種別</th><th>試合 / ベット</th>
+              <th>オッズ</th><th>賭け金</th><th>結果</th><th>損益</th><th></th>
+            </tr></thead>
+            <tbody>${bets.map(buildBetRow).join('')}</tbody>
+          </table></div>
+        </details>`;
+      }
+      html += '</details>'; // week-group
+    }
+    html += '</details>'; // month-group
+  }
+
   container.innerHTML = html;
 
   container.querySelectorAll('.btn-edit').forEach(btn =>
