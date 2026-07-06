@@ -1178,9 +1178,13 @@ function getCampaignProgress(campaignId) {
 function populateCampaignSelect(currentId = '') {
   const sel = document.getElementById('form-campaign-select');
   if (!sel) return;
+  // 進行中のみ表示。編集時に既に完了済みキャンペーンが選択されていれば例外的に追加
+  const visible = _campaigns.filter(c =>
+    c.status !== 'completed' || String(c.id) === String(currentId)
+  );
   sel.innerHTML = '<option value="">なし</option>' +
-    _campaigns.map(c =>
-      `<option value="${c.id}" ${c.id === currentId ? 'selected' : ''}>${escapeHtml(c.name)}${c.status === 'completed' ? ' ✅' : ''}</option>`
+    visible.map(c =>
+      `<option value="${c.id}" ${String(c.id) === String(currentId) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
     ).join('');
   updateFreebetToggle();
 }
@@ -1192,43 +1196,84 @@ function updateFreebetToggle() {
 }
 
 function renderCampaigns() {
-  const list = document.getElementById('campaign-list');
-  if (_campaigns.length === 0) {
-    list.innerHTML = '<p style="opacity:0.6;font-size:12px;padding:8px 0;">キャンペーンがありません。下から追加してください。</p>';
-    return;
+  const list     = document.getElementById('campaign-list');
+  const active   = _campaigns.filter(c => c.status !== 'completed');
+  const completed = _campaigns.filter(c => c.status === 'completed')
+    .sort((a, b) => (b.completedDate || '').localeCompare(a.completedDate || ''));
+
+  let html = '';
+
+  // ---- 進行中キャンペーン ----
+  if (active.length === 0) {
+    html += '<p class="campaign-empty">進行中のキャンペーンがありません。</p>';
+  } else {
+    html += active.map(c => {
+      const progress = getCampaignProgress(c.id);
+      const pct      = Math.min(100, Math.round(progress / c.wagerRequired * 100));
+      const color    = pct >= 100 ? '#F39C12' : '#9B59B6';
+      return `<div class="campaign-item">
+        <div class="campaign-header">
+          <span class="campaign-name">${escapeHtml(c.name)}</span>
+          <span class="campaign-reward">FB報酬: <strong>¥${Number(c.fbReward).toLocaleString()}</strong></span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <span class="progress-label">¥${progress.toLocaleString()} / ¥${Number(c.wagerRequired).toLocaleString()} (${pct}%)</span>
+        </div>
+        <div class="campaign-actions">
+          <button class="small-btn btn-campaign-complete" data-id="${c.id}">✅ 達成マーク</button>
+          <button class="small-btn btn-campaign-end"      data-id="${c.id}">終了</button>
+        </div>
+      </div>`;
+    }).join('');
   }
-  list.innerHTML = _campaigns.map(c => {
-    const progress = getCampaignProgress(c.id);
-    const pct      = Math.min(100, Math.round(progress / c.wagerRequired * 100));
-    const isDone   = c.status === 'completed';
-    const color    = isDone ? '#27AE60' : pct >= 100 ? '#F39C12' : '#9B59B6';
-    return `<div class="campaign-item ${isDone ? 'campaign-done' : ''}">
-      <div class="campaign-header">
-        <span class="campaign-name">${escapeHtml(c.name)}</span>
-        <span class="campaign-reward">FB報酬: <strong>¥${Number(c.fbReward).toLocaleString()}</strong></span>
+
+  // ---- 過去の結果 ----
+  if (completed.length > 0) {
+    const rows = completed.map(c => {
+      const betPnl   = _bets
+        .filter(b => String(b.campaignId) === String(c.id))
+        .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
+      const pnlClass = betPnl > 0 ? 'win' : betPnl < 0 ? 'loss' : '';
+      return `<tr>
+        <td>${escapeHtml(c.name)}</td>
+        <td>¥${Number(c.fbReward).toLocaleString()}</td>
+        <td>${c.completedDate || '-'}</td>
+        <td class="${pnlClass}">${formatPnl(betPnl)}</td>
+      </tr>`;
+    }).join('');
+    html += `
+    <div class="campaign-history">
+      <div class="campaign-history-label">過去の結果（${completed.length}件）</div>
+      <div class="table-scroll">
+        <table class="campaign-history-table">
+          <thead><tr><th>キャンペーン</th><th>FB報酬</th><th>達成日</th><th>ベット損益</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
       </div>
-      <div class="progress-bar-wrap">
-        <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-        <span class="progress-label">¥${progress.toLocaleString()} / ¥${Number(c.wagerRequired).toLocaleString()} (${pct}%)</span>
-      </div>
-      ${isDone
-        ? `<small class="campaign-completed-label">✅ 達成済み（${c.completedDate || ''}）</small>`
-        : `<button class="small-btn btn-campaign-complete" data-id="${c.id}">達成マーク</button>`}
-      <button class="small-btn btn-campaign-delete" data-id="${c.id}">削除</button>
     </div>`;
-  }).join('');
+  }
+
+  list.innerHTML = html;
 
   list.querySelectorAll('.btn-campaign-complete').forEach(btn =>
     btn.addEventListener('click', () => completeCampaign(btn.dataset.id))
   );
-  list.querySelectorAll('.btn-campaign-delete').forEach(btn =>
-    btn.addEventListener('click', () => confirmDeleteCampaign(btn.dataset.id))
+  list.querySelectorAll('.btn-campaign-end').forEach(btn =>
+    btn.addEventListener('click', () => endCampaign(btn.dataset.id))
   );
 }
 
 async function completeCampaign(id) {
   const c = _campaigns.find(c => c.id === id);
   if (!c || !confirm(`「${c.name}」を達成済みにしますか？`)) return;
+  await updateCampaign(id, { status: 'completed', completedDate: todayJST() });
+  refreshAll();
+}
+
+async function endCampaign(id) {
+  const c = _campaigns.find(c => String(c.id) === String(id));
+  if (!c || !confirm(`「${c.name}」を終了して過去の結果に移動しますか？`)) return;
   await updateCampaign(id, { status: 'completed', completedDate: todayJST() });
   refreshAll();
 }

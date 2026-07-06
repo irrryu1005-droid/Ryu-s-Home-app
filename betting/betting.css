@@ -639,7 +639,14 @@ details[open] > summary::before    { content: '▼ '; }
   margin-bottom: 8px;
   border: 1.5px solid var(--border);
 }
-.campaign-item.campaign-done { opacity: 0.6; }
+.campaign-empty { opacity: 0.6; font-size: 12px; padding: 8px 0; }
+.campaign-actions { margin-top: 6px; }
+.campaign-history { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+.campaign-history-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.campaign-history-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.campaign-history-table th { color: var(--muted); font-weight: 600; text-align: left; padding: 4px 6px; white-space: nowrap; }
+.campaign-history-table td { padding: 5px 6px; border-bottom: 1px solid var(--border); }
+.campaign-history-table tr:last-child td { border-bottom: none; }
 .campaign-header {
   display: flex;
   justify-content: space-between;
