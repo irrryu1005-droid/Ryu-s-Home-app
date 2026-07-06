@@ -1769,8 +1769,9 @@ function renderCharts() {
 }
 
 function renderBalanceChart() {
-  const totalDeposited = _deposits.reduce((s, d) => s + d.amount, 0);
-  const initialBankroll = (_settings.bankroll || 0) - totalDeposited;
+  // 出金は負数として計算（入金:+amount、出金:-amount）
+  const netDeposited = _deposits.reduce((s, d) => s + (d.type === 'withdrawal' ? -d.amount : d.amount), 0);
+  const initialBankroll = (_settings.bankroll || 0) - netDeposited;
 
   // ベット時点でスタークを控除し、確定時に払い戻しを加算する方式
   // pending非FB: -stake（ベット時点で即控除）
@@ -1794,7 +1795,8 @@ function renderBalanceChart() {
       events.push({ date: bet.date, pnl, deposit: 0 });
     }
     for (const dep of _deposits) {
-      events.push({ date: dep.deposit_date, pnl: 0, deposit: dep.amount });
+      const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
+      events.push({ date: dep.deposit_date, pnl: 0, deposit: signed });
     }
     events.sort((a, b) => {
       if (a.date !== b.date) return a.date < b.date ? -1 : 1;
@@ -1804,8 +1806,8 @@ function renderBalanceChart() {
       balance += ev.deposit + ev.pnl;
       labels.push(ev.date);
       data.push(balance);
-      pointColors.push(ev.deposit > 0 ? '#F59E0B' : '#3498DB');
-      pointRadii.push(ev.deposit > 0 ? 6 : 3);
+      pointColors.push(ev.deposit !== 0 ? '#F59E0B' : '#3498DB');
+      pointRadii.push(ev.deposit !== 0 ? 6 : 3);
       tooltipDeposits.push(ev.deposit);
     }
   } else {
@@ -1817,16 +1819,17 @@ function renderBalanceChart() {
       dayMap[bet.date].pnl += pnl;
     }
     for (const dep of _deposits) {
+      const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
       if (!dayMap[dep.deposit_date]) dayMap[dep.deposit_date] = { pnl: 0, deposit: 0 };
-      dayMap[dep.deposit_date].deposit += dep.amount;
+      dayMap[dep.deposit_date].deposit += signed;
     }
     for (const d of Object.keys(dayMap).sort()) {
       const ev = dayMap[d];
       balance += ev.deposit + ev.pnl;
       labels.push(d);
       data.push(balance);
-      pointColors.push(ev.deposit > 0 ? '#F59E0B' : '#3498DB');
-      pointRadii.push(ev.deposit > 0 ? 6 : 3);
+      pointColors.push(ev.deposit !== 0 ? '#F59E0B' : '#3498DB');
+      pointRadii.push(ev.deposit !== 0 ? 6 : 3);
       tooltipDeposits.push(ev.deposit);
     }
   }
@@ -1858,7 +1861,7 @@ function renderBalanceChart() {
           callbacks: {
             afterLabel: (item) => {
               const dep = tooltipDeposits[item.dataIndex];
-              return dep > 0 ? `入金: +¥${dep.toLocaleString()}` : '';
+              return dep > 0 ? `入金: +¥${dep.toLocaleString()}` : dep < 0 ? `出金: -¥${Math.abs(dep).toLocaleString()}` : '';
             },
           },
         },
