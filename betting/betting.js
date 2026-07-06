@@ -39,6 +39,7 @@ let _settings      = { bankroll: null };
 let _goals         = [];
 let _deposits      = [];
 let _consultations = [];
+let _detailsOpenState = null; // null=初回レンダリング。toggle イベントで常に最新を保持
 
 const _now = new Date();
 let _pnlYear  = _now.getFullYear();
@@ -820,15 +821,14 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
 
   const todayMonth = todayJST().slice(0, 7);
 
-  // 再描画前に開閉状態を保存（初回は空なのでデフォルト動作）
-  // preOpen* が渡された場合はそれを優先（drag中のタイミング問題を回避）
-  const isFirstRender = preOpenMonths === null && container.querySelectorAll('details').length === 0;
-  const openMonths = preOpenMonths ?? new Set([...container.querySelectorAll('.month-group[open]')].map(el => el.dataset.month));
-  const openWeeks  = preOpenWeeks  ?? new Set([...container.querySelectorAll('.week-group[open]')].map(el => `${el.dataset.month}/${el.dataset.week}`));
-  const openDays   = preOpenDays   ?? new Set([...container.querySelectorAll('.day-group[open]')].map(el => el.dataset.date));
-  const mOpen = (mKey)       => isFirstRender ? mKey === todayMonth : openMonths.has(mKey);
-  const wOpen = (mKey, wKey) => isFirstRender ? mKey === todayMonth : openWeeks.has(`${mKey}/${wKey}`);
-  const dOpen = (dKey, mKey) => isFirstRender ? mKey === todayMonth : openDays.has(dKey);
+  // 開閉状態を決定（優先順: 明示引数 > module変数 > 初回デフォルト）
+  const state = preOpenMonths !== null
+    ? { months: preOpenMonths, weeks: preOpenWeeks, days: preOpenDays }
+    : _detailsOpenState;
+  const isFirstRender = state === null;
+  const mOpen = (mKey)       => isFirstRender ? mKey === todayMonth : state.months.has(mKey);
+  const wOpen = (mKey, wKey) => isFirstRender ? mKey === todayMonth : state.weeks.has(`${mKey}/${wKey}`);
+  const dOpen = (dKey, mKey) => isFirstRender ? mKey === todayMonth : state.days.has(dKey);
 
   // 月 → 週（月内の第N週）→ 日 の3段階グルーピング
   const monthMap = new Map();
@@ -913,6 +913,17 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
   }
 
   container.innerHTML = html;
+
+  // toggle イベントで _detailsOpenState を常に最新化（どの経路で再描画が走っても状態が維持される）
+  const syncDetailsState = () => {
+    _detailsOpenState = {
+      months: new Set([...container.querySelectorAll('.month-group[open]')].map(el => el.dataset.month)),
+      weeks:  new Set([...container.querySelectorAll('.week-group[open]')].map(el => `${el.dataset.month}/${el.dataset.week}`)),
+      days:   new Set([...container.querySelectorAll('.day-group[open]')].map(el => el.dataset.date))
+    };
+  };
+  syncDetailsState(); // 描画直後の状態を保存
+  container.querySelectorAll('details').forEach(d => d.addEventListener('toggle', syncDetailsState));
 
   container.querySelectorAll('.btn-edit').forEach(btn =>
     btn.addEventListener('click', () => openEditForm(btn.dataset.id))
