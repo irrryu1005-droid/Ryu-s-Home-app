@@ -1338,8 +1338,8 @@ function renderCampaigns() {
           <span class="progress-label">¥${progress.toLocaleString()} / ¥${Number(c.wagerRequired).toLocaleString()} (${pct}%)</span>
         </div>
         <div class="campaign-actions">
-          <button class="small-btn btn-campaign-complete" data-id="${c.id}">✅ 達成</button>
-          <button class="small-btn btn-campaign-end"      data-id="${c.id}">終了</button>
+          <button class="small-btn btn-campaign-complete" data-id="${c.id}">✅ ベット成功</button>
+          <button class="small-btn btn-campaign-end"      data-id="${c.id}">❌ 条件未達</button>
           <button class="small-btn btn-campaign-edit"     data-id="${c.id}">編集</button>
         </div>
         <form class="campaign-edit-form" data-id="${c.id}" hidden>
@@ -1383,6 +1383,7 @@ function renderCampaigns() {
         <td>${escapeHtml(c.name)}</td>
         <td>¥${Number(c.fbReward).toLocaleString()}</td>
         <td class="${pnlClass}">${formatPnl(betPnl)}</td>
+        <td><button class="small-btn btn-campaign-reopen" data-id="${c.id}">再開</button></td>
       </tr>`;
     }).join('');
     html += `
@@ -1390,7 +1391,7 @@ function renderCampaigns() {
       <div class="campaign-history-label">過去の結果（${completed.length}件）</div>
       <div class="table-scroll">
         <table class="campaign-history-table">
-          <thead><tr><th>キャンペーン</th><th>FB報酬</th><th>ベット損益</th></tr></thead>
+          <thead><tr><th>キャンペーン</th><th>FB報酬</th><th>ベット損益</th><th></th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -1399,6 +1400,9 @@ function renderCampaigns() {
 
   list.innerHTML = html;
 
+  list.querySelectorAll('.btn-campaign-reopen').forEach(btn =>
+    btn.addEventListener('click', () => reopenCampaign(btn.dataset.id))
+  );
   list.querySelectorAll('.btn-campaign-complete').forEach(btn =>
     btn.addEventListener('click', () => completeCampaign(btn.dataset.id))
   );
@@ -1435,18 +1439,30 @@ function renderCampaigns() {
 
 async function completeCampaign(id) {
   const c = _campaigns.find(c => c.id === id);
-  if (!c || !await showConfirm(`「${c.name}」を達成済みにしますか？`)) return;
+  if (!c || !await showConfirm(`「${c.name}」をベット成功で完了しますか？`)) return;
   await updateCampaign(id, { status: 'completed', completedDate: todayJST() });
   refreshAll();
 }
 
 async function endCampaign(id) {
   const c = _campaigns.find(c => String(c.id) === String(id));
-  if (!c || !await showConfirm(`「${c.name}」を終了して過去の結果に移動しますか？`)) return;
+  if (!c || !await showConfirm(`「${c.name}」を条件未達で終了しますか？`)) return;
   const { error } = await db.from('bet_campaigns')
     .update({ status: 'completed', completed_date: todayJST() })
     .eq('id', id);
   if (error) { console.error('endCampaign error:', error); return; }
+  const { data } = await db.from('bet_campaigns').select('*').eq('hidden', false).order('created_at');
+  if (data) _campaigns = data.map(normalizeCampaign);
+  refreshAll();
+}
+
+async function reopenCampaign(id) {
+  const c = _campaigns.find(c => String(c.id) === String(id));
+  if (!c || !await showConfirm(`「${c.name}」を進行中に戻しますか？`)) return;
+  const { error } = await db.from('bet_campaigns')
+    .update({ status: 'active', completed_date: null })
+    .eq('id', id);
+  if (error) { console.error('reopenCampaign error:', error); return; }
   const { data } = await db.from('bet_campaigns').select('*').eq('hidden', false).order('created_at');
   if (data) _campaigns = data.map(normalizeCampaign);
   refreshAll();
