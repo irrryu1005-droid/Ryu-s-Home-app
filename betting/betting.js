@@ -1911,6 +1911,10 @@ function renderBalanceChart() {
             },
           },
         },
+        zoom: {
+          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+          pan:  { enabled: true, mode: 'x' },
+        },
       },
       scales: { y: { beginAtZero: false } },
     },
@@ -2018,7 +2022,14 @@ function renderPnlChart(settledBets) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { filter: item => iData[item.dataIndex] !== 0 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { filter: item => iData[item.dataIndex] !== 0 },
+        zoom: {
+          zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+          pan:  { enabled: true, mode: 'x' },
+        },
+      },
       scales: { y: { beginAtZero: false } },
     },
     plugins: [greenRedFill],
@@ -3298,10 +3309,12 @@ function initTabs() {
       document.querySelectorAll('.stats-toggle-btn[data-balance]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       _balanceViewBy = btn.dataset.balance;
-      const settled = _bets.filter(b => b.result !== 'pending').slice().reverse();
-      renderBalanceChart(settled);
+      renderBalanceChart();
     });
   });
+
+  document.getElementById('btn-reset-pnl-zoom')?.addEventListener('click', () => pnlChart?.resetZoom());
+  document.getElementById('btn-reset-balance-zoom')?.addEventListener('click', () => balanceChart?.resetZoom());
 
   document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
