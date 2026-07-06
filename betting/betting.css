@@ -641,6 +641,8 @@ details[open] > summary::before    { content: '▼ '; }
 }
 .campaign-empty { opacity: 0.6; font-size: 12px; padding: 8px 0; }
 .campaign-actions { margin-top: 6px; }
+.campaign-edit-form { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.campaign-edit-btns { display: flex; gap: 8px; margin-top: 8px; }
 .campaign-history { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
 .campaign-history-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
 .campaign-history-table { width: 100%; font-size: 12px; border-collapse: collapse; }

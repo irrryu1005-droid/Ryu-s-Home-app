@@ -191,9 +191,14 @@ async function updateCampaign(id, updates) {
   const row = {};
   if (updates.status        !== undefined) row.status         = updates.status;
   if (updates.completedDate !== undefined) row.completed_date = updates.completedDate;
+  if (updates.name          !== undefined) row.name           = updates.name;
+  if (updates.startDate     !== undefined) row.start_date     = updates.startDate || null;
+  if (updates.wagerRequired !== undefined) row.wager_required = updates.wagerRequired;
+  if (updates.fbReward      !== undefined) row.fb_reward      = updates.fbReward;
   const { error } = await db.from('bet_campaigns').update(row).eq('id', id);
   if (error) { console.error('updateCampaign error:', error); return; }
-  const idx = _campaigns.findIndex(c => c.id === id);
+  // String() で型不一致を回避
+  const idx = _campaigns.findIndex(c => String(c.id) === String(id));
   if (idx !== -1) _campaigns[idx] = { ..._campaigns[idx], ...updates };
 }
 
@@ -1286,7 +1291,7 @@ function renderCampaigns() {
       const progress = getCampaignProgress(c.id);
       const pct      = Math.min(100, Math.round(progress / c.wagerRequired * 100));
       const color    = pct >= 100 ? '#F39C12' : '#9B59B6';
-      return `<div class="campaign-item">
+      return `<div class="campaign-item" data-id="${c.id}">
         <div class="campaign-header">
           <span class="campaign-name">${escapeHtml(c.name)}</span>
           <span class="campaign-reward">FB報酬: <strong>¥${Number(c.fbReward).toLocaleString()}</strong></span>
@@ -1298,7 +1303,34 @@ function renderCampaigns() {
         <div class="campaign-actions">
           <button class="small-btn btn-campaign-complete" data-id="${c.id}">✅ 達成マーク</button>
           <button class="small-btn btn-campaign-end"      data-id="${c.id}">終了</button>
+          <button class="small-btn btn-campaign-edit"     data-id="${c.id}">編集</button>
         </div>
+        <form class="campaign-edit-form" data-id="${c.id}" hidden>
+          <div class="form-row">
+            <div class="form-group">
+              <label>名前</label>
+              <input type="text" name="campaignName" value="${escapeHtml(c.name)}" required>
+            </div>
+            <div class="form-group">
+              <label>開始日</label>
+              <input type="date" name="campaignStart" value="${c.startDate || ''}">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>達成条件 (¥)</label>
+              <input type="number" name="wagerRequired" value="${c.wagerRequired}" step="1000" required>
+            </div>
+            <div class="form-group">
+              <label>FB報酬額 (¥)</label>
+              <input type="number" name="fbReward" value="${c.fbReward}" step="500" required>
+            </div>
+          </div>
+          <div class="campaign-edit-btns">
+            <button type="submit" class="btn-secondary">保存</button>
+            <button type="button" class="btn-campaign-edit-cancel" data-id="${c.id}">キャンセル</button>
+          </div>
+        </form>
       </div>`;
     }).join('');
   }
@@ -1337,6 +1369,32 @@ function renderCampaigns() {
   list.querySelectorAll('.btn-campaign-end').forEach(btn =>
     btn.addEventListener('click', () => endCampaign(btn.dataset.id))
   );
+  list.querySelectorAll('.btn-campaign-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const form = list.querySelector(`.campaign-edit-form[data-id="${btn.dataset.id}"]`);
+      if (form) form.hidden = !form.hidden;
+    });
+  });
+  list.querySelectorAll('.btn-campaign-edit-cancel').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const form = list.querySelector(`.campaign-edit-form[data-id="${btn.dataset.id}"]`);
+      if (form) form.hidden = true;
+    });
+  });
+  list.querySelectorAll('.campaign-edit-form').forEach(form => {
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const id   = form.dataset.id;
+      const f    = form.elements;
+      await updateCampaign(id, {
+        name:          f.campaignName.value.trim(),
+        startDate:     f.campaignStart.value || null,
+        wagerRequired: parseInt(f.wagerRequired.value),
+        fbReward:      parseInt(f.fbReward.value),
+      });
+      refreshAll();
+    });
+  });
 }
 
 async function completeCampaign(id) {
