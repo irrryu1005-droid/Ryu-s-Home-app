@@ -1763,33 +1763,42 @@ function getTableKey(sport, league) {
 function renderCharts() {
   const settled = _bets.filter(b => b.result !== 'pending').slice().reverse();
   renderPnlChart(settled);
-  renderBalanceChart(settled);
+  renderBalanceChart();
   renderSportChart();
   renderStatsTable();
 }
 
-function renderBalanceChart(settledBets) {
+function renderBalanceChart() {
   const totalDeposited = _deposits.reduce((s, d) => s + d.amount, 0);
   const initialBankroll = (_settings.bankroll || 0) - totalDeposited;
+
+  // ベット時点でスタークを控除し、確定時に払い戻しを加算する方式
+  // pending非FB: -stake（ベット時点で即控除）
+  // 勝ち: stake*(odds-1)  負け: 0  無効: 0  ※いずれも確定P&Lとして加算
+  const calcPnlForChart = (bet) => {
+    if (bet.result === 'pending') return bet.isFreebet ? null : -bet.stake;
+    return calcPnl(bet);
+  };
 
   const labels = [], data = [], pointColors = [], pointRadii = [], tooltipDeposits = [];
   let balance = initialBankroll;
 
+  // 全ベット（pending含む）を時系列順に並べる（settled と pending を統合）
+  const allBets = _bets.slice().reverse(); // renderCharts で reverse 済みのものを再利用
+
   if (_balanceViewBy === 'bet') {
-    // ベット別: ベットと入金を日付順にマージして1点ずつプロット
     const events = [];
-    for (const bet of settledBets) {
-      const pnl = calcPnl(bet);
+    for (const bet of allBets) {
+      const pnl = calcPnlForChart(bet);
       if (pnl === null) continue;
       events.push({ date: bet.date, pnl, deposit: 0 });
     }
     for (const dep of _deposits) {
       events.push({ date: dep.deposit_date, pnl: 0, deposit: dep.amount });
     }
-    // 同日は入金→ベットの順、次に created_at 順（ここでは index順で近似）
     events.sort((a, b) => {
       if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-      return b.deposit - a.deposit; // 入金を先に
+      return b.deposit - a.deposit;
     });
     for (const ev of events) {
       balance += ev.deposit + ev.pnl;
@@ -1800,10 +1809,9 @@ function renderBalanceChart(settledBets) {
       tooltipDeposits.push(ev.deposit);
     }
   } else {
-    // 日別: 同じ日のベット損益・入金をまとめて1点
     const dayMap = {};
-    for (const bet of settledBets) {
-      const pnl = calcPnl(bet);
+    for (const bet of allBets) {
+      const pnl = calcPnlForChart(bet);
       if (pnl === null) continue;
       if (!dayMap[bet.date]) dayMap[bet.date] = { pnl: 0, deposit: 0 };
       dayMap[bet.date].pnl += pnl;
@@ -1820,23 +1828,6 @@ function renderBalanceChart(settledBets) {
       pointColors.push(ev.deposit > 0 ? '#F59E0B' : '#3498DB');
       pointRadii.push(ev.deposit > 0 ? 6 : 3);
       tooltipDeposits.push(ev.deposit);
-    }
-  }
-
-  // 未確定ベットの賭け金をグラフ末尾に反映（ヘッダー残高と一致させる）
-  const pendingStake = _bets
-    .filter(b => b.result === 'pending' && !b.isFreebet)
-    .reduce((sum, b) => sum + (b.stake || 0), 0);
-  if (pendingStake > 0) {
-    const today = todayJST();
-    if (labels.length > 0 && labels[labels.length - 1] === today) {
-      data[data.length - 1] = balance - pendingStake;
-    } else {
-      labels.push(today);
-      data.push(balance - pendingStake);
-      pointColors.push('#3498DB');
-      pointRadii.push(3);
-      tooltipDeposits.push(0);
     }
   }
 
