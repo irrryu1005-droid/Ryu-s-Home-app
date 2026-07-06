@@ -820,6 +820,15 @@ function renderRecords() {
 
   const todayMonth = todayJST().slice(0, 7);
 
+  // 再描画前に開閉状態を保存（初回は空なのでデフォルト動作）
+  const isFirstRender = container.querySelectorAll('details').length === 0;
+  const openMonths = new Set([...container.querySelectorAll('.month-group[open]')].map(el => el.dataset.month));
+  const openWeeks  = new Set([...container.querySelectorAll('.week-group[open]')].map(el => `${el.dataset.month}/${el.dataset.week}`));
+  const openDays   = new Set([...container.querySelectorAll('.day-group[open]')].map(el => el.dataset.date));
+  const mOpen = (mKey)       => isFirstRender ? mKey === todayMonth : openMonths.has(mKey);
+  const wOpen = (mKey, wKey) => isFirstRender ? mKey === todayMonth : openWeeks.has(`${mKey}/${wKey}`);
+  const dOpen = (dKey, mKey) => isFirstRender ? mKey === todayMonth : openDays.has(dKey);
+
   // 月 → 週（月内の第N週）→ 日 の3段階グルーピング
   const monthMap = new Map();
   for (const bet of _bets) {
@@ -847,11 +856,10 @@ function renderRecords() {
   for (const [mKey, wMap] of sortedMonths) {
     const [year, monStr] = mKey.split('-');
     const mon            = parseInt(monStr);
-    const isCurrentMonth = mKey === todayMonth;
     const allMonthBets   = [...wMap.values()].flatMap(d => [...d.values()].flat());
     const mPnl           = sumPnl(allMonthBets);
 
-    html += `<details class="month-group" ${isCurrentMonth ? 'open' : ''}>
+    html += `<details class="month-group" data-month="${mKey}" ${mOpen(mKey) ? 'open' : ''}>
       <summary class="group-summary month-summary">
         <span class="group-arrow">▶</span>
         <span class="group-label">${year}年${mon}月</span>
@@ -870,7 +878,7 @@ function renderRecords() {
         ? `${parseInt(wStart.slice(5,7))}/${parseInt(wStart.slice(8,10))}`
         : `${parseInt(wStart.slice(5,7))}/${parseInt(wStart.slice(8,10))} 〜 ${parseInt(wEnd.slice(5,7))}/${parseInt(wEnd.slice(8,10))}`;
 
-      html += `<details class="week-group" ${isCurrentMonth ? 'open' : ''}>
+      html += `<details class="week-group" data-month="${mKey}" data-week="${wKey}" ${wOpen(mKey, wKey) ? 'open' : ''}>
         <summary class="group-summary week-summary">
           <span class="group-arrow">▶</span>
           <span class="group-label">${wLabel}</span>
@@ -882,7 +890,7 @@ function renderRecords() {
         const dLabel = `${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
         const dPnl   = sumPnl(bets);
 
-        html += `<details class="day-group" ${isCurrentMonth ? 'open' : ''}>
+        html += `<details class="day-group" data-date="${dKey}" ${dOpen(dKey, mKey) ? 'open' : ''}>
           <summary class="group-summary day-summary">
             <span class="group-arrow">▶</span>
             <span class="group-label">${dLabel}</span>
