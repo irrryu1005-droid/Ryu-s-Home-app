@@ -2183,15 +2183,42 @@ async function fetchBasketballInternational(dateStr) {
   return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
 }
 
+async function fetchBasketballIntlApi(dateStr) {
+  try {
+    const res = await fetch(`/.netlify/functions/basketball-international?date=${dateStr}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.events || []).map(ev => ({ ...ev, sportKey: 'Basketball' }));
+  } catch { return []; }
+}
+
+const BBALL_DOMESTIC_RE = /\bnba\b|b\.?league|euroleague|eurocup|ncaa|g[-\s]?league/i;
+
 async function fetchBasketball(dateStr) {
-  const [nba, bLeague, intl] = await Promise.all([
+  const [nba, bLeague, intlEspn, intlApi, tsdbEvs] = await Promise.all([
     fetchESPN('basketball', 'nba', dateStr)
       .then(evs => evs.map(ev => ({ ...ev, league: 'NBA', sportKey: 'Basketball' })))
       .catch(() => []),
     fetchBLeagueData(dateStr).catch(() => []),
     fetchBasketballInternational(dateStr).catch(() => []),
+    fetchBasketballIntlApi(dateStr).catch(() => []),
+    // TheSportsDB: 無料・キー不要・FIBA予選も収録
+    fetchTSDB('Basketball', dateStr)
+      .then(evs => evs
+        .filter(ev => !BBALL_DOMESTIC_RE.test(ev.league || ''))
+        .map(ev => ({ ...ev, sportKey: 'Basketball' }))
+      ).catch(() => []),
   ]);
-  return [...nba, ...bLeague, ...intl];
+
+  // 全ソースをタイトルで重複除去（先着優先）
+  const seen = new Set();
+  const all  = [...nba, ...bLeague, ...intlEspn, ...intlApi, ...tsdbEvs];
+  return all.filter(ev => {
+    const key = ev.title?.toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // ---- 🎾 テニス（ESPN /events → フォールバック TheSportsDB）----
