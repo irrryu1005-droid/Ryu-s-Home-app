@@ -396,6 +396,7 @@ function calcPnl(bet) {
   if (bet.isFreebet && bet.campaignId) {
     const campaign = _campaigns.find(c => c.id === bet.campaignId);
     if (!campaign || campaign.status !== 'completed') return null;
+    if (campaign.completionType === 'failed') return 0; // 条件未達: FB損益は常に0
   }
   const odds = bet.type === 'parlay' ? calcEffectiveOdds(bet) : bet.odds;
   if (bet.result === 'win')  return Math.round(bet.stake * (odds - 1));
