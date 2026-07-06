@@ -3298,14 +3298,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('bet-form').addEventListener('submit', async e => {
     e.preventDefault();
-    const f    = e.target;
+    const f      = e.target;
+    const submitBtn = f.querySelector('[type="submit"]');
+    if (submitBtn.disabled) return; // 二重送信防止
+    submitBtn.disabled = true;
+    submitBtn.textContent = '保存中…';
+
     const type = f.querySelector('input[name="type"]:checked').value;
     let bet;
 
     if (type === 'parlay') {
       const legs = getLegsFromForm();
-      if (legs.length < 2)                                 { await showAlert('マルチは2レッグ以上必要です'); return; }
-      if (legs.some(l => isNaN(l.odds) || l.odds < 1.01)) { await showAlert('すべてのレッグにオッズを入力してください'); return; }
+      if (legs.length < 2)                                 { await showAlert('マルチは2レッグ以上必要です'); submitBtn.disabled = false; submitBtn.textContent = '保存'; return; }
+      if (legs.some(l => isNaN(l.odds) || l.odds < 1.01)) { await showAlert('すべてのレッグにオッズを入力してください'); submitBtn.disabled = false; submitBtn.textContent = '保存'; return; }
       const combinedOdds = Math.round(legs.reduce((acc, l) => acc * l.odds, 1) * 100) / 100;
       const comboBoost   = parseFloat(document.getElementById('input-combo-boost').value) || null;
       const campaignIdP  = f.elements.campaignId.value || null;
@@ -3315,7 +3320,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               campaignId: campaignIdP,
               result: f.elements.result.value, memo: f.elements.memo.value.trim() };
     } else {
-      if (!f.elements.odds.value) { await showAlert('オッズを入力してください'); return; }
+      if (!f.elements.odds.value) { await showAlert('オッズを入力してください'); submitBtn.disabled = false; submitBtn.textContent = '保存'; return; }
       const sport      = f.elements.sport.value;
       const leagueSel  = document.getElementById('single-league-select');
       const campaignId = f.elements.campaignId.value || null;
@@ -3331,6 +3336,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const id = f.elements.id.value;
     if (id) await updateBet(id, bet); else await addBet(bet);
+    submitBtn.disabled = false;
+    submitBtn.textContent = '保存';
     document.getElementById('form-container').hidden = true;
     refreshAll();
   });
