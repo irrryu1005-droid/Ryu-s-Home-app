@@ -121,13 +121,14 @@ function normalizeGoal(row) {
 
 function normalizeCampaign(row) {
   return {
-    id:            row.id,
-    name:          row.name,
-    wagerRequired: row.wager_required,
-    fbReward:      row.fb_reward,
-    startDate:     row.start_date,
-    status:        row.status        || 'active',
-    completedDate: row.completed_date,
+    id:             row.id,
+    name:           row.name,
+    wagerRequired:  row.wager_required,
+    fbReward:       row.fb_reward,
+    startDate:      row.start_date,
+    status:         row.status         || 'active',
+    completedDate:  row.completed_date,
+    completionType: row.completion_type || 'success',
   };
 }
 
@@ -1375,12 +1376,16 @@ function renderCampaigns() {
   // ---- 過去の結果 ----
   if (completed.length > 0) {
     const rows = completed.map(c => {
-      const betPnl   = _bets
+      const isFailed = c.completionType === 'failed';
+      const betPnl   = isFailed ? 0 : _bets
         .filter(b => String(b.campaignId) === String(c.id))
         .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
       const pnlClass = betPnl > 0 ? 'win' : betPnl < 0 ? 'loss' : '';
+      const statusBadge = isFailed
+        ? '<span class="badge-failed">条件未達</span>'
+        : '<span class="badge-success">ベット成功</span>';
       return `<tr>
-        <td>${escapeHtml(c.name)}</td>
+        <td>${escapeHtml(c.name)} ${statusBadge}</td>
         <td>¥${Number(c.fbReward).toLocaleString()}</td>
         <td class="${pnlClass}">${formatPnl(betPnl)}</td>
         <td><button class="small-btn btn-campaign-reopen" data-id="${c.id}">再開</button></td>
@@ -1438,9 +1443,14 @@ function renderCampaigns() {
 }
 
 async function completeCampaign(id) {
-  const c = _campaigns.find(c => c.id === id);
+  const c = _campaigns.find(c => String(c.id) === String(id));
   if (!c || !await showConfirm(`「${c.name}」をベット成功で完了しますか？`)) return;
-  await updateCampaign(id, { status: 'completed', completedDate: todayJST() });
+  const { error } = await db.from('bet_campaigns')
+    .update({ status: 'completed', completed_date: todayJST(), completion_type: 'success' })
+    .eq('id', id);
+  if (error) { console.error('completeCampaign error:', error); return; }
+  const { data } = await db.from('bet_campaigns').select('*').eq('hidden', false).order('created_at');
+  if (data) _campaigns = data.map(normalizeCampaign);
   refreshAll();
 }
 
@@ -1448,7 +1458,7 @@ async function endCampaign(id) {
   const c = _campaigns.find(c => String(c.id) === String(id));
   if (!c || !await showConfirm(`「${c.name}」を条件未達で終了しますか？`)) return;
   const { error } = await db.from('bet_campaigns')
-    .update({ status: 'completed', completed_date: todayJST() })
+    .update({ status: 'completed', completed_date: todayJST(), completion_type: 'failed' })
     .eq('id', id);
   if (error) { console.error('endCampaign error:', error); return; }
   const { data } = await db.from('bet_campaigns').select('*').eq('hidden', false).order('created_at');

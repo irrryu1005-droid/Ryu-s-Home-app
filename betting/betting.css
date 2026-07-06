@@ -1519,3 +1519,24 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   font-size: 14px;
   box-sizing: border-box;
 }
+
+.badge-success {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #d4edda;
+  color: #27AE60;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.badge-failed {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #fde8e8;
+  color: #E74C3C;
+  font-weight: 600;
+  vertical-align: middle;
+}
