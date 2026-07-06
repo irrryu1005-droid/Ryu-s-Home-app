@@ -1459,41 +1459,63 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
 /* カスタム確認ダイアログ */
 .custom-confirm-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.55);
   display: flex; align-items: center; justify-content: center;
   z-index: 9999;
+  backdrop-filter: blur(2px);
 }
 .custom-confirm-dialog {
-  background: var(--card);
-  border-radius: 12px;
-  padding: 24px 20px 20px;
-  width: min(320px, 90vw);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  background: #fff;
+  border-radius: 14px;
+  padding: 0;
+  width: min(340px, 90vw);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.22);
+  overflow: hidden;
+  border-top: 4px solid var(--purple);
 }
 .custom-confirm-msg {
-  margin: 0 0 20px;
+  padding: 24px 22px 20px;
   font-size: 15px;
-  line-height: 1.5;
-  color: var(--text);
+  line-height: 1.6;
+  color: #2C3E50;
+  font-weight: 500;
 }
 .custom-confirm-btns {
-  display: flex; gap: 10px; justify-content: flex-end;
+  display: flex;
+  border-top: 1px solid #E4E9F0;
 }
 .custom-confirm-cancel {
-  padding: 8px 18px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-right: 1px solid #E4E9F0;
+  background: #F8F9FA;
+  color: #555;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
 }
+.custom-confirm-cancel:hover { background: #eee; }
 .custom-confirm-ok {
-  padding: 8px 18px;
-  border-radius: 8px;
+  flex: 1;
+  padding: 14px;
   border: none;
   background: var(--purple);
   color: #fff;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 600;
+}
+.custom-confirm-ok:hover { background: #8e44ad; }
+.custom-prompt-input {
+  width: 100%;
+  padding: 8px 10px;
+  margin: 0 22px 16px;
+  width: calc(100% - 44px);
+  border-radius: 8px;
+  border: 1px solid #D0D7E0;
+  background: #F8F9FA;
+  color: #2C3E50;
+  font-size: 14px;
+  box-sizing: border-box;
 }

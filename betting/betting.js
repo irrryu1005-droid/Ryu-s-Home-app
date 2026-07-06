@@ -50,16 +50,40 @@ function todayJST() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+function _makeOverlay(html) {
+  const overlay = document.createElement('div');
+  overlay.className = 'custom-confirm-overlay';
+  overlay.innerHTML = html;
+  document.body.appendChild(overlay);
+  return overlay;
+}
 function showConfirm(message) {
   return new Promise(resolve => {
-    const overlay = document.createElement('div');
-    overlay.className = 'custom-confirm-overlay';
-    overlay.innerHTML = `<div class="custom-confirm-dialog"><p class="custom-confirm-msg">${escapeHtml(message)}</p><div class="custom-confirm-btns"><button class="custom-confirm-cancel">キャンセル</button><button class="custom-confirm-ok">OK</button></div></div>`;
-    document.body.appendChild(overlay);
+    const overlay = _makeOverlay(`<div class="custom-confirm-dialog"><p class="custom-confirm-msg">${escapeHtml(message)}</p><div class="custom-confirm-btns"><button class="custom-confirm-cancel">キャンセル</button><button class="custom-confirm-ok">OK</button></div></div>`);
     const close = (val) => { document.body.removeChild(overlay); resolve(val); };
     overlay.querySelector('.custom-confirm-ok').addEventListener('click', () => close(true));
     overlay.querySelector('.custom-confirm-cancel').addEventListener('click', () => close(false));
     overlay.addEventListener('click', e => { if (e.target === overlay) close(false); });
+  });
+}
+function showAlert(message) {
+  return new Promise(resolve => {
+    const overlay = _makeOverlay(`<div class="custom-confirm-dialog"><p class="custom-confirm-msg">${escapeHtml(message)}</p><div class="custom-confirm-btns"><button class="custom-confirm-ok">OK</button></div></div>`);
+    const close = () => { document.body.removeChild(overlay); resolve(); };
+    overlay.querySelector('.custom-confirm-ok').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  });
+}
+function showPrompt(message, defaultValue = '') {
+  return new Promise(resolve => {
+    const overlay = _makeOverlay(`<div class="custom-confirm-dialog"><p class="custom-confirm-msg">${escapeHtml(message)}</p><input class="custom-prompt-input" type="text" value="${escapeHtml(defaultValue)}"><div class="custom-confirm-btns"><button class="custom-confirm-cancel">キャンセル</button><button class="custom-confirm-ok">OK</button></div></div>`);
+    const input = overlay.querySelector('.custom-prompt-input');
+    const close = (val) => { document.body.removeChild(overlay); resolve(val); };
+    overlay.querySelector('.custom-confirm-ok').addEventListener('click', () => close(input.value));
+    overlay.querySelector('.custom-confirm-cancel').addEventListener('click', () => close(null));
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(null); });
+    input.focus();
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') close(input.value); if (e.key === 'Escape') close(null); });
   });
 }
 
@@ -1292,7 +1316,7 @@ function renderCampaigns() {
   const list     = document.getElementById('campaign-list');
   const active   = _campaigns.filter(c => c.status !== 'completed');
   const completed = _campaigns.filter(c => c.status === 'completed')
-    .sort((a, b) => (b.completedDate || '').localeCompare(a.completedDate || ''));
+    .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
 
   let html = '';
 
@@ -1314,7 +1338,7 @@ function renderCampaigns() {
           <span class="progress-label">¥${progress.toLocaleString()} / ¥${Number(c.wagerRequired).toLocaleString()} (${pct}%)</span>
         </div>
         <div class="campaign-actions">
-          <button class="small-btn btn-campaign-complete" data-id="${c.id}">✅ 達成マーク</button>
+          <button class="small-btn btn-campaign-complete" data-id="${c.id}">✅ 達成</button>
           <button class="small-btn btn-campaign-end"      data-id="${c.id}">終了</button>
           <button class="small-btn btn-campaign-edit"     data-id="${c.id}">編集</button>
         </div>
@@ -1341,7 +1365,7 @@ function renderCampaigns() {
           </div>
           <div class="campaign-edit-btns">
             <button type="submit" class="btn-secondary">保存</button>
-            <button type="button" class="btn-campaign-edit-cancel" data-id="${c.id}">キャンセル</button>
+            <button type="button" class="btn-secondary btn-campaign-edit-cancel" data-id="${c.id}">キャンセル</button>
           </div>
         </form>
       </div>`;
@@ -1358,7 +1382,6 @@ function renderCampaigns() {
       return `<tr>
         <td>${escapeHtml(c.name)}</td>
         <td>¥${Number(c.fbReward).toLocaleString()}</td>
-        <td>${c.completedDate || '-'}</td>
         <td class="${pnlClass}">${formatPnl(betPnl)}</td>
       </tr>`;
     }).join('');
@@ -1367,7 +1390,7 @@ function renderCampaigns() {
       <div class="campaign-history-label">過去の結果（${completed.length}件）</div>
       <div class="table-scroll">
         <table class="campaign-history-table">
-          <thead><tr><th>キャンペーン</th><th>FB報酬</th><th>達成日</th><th>ベット損益</th></tr></thead>
+          <thead><tr><th>キャンペーン</th><th>FB報酬</th><th>ベット損益</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -2917,9 +2940,9 @@ function renderSportsEvents() {
 
 async function addMatchToGcal(btn) {
   if (!gcalTokenBet) {
-    if (!gcTokenClientBet) { alert('Googleカレンダーに接続できません'); return; }
+    if (!gcTokenClientBet) { await showAlert('Googleカレンダーに接続できません'); return; }
     gcTokenClientBet.requestAccessToken({ prompt: 'consent' });
-    alert('ログイン後、もう一度ボタンを押してください');
+    await showAlert('ログイン後、もう一度ボタンを押してください');
     return;
   }
 
@@ -2957,7 +2980,7 @@ async function addMatchToGcal(btn) {
     if (res.status === 401) {
       gcalTokenClear();
       btn.textContent = '📅＋'; btn.disabled = false;
-      alert('認証期限切れです。再ログインしてください。');
+      await showAlert('認証期限切れです。再ログインしてください。');
       return;
     }
     if (res.ok) {
@@ -2973,7 +2996,7 @@ async function addMatchToGcal(btn) {
       const errData = await res.json().catch(() => ({}));
       console.error('Calendar API error:', res.status, errData);
       btn.textContent = '📅＋'; btn.disabled = false;
-      alert(`追加に失敗しました（${errData.error?.message || res.status}）`);
+      await showAlert(`追加に失敗しました（${errData.error?.message || res.status}）`);
     }
   } catch (e) {
     console.error('addMatchToGcal fetch error:', e);
@@ -3003,10 +3026,10 @@ async function removeMatchFromGcal(btn) {
     } else if (res.status === 401) {
       gcalTokenClear();
       btn.textContent = '🗑 削除'; btn.disabled = false;
-      alert('認証期限切れです。再ログインしてください。');
+      await showAlert('認証期限切れです。再ログインしてください。');
     } else {
       btn.textContent = '🗑 削除'; btn.disabled = false;
-      alert('削除に失敗しました');
+      await showAlert('削除に失敗しました');
     }
   } catch { btn.textContent = '🗑 削除'; btn.disabled = false; }
 }
@@ -3083,9 +3106,9 @@ function initScheduleTab() {
 
   if (gcalTokenBet) gcalSetConnected();
 
-  document.getElementById('gcal-login-btn').addEventListener('click', () => {
+  document.getElementById('gcal-login-btn').addEventListener('click', async () => {
     if (!gcTokenClientBet) {
-      alert('Googleカレンダーの初期化中です。しばらく待ってから再試行してください。');
+      await showAlert('Googleカレンダーの初期化中です。しばらく待ってから再試行してください。');
       return;
     }
     gcTokenClientBet.requestAccessToken({ prompt: 'consent' });
@@ -3267,7 +3290,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-add-league').addEventListener('click', async () => {
     const sport = document.querySelector('select[name="sport"]').value;
-    const name  = prompt(`「${sport}」に追加するリーグ名を入力してください`);
+    const name  = await showPrompt(`「${sport}」に追加するリーグ名を入力してください`);
     if (!name || !name.trim()) return;
     await addLeague(sport, name.trim());
     updateLeagueSelect(sport, name.trim());
@@ -3281,8 +3304,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (type === 'parlay') {
       const legs = getLegsFromForm();
-      if (legs.length < 2)                                 { alert('マルチは2レッグ以上必要です'); return; }
-      if (legs.some(l => isNaN(l.odds) || l.odds < 1.01)) { alert('すべてのレッグにオッズを入力してください'); return; }
+      if (legs.length < 2)                                 { await showAlert('マルチは2レッグ以上必要です'); return; }
+      if (legs.some(l => isNaN(l.odds) || l.odds < 1.01)) { await showAlert('すべてのレッグにオッズを入力してください'); return; }
       const combinedOdds = Math.round(legs.reduce((acc, l) => acc * l.odds, 1) * 100) / 100;
       const comboBoost   = parseFloat(document.getElementById('input-combo-boost').value) || null;
       const campaignIdP  = f.elements.campaignId.value || null;
@@ -3292,7 +3315,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               campaignId: campaignIdP,
               result: f.elements.result.value, memo: f.elements.memo.value.trim() };
     } else {
-      if (!f.elements.odds.value) { alert('オッズを入力してください'); return; }
+      if (!f.elements.odds.value) { await showAlert('オッズを入力してください'); return; }
       const sport      = f.elements.sport.value;
       const leagueSel  = document.getElementById('single-league-select');
       const campaignId = f.elements.campaignId.value || null;
