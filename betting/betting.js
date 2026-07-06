@@ -2137,7 +2137,7 @@ async function fetchBaseball(dateStr) {
   return [...mlbEvs, ...npbEvs];
 }
 
-// ---- 🏀 バスケ（ESPN: NBA + Bリーグ）----
+// ---- 🏀 バスケ（ESPN: NBA + Bリーグ + 国際）----
 async function fetchBLeagueData(dateStr) {
   // Netlify Function 経由で SofaScore から取得
   try {
@@ -2157,14 +2157,41 @@ async function fetchBLeagueData(dateStr) {
   return [];
 }
 
+// ESPN の国際バスケリーグ slug → 表示リーグ名 のマッピング
+const INTL_BBALL_ESPN = [
+  { id: 'mens-fiba-world-cup',                label: 'FIBA World Cup'    },
+  { id: 'fiba-world-cup-qualifying-europe',   label: 'FIBA WC Qualifier' },
+  { id: 'fiba-world-cup-qualifying-americas', label: 'FIBA WC Qualifier' },
+  { id: 'fiba-world-cup-qualifying-asia',     label: 'FIBA WC Qualifier' },
+  { id: 'fiba-world-cup-qualifying-africa',   label: 'FIBA WC Qualifier' },
+  { id: 'fiba-world-cup-qualifying-oceania',  label: 'FIBA WC Qualifier' },
+  { id: 'mens-fiba-eurobasket',               label: 'EuroBasket'        },
+  { id: 'mens-fiba-asia-cup',                 label: 'FIBA Asia Cup'     },
+  { id: 'mens-fiba-americup',                 label: 'FIBA AmeriCup'     },
+  { id: 'mens-fiba-africa',                   label: 'FIBA AfroBasket'   },
+  { id: 'mens-basketball-olympics',           label: 'Olympics'          },
+];
+
+async function fetchBasketballInternational(dateStr) {
+  const results = await Promise.allSettled(
+    INTL_BBALL_ESPN.map(({ id, label }) =>
+      fetchESPN('basketball', id, dateStr)
+        .then(evs => evs.map(ev => ({ ...ev, league: label, sportKey: 'Basketball' })))
+    )
+  );
+  // 開催中の大会だけデータが返る。404は [] なので自動でスキップ
+  return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+}
+
 async function fetchBasketball(dateStr) {
-  const [nba, bLeague] = await Promise.all([
+  const [nba, bLeague, intl] = await Promise.all([
     fetchESPN('basketball', 'nba', dateStr)
       .then(evs => evs.map(ev => ({ ...ev, league: 'NBA', sportKey: 'Basketball' })))
       .catch(() => []),
     fetchBLeagueData(dateStr).catch(() => []),
+    fetchBasketballInternational(dateStr).catch(() => []),
   ]);
-  return [...nba, ...bLeague];
+  return [...nba, ...bLeague, ...intl];
 }
 
 // ---- 🎾 テニス（ESPN /events → フォールバック TheSportsDB）----
