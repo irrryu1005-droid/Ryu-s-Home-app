@@ -220,15 +220,18 @@
 
           <div class="form-row">
             <div class="form-group">
-              <label>追加入金 (¥)</label>
+              <label>金額 (¥)</label>
               <input type="number" id="settings-deposit" step="1000" placeholder="5000" min="1">
             </div>
             <div class="form-group">
-              <label>入金日</label>
+              <label>日付</label>
               <input type="date" id="settings-deposit-date">
             </div>
           </div>
-          <button id="btn-deposit" class="btn-deposit">＋ 入金を反映</button>
+          <div class="deposit-btns">
+            <button id="btn-deposit"  class="btn-deposit">＋ 入金を反映</button>
+            <button id="btn-withdraw" class="btn-withdraw">－ 出金を反映</button>
+          </div>
 
           <div id="deposit-history" class="deposit-history"></div>
         </div>

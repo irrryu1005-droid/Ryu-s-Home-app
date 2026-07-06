@@ -266,29 +266,30 @@ function initSettings() {
     refreshAll();
   });
 
-  document.getElementById('btn-deposit').addEventListener('click', async () => {
+  async function handleDepositAction(type) {
     const amount = parseInt(document.getElementById('settings-deposit').value);
     if (!amount || amount <= 0) return;
     const dateVal = document.getElementById('settings-deposit-date').value;
     const depositDate = dateVal || todayJST();
 
-    // bankroll を更新
     const current = _settings.bankroll || 0;
-    const newBankroll = current + amount;
+    const newBankroll = type === 'deposit' ? current + amount : current - amount;
     await saveBankroll(newBankroll);
 
-    // 入金履歴をDBに保存
     const { data, error } = await db.from('bet_deposits').insert([{
-      amount, deposit_date: depositDate,
+      amount, deposit_date: depositDate, type,
     }]).select().single();
     if (!error && data) _deposits.unshift(data);
 
-    document.getElementById('settings-bankroll').value    = newBankroll;
-    document.getElementById('settings-deposit').value     = '';
+    document.getElementById('settings-bankroll').value     = newBankroll;
+    document.getElementById('settings-deposit').value      = '';
     document.getElementById('settings-deposit-date').value = '';
     renderDepositHistory();
     refreshAll();
-  });
+  }
+
+  document.getElementById('btn-deposit') .addEventListener('click', () => handleDepositAction('deposit'));
+  document.getElementById('btn-withdraw').addEventListener('click', () => handleDepositAction('withdrawal'));
 
   renderDepositHistory();
 }
@@ -297,21 +298,27 @@ function renderDepositHistory() {
   const el = document.getElementById('deposit-history');
   if (!el) return;
   if (_deposits.length === 0) { el.innerHTML = ''; return; }
-  const rows = _deposits.map(d => `
+  const rows = _deposits.map(d => {
+    const isWithdrawal = d.type === 'withdrawal';
+    const sign    = isWithdrawal ? '－' : '＋';
+    const cls     = isWithdrawal ? 'deposit-amount withdrawal' : 'deposit-amount';
+    return `
     <div class="deposit-row">
       <span class="deposit-date">${d.deposit_date}</span>
-      <span class="deposit-amount">+¥${Number(d.amount).toLocaleString()}</span>
+      <span class="${cls}">${sign}¥${Number(d.amount).toLocaleString()}</span>
       <button class="deposit-del-btn" data-id="${d.id}">✕</button>
-    </div>`).join('');
-  el.innerHTML = `<div class="deposit-history-label">入金履歴</div>${rows}`;
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="deposit-history-label">入出金履歴</div>${rows}`;
 
   el.querySelectorAll('.deposit-del-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = Number(btn.dataset.id);
       const dep = _deposits.find(d => d.id === id);
       if (!dep) return;
-      // bankroll から差し引き
-      const newBankroll = (_settings.bankroll || 0) - dep.amount;
+      // 入金削除 → bankroll を減らす、出金削除 → bankroll を戻す
+      const isWithdrawal = dep.type === 'withdrawal';
+      const newBankroll = (_settings.bankroll || 0) + (isWithdrawal ? dep.amount : -dep.amount);
       await saveBankroll(newBankroll);
       await db.from('bet_deposits').delete().eq('id', id);
       _deposits = _deposits.filter(d => d.id !== id);

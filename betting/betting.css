@@ -389,9 +389,10 @@ details[open].settings-section > summary::before { content: '▼ '; }
   border-top: 1px dashed var(--border);
   margin: 16px 0;
 }
-.btn-deposit {
-  padding: 10px 20px;
-  background: var(--win);
+.deposit-btns { display: flex; gap: 8px; }
+.btn-deposit, .btn-withdraw {
+  flex: 1;
+  padding: 10px 16px;
   color: var(--white);
   border: none;
   border-radius: 10px;
@@ -400,7 +401,9 @@ details[open].settings-section > summary::before { content: '▼ '; }
   cursor: pointer;
   transition: opacity 0.15s;
 }
-.btn-deposit:hover { opacity: 0.88; }
+.btn-deposit  { background: var(--win); }
+.btn-withdraw { background: var(--loss); }
+.btn-deposit:hover, .btn-withdraw:hover { opacity: 0.88; }
 
 .deposit-history { margin-top: 14px; }
 .deposit-history-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
@@ -415,6 +418,7 @@ details[open].settings-section > summary::before { content: '▼ '; }
 .deposit-row:last-child { border-bottom: none; }
 .deposit-date { flex: 1; color: var(--muted); }
 .deposit-amount { font-weight: 600; color: var(--win); font-variant-numeric: tabular-nums; }
+.deposit-amount.withdrawal { color: var(--loss); }
 .deposit-del-btn {
   background: none;
   border: none;
