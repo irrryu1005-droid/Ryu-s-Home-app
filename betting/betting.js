@@ -68,6 +68,7 @@ function normalizeBet(row) {
     campaignId:   row.campaign_id,
     result:       row.result        || 'pending',
     memo:         row.memo,
+    sortOrder:    row.sort_order    ?? 0,
   };
 }
 
@@ -95,7 +96,7 @@ function normalizeCampaign(row) {
 
 async function loadAll() {
   const [betsRes, campsRes, settingsRes, goalsRes, depositsRes, leaguesRes, consultRes] = await Promise.all([
-    db.from('bets').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
+    db.from('bets').select('*').order('date', { ascending: false }).order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
     db.from('bet_campaigns').select('*').eq('hidden', false).order('created_at'),
     db.from('bet_settings').select('*').eq('id', 1).single(),
     db.from('bet_goals').select('*').order('created_at'),
@@ -165,6 +166,7 @@ function betToRow(bet) {
     campaign_id:   bet.campaignId    || null,
     result:        bet.result,
     memo:          bet.memo          || null,
+    sort_order:    bet.sortOrder     ?? 0,
   };
 }
 
@@ -698,6 +700,18 @@ function renderPnlStatement() {
 // ============================================================
 // 記録レンダリング
 // ============================================================
+let _dragBetId   = null;
+let _dragBetDate = null;
+let _dragOverId  = null;
+let _dragOverPos = null; // 'before' | 'after'
+
+async function saveSortOrders(dateBets) {
+  await Promise.all(dateBets.map((b, i) => {
+    b.sortOrder = i;
+    return db.from('bets').update({ sort_order: i }).eq('id', b.id);
+  }));
+}
+
 function renderRecords() {
   const container = document.getElementById('records-list');
   if (_bets.length === 0) {
@@ -706,6 +720,7 @@ function renderRecords() {
   }
   let html = `<div class="table-scroll"><table>
     <thead><tr>
+      <th class="col-drag"></th>
       <th>日付</th><th>種別</th><th>試合 / ベット</th>
       <th>オッズ</th><th>賭け金</th><th>結果</th><th>損益</th><th></th>
     </tr></thead><tbody>`;
@@ -741,7 +756,8 @@ function renderRecords() {
     }
 
     const oddsVal = isParlay ? calcEffectiveOdds(bet).toFixed(2) : bet.odds;
-    html += `<tr>
+    html += `<tr class="bet-row" draggable="true" data-id="${bet.id}" data-date="${bet.date}">
+      <td class="drag-handle" title="ドラッグして並び替え">⠿</td>
       <td>${bet.date}</td>
       ${typeCell}
       ${detailCell}
@@ -781,6 +797,69 @@ function renderRecords() {
       const updatedLegs = bet.legs.map((l, i) => i === legIdx ? { ...l, legResult: sel.value } : l);
       await updateBet(sel.dataset.id, { ...bet, legs: updatedLegs });
       refreshAll();
+    });
+  });
+
+  // ---- Drag & Drop ----
+  const rows = container.querySelectorAll('.bet-row');
+
+  const clearDropIndicators = () => {
+    rows.forEach(r => r.classList.remove('drop-before', 'drop-after'));
+  };
+
+  rows.forEach(row => {
+    row.addEventListener('dragstart', e => {
+      _dragBetId   = row.dataset.id;
+      _dragBetDate = row.dataset.date;
+      e.dataTransfer.effectAllowed = 'move';
+      // slight delay so the browser snapshot doesn't show the dim state
+      requestAnimationFrame(() => row.classList.add('bet-row-dragging'));
+    });
+
+    row.addEventListener('dragend', () => {
+      row.classList.remove('bet-row-dragging');
+      clearDropIndicators();
+      _dragBetId = _dragBetDate = _dragOverId = _dragOverPos = null;
+    });
+
+    row.addEventListener('dragover', e => {
+      if (!_dragBetId || _dragBetDate !== row.dataset.date) return;
+      if (_dragBetId === row.dataset.id) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      clearDropIndicators();
+      const { top, height } = row.getBoundingClientRect();
+      if (e.clientY < top + height / 2) {
+        row.classList.add('drop-before');
+        _dragOverId  = row.dataset.id;
+        _dragOverPos = 'before';
+      } else {
+        row.classList.add('drop-after');
+        _dragOverId  = row.dataset.id;
+        _dragOverPos = 'after';
+      }
+    });
+
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drop-before', 'drop-after');
+    });
+
+    row.addEventListener('drop', async e => {
+      e.preventDefault();
+      if (!_dragBetId || !_dragOverId) return;
+      if (_dragBetDate !== row.dataset.date) return;
+      if (_dragBetId === _dragOverId) return;
+
+      const dragIdx = _bets.findIndex(b => String(b.id) === _dragBetId);
+      const [dragged] = _bets.splice(dragIdx, 1);
+      const targetIdx = _bets.findIndex(b => String(b.id) === _dragOverId);
+      _bets.splice(_dragOverPos === 'before' ? targetIdx : targetIdx + 1, 0, dragged);
+
+      const dateBets = _bets.filter(b => b.date === _dragBetDate);
+      await saveSortOrders(dateBets);
+
+      renderRecords();
     });
   });
 
@@ -1145,15 +1224,21 @@ function updateSummary() {
   document.getElementById('win-rate').textContent   = winRate;
   document.getElementById('hit-rate').textContent   = calcHitRate();
 
+  // 未確定ベットの賭け金は既に支出済みなので残高から差し引く（フリーベットは実費なし）
+  const pendingStake = _bets
+    .filter(b => b.result === 'pending' && !b.isFreebet)
+    .reduce((sum, b) => sum + (b.stake || 0), 0);
+
   // 残高（元手が設定されていれば元手+損益、なければ損益だけ表示）
   const balanceEl = document.getElementById('balance');
   if (_settings.bankroll) {
-    const balance = _settings.bankroll + totalPnl;
+    const balance = _settings.bankroll + totalPnl - pendingStake;
     balanceEl.textContent = '¥' + balance.toLocaleString();
-    balanceEl.className   = 's-val ' + (totalPnl > 0 ? 'win' : totalPnl < 0 ? 'loss' : '');
+    balanceEl.className   = 's-val ' + (balance < _settings.bankroll ? 'loss' : balance > _settings.bankroll ? 'win' : '');
   } else {
-    balanceEl.textContent = (totalPnl >= 0 ? '+' : '') + '¥' + totalPnl.toLocaleString();
-    balanceEl.className   = 's-val ' + (totalPnl > 0 ? 'win' : totalPnl < 0 ? 'loss' : '');
+    const effectivePnl = totalPnl - pendingStake;
+    balanceEl.textContent = (effectivePnl >= 0 ? '+' : '') + '¥' + effectivePnl.toLocaleString();
+    balanceEl.className   = 's-val ' + (effectivePnl > 0 ? 'win' : effectivePnl < 0 ? 'loss' : '');
   }
 
   // 連勝・連敗
@@ -2234,6 +2319,7 @@ async function loadSportsSchedule() {
 // ---- 試合ピッカー ----
 const SPORT_KEY_TO_FORM = {
   Soccer: 'Football', Baseball: 'Baseball', Basketball: 'Basketball', Tennis: 'Tennis',
+  Volleyball: 'Volleyball', TableTennis: 'TableTennis', Rugby: 'Rugby',
 };
 
 let pickerDate         = new Date();

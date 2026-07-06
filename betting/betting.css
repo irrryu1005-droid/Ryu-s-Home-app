@@ -1379,3 +1379,19 @@ tr:last-child td { border-bottom: none; }
   line-height: 1;
 }
 .btn-clear-match:hover { color: var(--loss, #e53e3e); border-color: var(--loss, #e53e3e); }
+
+/* ---- Drag & Drop (Records) ---- */
+.col-drag { width: 24px; }
+.drag-handle {
+  color: var(--muted);
+  cursor: grab;
+  font-size: 16px;
+  text-align: center;
+  vertical-align: middle;
+  user-select: none;
+  padding: 0 4px;
+}
+.drag-handle:active { cursor: grabbing; }
+.bet-row-dragging { opacity: 0.4; }
+.bet-row.drop-before { box-shadow: inset 0 2px 0 0 var(--purple); }
+.bet-row.drop-after  { box-shadow: inset 0 -2px 0 0 var(--purple); }
