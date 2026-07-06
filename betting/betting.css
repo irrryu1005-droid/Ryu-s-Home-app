@@ -225,6 +225,8 @@ body {
 }
 .btn-edit:hover   { border-color: var(--purple); color: var(--purple); }
 .btn-delete:hover { border-color: var(--loss);   color: var(--loss);   }
+.btn-danger       { border-color: var(--loss);   color: var(--loss);   }
+.btn-danger:hover { background: var(--loss);      color: #fff;          }
 
 .result-select, .leg-result-select {
   appearance: none;

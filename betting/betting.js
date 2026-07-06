@@ -342,27 +342,73 @@ function renderDepositHistory() {
   const el = document.getElementById('deposit-history');
   if (!el) return;
   if (_deposits.length === 0) { el.innerHTML = ''; return; }
-  const rows = _deposits.map(d => {
+
+  // 日付降順（新しい順）
+  const sorted = [..._deposits].sort((a, b) => b.deposit_date.localeCompare(a.deposit_date));
+
+  const rows = sorted.map(d => {
     const isWithdrawal = d.type === 'withdrawal';
-    const sign    = isWithdrawal ? '－' : '＋';
-    const cls     = isWithdrawal ? 'deposit-amount withdrawal' : 'deposit-amount';
+    const sign = isWithdrawal ? '－' : '＋';
+    const cls  = isWithdrawal ? 'deposit-amount withdrawal' : 'deposit-amount';
     return `
-    <div class="deposit-row">
+    <div class="deposit-row" data-id="${d.id}">
       <span class="deposit-date">${d.deposit_date}</span>
       <span class="${cls}">${sign}¥${Number(d.amount).toLocaleString()}</span>
-      <button class="deposit-del-btn" data-id="${d.id}">✕</button>
+      <button class="deposit-edit-btn small-btn btn-secondary" data-id="${d.id}">編集</button>
+      <button class="deposit-del-btn small-btn btn-danger" data-id="${d.id}">削除</button>
     </div>`;
   }).join('');
   el.innerHTML = `<div class="deposit-history-label">入出金履歴</div>${rows}`;
 
-  el.querySelectorAll('.deposit-del-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = Number(btn.dataset.id);
+  el.querySelectorAll('.deposit-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id  = Number(btn.dataset.id);
       const dep = _deposits.find(d => d.id === id);
       if (!dep) return;
-      // 入金削除 → bankroll を減らす、出金削除 → bankroll を戻す
+      const row = el.querySelector(`.deposit-row[data-id="${id}"]`);
+      row.innerHTML = `
+        <input type="date" class="dep-edit-date" value="${dep.deposit_date}" style="width:130px">
+        <input type="number" class="dep-edit-amount" value="${dep.amount}" min="1" style="width:100px">
+        <select class="dep-edit-type">
+          <option value="deposit"   ${dep.type === 'deposit'    ? 'selected' : ''}>入金</option>
+          <option value="withdrawal"${dep.type === 'withdrawal' ? 'selected' : ''}>出金</option>
+        </select>
+        <button class="dep-save-btn small-btn">保存</button>
+        <button class="dep-cancel-btn small-btn btn-secondary">キャンセル</button>`;
+
+      row.querySelector('.dep-cancel-btn').addEventListener('click', () => renderDepositHistory());
+
+      row.querySelector('.dep-save-btn').addEventListener('click', async () => {
+        const newDate   = row.querySelector('.dep-edit-date').value;
+        const newAmount = parseInt(row.querySelector('.dep-edit-amount').value);
+        const newType   = row.querySelector('.dep-edit-type').value;
+        if (!newDate || !newAmount || newAmount <= 0) return;
+
+        // bankroll への影響差分を計算
+        const oldEffect = dep.type === 'withdrawal' ? -dep.amount :  dep.amount;
+        const newEffect = newType  === 'withdrawal' ? -newAmount  :  newAmount;
+        const newBankroll = (_settings.bankroll || 0) + (newEffect - oldEffect);
+
+        await saveBankroll(newBankroll);
+        await db.from('bet_deposits').update({ amount: newAmount, deposit_date: newDate, type: newType }).eq('id', id);
+
+        const idx = _deposits.findIndex(d => d.id === id);
+        if (idx !== -1) _deposits[idx] = { ..._deposits[idx], amount: newAmount, deposit_date: newDate, type: newType };
+        document.getElementById('settings-bankroll').value = newBankroll;
+        renderDepositHistory();
+        refreshAll();
+      });
+    });
+  });
+
+  el.querySelectorAll('.deposit-del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id  = Number(btn.dataset.id);
+      const dep = _deposits.find(d => d.id === id);
+      if (!dep) return;
+      if (!await showConfirm(`この入出金履歴を削除しますか？`)) return;
       const isWithdrawal = dep.type === 'withdrawal';
-      const newBankroll = (_settings.bankroll || 0) + (isWithdrawal ? dep.amount : -dep.amount);
+      const newBankroll  = (_settings.bankroll || 0) + (isWithdrawal ? dep.amount : -dep.amount);
       await saveBankroll(newBankroll);
       await db.from('bet_deposits').delete().eq('id', id);
       _deposits = _deposits.filter(d => d.id !== id);
