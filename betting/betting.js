@@ -707,10 +707,11 @@ function renderPnlStatement() {
 // ============================================================
 // 記録レンダリング
 // ============================================================
-let _dragBetId   = null;
-let _dragBetDate = null;
-let _dragOverId  = null;
-let _dragOverPos = null; // 'before' | 'after'
+let _dragBetId    = null;
+let _dragBetDate  = null;
+let _dragOverId   = null;
+let _dragOverPos  = null; // 'before' | 'after'
+let _touchDragRow = null;
 
 async function saveSortOrders(dateBets) {
   await Promise.all(dateBets.map((b, i) => {
@@ -807,19 +808,54 @@ function renderRecords() {
     });
   });
 
-  // ---- Drag & Drop ----
+  // ---- Drag & Drop (mouse + touch) ----
   const rows = container.querySelectorAll('.bet-row');
 
   const clearDropIndicators = () => {
     rows.forEach(r => r.classList.remove('drop-before', 'drop-after'));
   };
 
+  async function applyReorder() {
+    if (!_dragBetId || !_dragOverId) return;
+    const dragIdx = _bets.findIndex(b => String(b.id) === _dragBetId);
+    const [dragged] = _bets.splice(dragIdx, 1);
+    const targetIdx = _bets.findIndex(b => String(b.id) === _dragOverId);
+    _bets.splice(_dragOverPos === 'before' ? targetIdx : targetIdx + 1, 0, dragged);
+    const dateBets = _bets.filter(b => b.date === _dragBetDate);
+    await saveSortOrders(dateBets);
+    renderRecords();
+  }
+
+  function updateDropTarget(clientX, clientY) {
+    // ドラッグ中の行を一時的に透明にして下の要素を取得
+    if (_touchDragRow) _touchDragRow.style.visibility = 'hidden';
+    const el = document.elementFromPoint(clientX, clientY);
+    if (_touchDragRow) _touchDragRow.style.visibility = '';
+
+    const targetRow = el?.closest('.bet-row');
+    clearDropIndicators();
+    if (!targetRow || targetRow === _touchDragRow || targetRow.dataset.date !== _dragBetDate) {
+      _dragOverId = _dragOverPos = null;
+      return;
+    }
+    const { top, height } = targetRow.getBoundingClientRect();
+    if (clientY < top + height / 2) {
+      targetRow.classList.add('drop-before');
+      _dragOverId  = targetRow.dataset.id;
+      _dragOverPos = 'before';
+    } else {
+      targetRow.classList.add('drop-after');
+      _dragOverId  = targetRow.dataset.id;
+      _dragOverPos = 'after';
+    }
+  }
+
+  // -- マウス（PC）--
   rows.forEach(row => {
     row.addEventListener('dragstart', e => {
       _dragBetId   = row.dataset.id;
       _dragBetDate = row.dataset.date;
       e.dataTransfer.effectAllowed = 'move';
-      // slight delay so the browser snapshot doesn't show the dim state
       requestAnimationFrame(() => row.classList.add('bet-row-dragging'));
     });
 
@@ -834,7 +870,6 @@ function renderRecords() {
       if (_dragBetId === row.dataset.id) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-
       clearDropIndicators();
       const { top, height } = row.getBoundingClientRect();
       if (e.clientY < top + height / 2) {
@@ -857,17 +892,38 @@ function renderRecords() {
       if (!_dragBetId || !_dragOverId) return;
       if (_dragBetDate !== row.dataset.date) return;
       if (_dragBetId === _dragOverId) return;
-
-      const dragIdx = _bets.findIndex(b => String(b.id) === _dragBetId);
-      const [dragged] = _bets.splice(dragIdx, 1);
-      const targetIdx = _bets.findIndex(b => String(b.id) === _dragOverId);
-      _bets.splice(_dragOverPos === 'before' ? targetIdx : targetIdx + 1, 0, dragged);
-
-      const dateBets = _bets.filter(b => b.date === _dragBetDate);
-      await saveSortOrders(dateBets);
-
-      renderRecords();
+      await applyReorder();
     });
+  });
+
+  // -- タッチ（スマホ）: ⠿ ハンドルを長押しでドラッグ開始 --
+  function onTouchMove(e) {
+    if (!_dragBetId) return;
+    e.preventDefault();
+    const { clientX, clientY } = e.touches[0];
+    updateDropTarget(clientX, clientY);
+  }
+
+  async function onTouchEnd() {
+    document.removeEventListener('touchmove', onTouchMove);
+    if (_touchDragRow) _touchDragRow.classList.remove('bet-row-dragging');
+    clearDropIndicators();
+    await applyReorder();
+    _dragBetId = _dragBetDate = _dragOverId = _dragOverPos = _touchDragRow = null;
+  }
+
+  container.querySelectorAll('.drag-handle').forEach(handle => {
+    handle.addEventListener('touchstart', e => {
+      const row = handle.closest('.bet-row');
+      if (!row) return;
+      e.preventDefault();
+      _dragBetId    = row.dataset.id;
+      _dragBetDate  = row.dataset.date;
+      _touchDragRow = row;
+      requestAnimationFrame(() => row.classList.add('bet-row-dragging'));
+      document.addEventListener('touchmove', onTouchMove, { passive: false });
+      document.addEventListener('touchend', onTouchEnd, { once: true });
+    }, { passive: false });
   });
 
 }
