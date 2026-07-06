@@ -842,7 +842,9 @@ function renderRecords() {
 
   let html = '';
 
-  for (const [mKey, wMap] of monthMap) {
+  const sortedMonths = [...monthMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+
+  for (const [mKey, wMap] of sortedMonths) {
     const [year, monStr] = mKey.split('-');
     const mon            = parseInt(monStr);
     const isCurrentMonth = mKey === todayMonth;
@@ -856,12 +858,14 @@ function renderRecords() {
         <span class="group-meta">${allMonthBets.length}件 ${pnlSpan(mPnl)}</span>
       </summary>`;
 
-    for (const [wKey, dMap] of wMap) {
+    const sortedWeeks = [...wMap.entries()].sort((a, b) => b[0] - a[0]);
+
+    for (const [wKey, dMap] of sortedWeeks) {
       const allWeekBets = [...dMap.values()].flat();
       const wPnl        = sumPnl(allWeekBets);
-      const sortedDays  = [...dMap.keys()].sort();
-      const wStart      = sortedDays[0];
-      const wEnd        = sortedDays[sortedDays.length - 1];
+      const sortedDays  = [...dMap.keys()].sort((a, b) => b.localeCompare(a));
+      const wStart      = sortedDays[sortedDays.length - 1];
+      const wEnd        = sortedDays[0];
       const wLabel      = wStart === wEnd
         ? `${parseInt(wStart.slice(5,7))}/${parseInt(wStart.slice(8,10))}`
         : `${parseInt(wStart.slice(5,7))}/${parseInt(wStart.slice(8,10))} 〜 ${parseInt(wEnd.slice(5,7))}/${parseInt(wEnd.slice(8,10))}`;
@@ -873,7 +877,7 @@ function renderRecords() {
           <span class="group-meta">${allWeekBets.length}件 ${pnlSpan(wPnl)}</span>
         </summary>`;
 
-      for (const [dKey, bets] of dMap) {
+      for (const [dKey, bets] of [...dMap.entries()].sort((a, b) => b[0].localeCompare(a[0]))) {
         const d      = new Date(dKey + 'T12:00:00');
         const dLabel = `${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
         const dPnl   = sumPnl(bets);
