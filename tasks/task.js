@@ -1089,3 +1089,12 @@ async function loadHabitChart() {
 loadTodos();
 renderTimeline();
 initGcal();
+
+// データ更新ボタン
+document.getElementById('btn-refresh').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('spinning');
+  await loadTodos();
+  await renderTimeline();
+  btn.classList.remove('spinning');
+});

@@ -43,3 +43,28 @@
   color: #4A90D9;
   font-weight: 700;
 }
+
+/* データ更新ボタン（全ページ共通） */
+.refresh-btn {
+  margin-left: auto;
+  background: none;
+  border: 1.5px solid var(--border, #E4E9F0);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 17px;
+  cursor: pointer;
+  color: var(--muted, #8A9BB0);
+  line-height: 1;
+  transition: color 0.2s, border-color 0.2s, transform 0.2s;
+}
+.refresh-btn:hover {
+  color: var(--text, #2C3E50);
+  border-color: var(--text, #2C3E50);
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.refresh-btn.spinning {
+  animation: spin 0.6s linear infinite;
+  pointer-events: none;
+}

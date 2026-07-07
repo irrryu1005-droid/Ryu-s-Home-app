@@ -1705,3 +1705,17 @@ initPlannedSubTabs();
 initSubsF();
 initLoans();
 renderPlannedTab();
+
+// データ更新ボタン
+document.getElementById('btn-refresh').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('spinning');
+  const tab = document.querySelector('.nav-btn.active')?.dataset.tab;
+  if      (tab === 'data')     await renderFinancePnl();
+  else if (tab === 'list')     await renderList();
+  else if (tab === 'accounts') await renderAccounts();
+  else if (tab === 'planned')  await renderPlannedTab();
+  else if (tab === 'wishlist') await initWishList();
+  else                         await renderDashboard();
+  btn.classList.remove('spinning');
+});

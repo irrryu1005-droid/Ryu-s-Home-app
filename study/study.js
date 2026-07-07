@@ -756,4 +756,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderBooks();
   renderIelts();
   renderProgramming();
+
+  // データ更新ボタン
+  document.getElementById('btn-refresh').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-refresh');
+    btn.classList.add('spinning');
+    await Promise.all([loadBooks(), loadScores(), loadStudyLogs()]);
+    renderBooks();
+    renderIelts();
+    renderProgramming();
+    btn.classList.remove('spinning');
+  });
 });

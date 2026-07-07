@@ -3503,4 +3503,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 最初のタブを表示
   document.getElementById('tab-records').hidden = false;
+
+  // データ更新ボタン
+  document.getElementById('btn-refresh').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-refresh');
+    btn.classList.add('spinning');
+    await loadAll();
+    populateSettings();
+    refreshAll();
+    btn.classList.remove('spinning');
+  });
 });

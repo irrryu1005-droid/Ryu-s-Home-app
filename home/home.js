@@ -1101,3 +1101,18 @@ initMobileScheduleForm();
 ['sch-next', 'm-sch-next'].forEach(id => {
   document.getElementById(id)?.addEventListener('click', () => { _schedDayOffset++; loadTodaySchedule(); });
 });
+
+// データ更新ボタン
+document.getElementById('btn-refresh')?.addEventListener('click', async () => {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('spinning');
+  await Promise.all([
+    loadFinanceSummary(),
+    loadPcTodos(),
+    loadMobileTodos(),
+    loadRoutine(),
+    loadHabitChart(),
+  ]);
+  loadTodaySchedule();
+  btn.classList.remove('spinning');
+});
