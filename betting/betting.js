@@ -1789,10 +1789,9 @@ function renderGoalProgress() {
 // ============================================================
 // チャート・統計
 // ============================================================
-let pnlChart = null, sportChart = null, balanceChart = null;
+let pnlChart = null, sportChart = null, sportAmountChart = null, balanceChart = null;
 let _statsGroupBy      = 'sport'; // 'league' | 'sport'  ← グラフ用
 let _statsTableGroupBy = 'sport'; // 'league' | 'sport'  ← テーブル用（独立）
-let _statsChartMode    = 'count'; // 'count' | 'amount'
 let _pnlViewBy         = 'bet';   // 'bet' | 'day'
 let _balanceViewBy     = 'bet';   // 'bet' | 'day'
 
@@ -2037,87 +2036,94 @@ function renderPnlChart(settledBets) {
 }
 
 function renderSportChart() {
-  const sportMap = {};
-  const isAmount = _statsChartMode === 'amount';
+  const countMap = {}, amountMap = {};
 
-  if (!isAmount) {
-    const count = (key, result) => {
-      if (result !== 'win' && result !== 'loss') return;
-      if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
-      sportMap[key][result]++;
-    };
-    for (const bet of _bets) {
-      if (bet.type === 'parlay' && Array.isArray(bet.legs)) {
-        for (const leg of bet.legs) count(getStatKey(leg.sport, leg.league), leg.legResult);
-      } else {
-        count(getStatKey(bet.sport, bet.league), bet.result);
-      }
-    }
-  } else {
-    for (const bet of _bets) {
-      const pnl = calcPnl(bet);
-      if (pnl === null) continue;
-
-      if (bet.type === 'parlay' && Array.isArray(bet.legs) && bet.legs.length > 0) {
-        if (pnl < 0) {
-          // 負け: 非的中レッグで損失を均等分配
-          const nonWinLegs = bet.legs.filter(l => l.legResult !== 'win');
-          const targets = nonWinLegs.length > 0 ? nonWinLegs : bet.legs;
-          const share = Math.abs(pnl) / targets.length;
-          for (const leg of targets) {
-            const key = getStatKey(leg.sport, leg.league);
-            if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
-            sportMap[key].loss += share;
-          }
-        } else if (pnl > 0) {
-          // 勝ち: 全レッグで利益を均等分配
-          const share = pnl / bet.legs.length;
-          for (const leg of bet.legs) {
-            const key = getStatKey(leg.sport, leg.league);
-            if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
-            sportMap[key].win += share;
-          }
-        }
-        // void (pnl = 0): 何もしない
-      } else {
-        const key = getStatKey(bet.sport, bet.league);
-        if (!sportMap[key]) sportMap[key] = { win: 0, loss: 0 };
-        if (pnl > 0) sportMap[key].win  += pnl;
-        else if (pnl < 0) sportMap[key].loss += Math.abs(pnl);
-      }
+  // 的中数集計
+  const addCount = (key, result) => {
+    if (result !== 'win' && result !== 'loss') return;
+    if (!countMap[key]) countMap[key] = { win: 0, loss: 0 };
+    countMap[key][result]++;
+  };
+  for (const bet of _bets) {
+    if (bet.type === 'parlay' && Array.isArray(bet.legs)) {
+      for (const leg of bet.legs) addCount(getStatKey(leg.sport, leg.league), leg.legResult);
+    } else {
+      addCount(getStatKey(bet.sport, bet.league), bet.result);
     }
   }
 
-  document.querySelectorAll('.mode-opt').forEach(el => {
-    el.classList.toggle('active', el.dataset.mode === (isAmount ? 'amount' : 'count'));
-  });
-  const sports = Object.keys(sportMap);
-  const ctx    = document.getElementById('chart-sport').getContext('2d');
+  // 勝敗額集計
+  for (const bet of _bets) {
+    const pnl = calcPnl(bet);
+    if (pnl === null) continue;
+    if (bet.type === 'parlay' && Array.isArray(bet.legs) && bet.legs.length > 0) {
+      if (pnl < 0) {
+        const nonWinLegs = bet.legs.filter(l => l.legResult !== 'win');
+        const targets = nonWinLegs.length > 0 ? nonWinLegs : bet.legs;
+        const share = Math.abs(pnl) / targets.length;
+        for (const leg of targets) {
+          const key = getStatKey(leg.sport, leg.league);
+          if (!amountMap[key]) amountMap[key] = { win: 0, loss: 0 };
+          amountMap[key].loss += share;
+        }
+      } else if (pnl > 0) {
+        const share = pnl / bet.legs.length;
+        for (const leg of bet.legs) {
+          const key = getStatKey(leg.sport, leg.league);
+          if (!amountMap[key]) amountMap[key] = { win: 0, loss: 0 };
+          amountMap[key].win += share;
+        }
+      }
+    } else {
+      const key = getStatKey(bet.sport, bet.league);
+      if (!amountMap[key]) amountMap[key] = { win: 0, loss: 0 };
+      if (pnl > 0) amountMap[key].win  += pnl;
+      else if (pnl < 0) amountMap[key].loss += Math.abs(pnl);
+    }
+  }
+
+  // 的中数グラフ
+  const countKeys = Object.keys(countMap);
+  const ctxCount = document.getElementById('chart-sport-count').getContext('2d');
   if (sportChart) sportChart.destroy();
-  sportChart = new Chart(ctx, {
+  sportChart = new Chart(ctxCount, {
     type: 'bar',
     data: {
-      labels: sports,
+      labels: countKeys,
       datasets: [
-        { label: isAmount ? '利益' : '勝', data: sports.map(s => sportMap[s].win),  backgroundColor: 'rgba(39,174,96,0.8)' },
-        { label: isAmount ? '損失' : '負', data: sports.map(s => sportMap[s].loss), backgroundColor: 'rgba(231,76,60,0.8)' },
+        { label: '勝', data: countKeys.map(k => countMap[k].win),  backgroundColor: 'rgba(39,174,96,0.8)' },
+        { label: '負', data: countKeys.map(k => countMap[k].loss), backgroundColor: 'rgba(231,76,60,0.8)' },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } },
+      plugins: { legend: { position: 'top' } },
+    },
+  });
+
+  // 勝敗額グラフ
+  const amountKeys = Object.keys(amountMap);
+  const ctxAmount = document.getElementById('chart-sport-amount').getContext('2d');
+  if (sportAmountChart) sportAmountChart.destroy();
+  sportAmountChart = new Chart(ctxAmount, {
+    type: 'bar',
+    data: {
+      labels: amountKeys,
+      datasets: [
+        { label: '利益', data: amountKeys.map(k => amountMap[k].win),  backgroundColor: 'rgba(39,174,96,0.8)' },
+        { label: '損失', data: amountKeys.map(k => amountMap[k].loss), backgroundColor: 'rgba(231,76,60,0.8)' },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       scales: {
-        x: { stacked: !isAmount },
-        y: { stacked: !isAmount, beginAtZero: true,
-          ticks: isAmount
-            ? { callback: v => '¥' + v.toLocaleString() }
-            : { stepSize: 1 },
-        },
+        x: { stacked: false },
+        y: { beginAtZero: true, ticks: { callback: v => '¥' + v.toLocaleString() } },
       },
       plugins: {
-        tooltip: { callbacks: isAmount
-          ? { label: ctx => `${ctx.dataset.label}: ¥${ctx.parsed.y.toLocaleString()}` }
-          : {},
-        },
+        legend: { position: 'top' },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ¥${Math.round(ctx.parsed.y).toLocaleString()}` } },
       },
     },
   });
@@ -3265,14 +3271,6 @@ function refreshAll() {
 }
 
 function initTabs() {
-  // 勝敗数 / 勝敗額 切り替え
-  document.querySelectorAll('.mode-opt').forEach(btn => {
-    btn.addEventListener('click', () => {
-      _statsChartMode = btn.dataset.mode;
-      renderSportChart();
-    });
-  });
-
   document.querySelectorAll('.stats-toggle-btn[data-group]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.stats-toggle-btn[data-group]').forEach(b => b.classList.remove('active'));

@@ -790,6 +790,7 @@ tr:last-child td { border-bottom: none; }
 /* ============================================================
    統計・チャート
 ============================================================ */
+.charts-section-header { display: flex; justify-content: flex-end; margin-bottom: 6px; }
 .charts-grid { display: grid; gap: 14px; margin-bottom: 14px; }
 @media (min-width: 600px) { .charts-grid { grid-template-columns: 1fr 1fr; } }
 
