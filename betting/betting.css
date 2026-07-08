@@ -708,6 +708,10 @@ tr:last-child td { border-bottom: none; }
 .badge-parlay  { background: #EBF3FB; color: #2980B9; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
 .badge-single  { background: #F0FDF4; color: #16A34A; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
 .badge-league { background: #EEE8F7; color: var(--purple); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700; }
+.badge-deposit     { border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
+.badge-deposit-in  { background: #FEF3C7; color: #D97706; }
+.badge-deposit-out { background: #FEE2E2; color: #DC2626; }
+.records-deposit-row { background: #FFFBEB; }
 
 .stats-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .stats-card-header h3 { margin-bottom: 0; }

@@ -321,7 +321,7 @@ function initSettings() {
     await saveBankroll(newBankroll);
 
     const { data, error } = await db.from('bet_deposits').insert([{
-      amount, deposit_date: depositDate, type,
+      amount, deposit_date: depositDate, type, sort_order: -1,
     }]).select().single();
     if (!error && data) _deposits.unshift(data);
 
@@ -804,11 +804,26 @@ let _dragOverId   = null;
 let _dragOverPos  = null; // 'before' | 'after'
 let _touchDragRow = null;
 
-async function saveSortOrders(dateBets) {
-  await Promise.all(dateBets.map((b, i) => {
-    b.sortOrder = i;
-    return db.from('bets').update({ sort_order: i }).eq('id', b.id);
+// dayItems: [{ type: 'bet', ref: betObj } | { type: 'deposit', ref: depObj }]
+async function saveSortOrders(dayItems) {
+  await Promise.all(dayItems.map((item, i) => {
+    if (item.type === 'deposit') {
+      item.ref.sort_order = i;
+      return db.from('bet_deposits').update({ sort_order: i }).eq('id', item.ref.id);
+    } else {
+      item.ref.sortOrder = i;
+      return db.from('bets').update({ sort_order: i }).eq('id', item.ref.id);
+    }
   }));
+}
+
+function getDayItems(date) {
+  const items = [];
+  _bets.filter(b => b.date === date).forEach(b =>
+    items.push({ type: 'bet', id: String(b.id), sort_order: b.sortOrder ?? 0, ref: b }));
+  _deposits.filter(d => d.deposit_date === date).forEach(d =>
+    items.push({ type: 'deposit', id: `dep-${d.id}`, sort_order: d.sort_order ?? -1, ref: d }));
+  return items.sort((a, b) => a.sort_order - b.sort_order);
 }
 
 const DAY_NAMES = ['日','月','火','水','木','金','土'];
@@ -859,9 +874,22 @@ function buildBetRow(bet) {
   </tr>`;
 }
 
+function buildDepositRow(dep) {
+  const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
+  const isIn   = signed >= 0;
+  const label  = isIn ? '入金' : '出金';
+  const cls    = isIn ? 'badge-deposit-in' : 'badge-deposit-out';
+  return `<tr class="bet-row records-deposit-row" draggable="true" data-id="dep-${dep.id}" data-date="${dep.deposit_date}" data-deposit-id="${dep.id}">
+    <td class="drag-handle" title="ドラッグして並び替え">⠿</td>
+    <td colspan="5"><span class="badge-deposit ${cls}">${label}</span> ¥${Math.abs(dep.amount).toLocaleString()}</td>
+    <td class="${isIn ? 'win' : 'loss'}">${isIn ? '+' : '−'}¥${Math.abs(signed).toLocaleString()}</td>
+    <td></td>
+  </tr>`;
+}
+
 function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = null) {
   const container  = document.getElementById('records-list');
-  if (_bets.length === 0) {
+  if (_bets.length === 0 && _deposits.length === 0) {
     container.innerHTML = '<div class="empty-msg">まだ記録がありません。「＋ 追加」から始めましょう。</div>';
     return;
   }
@@ -877,18 +905,24 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
   const wOpen = (mKey, wKey) => isFirstRender ? mKey === todayMonth : state.weeks.has(`${mKey}/${wKey}`);
   const dOpen = (dKey, mKey) => isFirstRender ? mKey === todayMonth : state.days.has(dKey);
 
-  // 月 → 週（月内の第N週）→ 日 の3段階グルーピング
+  // 月 → 週（月内の第N週）→ 日 の3段階グルーピング（ベット＋入出金の両方を対象）
   const monthMap = new Map();
-  for (const bet of _bets) {
-    const mKey = bet.date.slice(0, 7);                                   // 'YYYY-MM'
-    const wKey = Math.ceil(parseInt(bet.date.slice(8, 10)) / 7);        // 1〜5
-    const dKey = bet.date;
+  const addToMonthMap = (dateStr) => {
+    const mKey = dateStr.slice(0, 7);
+    const wKey = Math.ceil(parseInt(dateStr.slice(8, 10)) / 7);
+    const dKey = dateStr;
     if (!monthMap.has(mKey)) monthMap.set(mKey, new Map());
     const wMap = monthMap.get(mKey);
     if (!wMap.has(wKey)) wMap.set(wKey, new Map());
     const dMap = wMap.get(wKey);
     if (!dMap.has(dKey)) dMap.set(dKey, []);
-    dMap.get(dKey).push(bet);
+    return dMap.get(dKey);
+  };
+  for (const bet of _bets) {
+    addToMonthMap(bet.date).push(bet);
+  }
+  for (const dep of _deposits) {
+    addToMonthMap(dep.deposit_date); // 入出金のみの日も日グループを作る（ベットは空配列）
   }
 
   const sumPnl  = bets => bets.reduce((s, b) => s + (calcPnl(b) ?? 0), 0);
@@ -938,6 +972,12 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
         const dLabel = `${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
         const dPnl   = sumPnl(bets);
 
+        // ベットと入金を sort_order で並べて混合表示
+        const dayItems = getDayItems(dKey);
+        const rowsHtml = dayItems.map(item =>
+          item.type === 'bet' ? buildBetRow(item.ref) : buildDepositRow(item.ref)
+        ).join('');
+
         html += `<details class="day-group" data-date="${dKey}" ${dOpen(dKey, mKey) ? 'open' : ''}>
           <summary class="group-summary day-summary">
             <span class="group-arrow">▶</span>
@@ -950,7 +990,7 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
               <th>種別</th><th>試合 / ベット</th>
               <th>オッズ</th><th>賭け金</th><th>結果</th><th>損益</th><th></th>
             </tr></thead>
-            <tbody>${bets.map(buildBetRow).join('')}</tbody>
+            <tbody>${rowsHtml}</tbody>
           </table></div>
         </details>`;
       }
@@ -1006,17 +1046,19 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
 
   async function applyReorder() {
     if (!_dragBetId || !_dragOverId) return;
-    const dragIdx = _bets.findIndex(b => String(b.id) === _dragBetId);
-    const [dragged] = _bets.splice(dragIdx, 1);
-    const targetIdx = _bets.findIndex(b => String(b.id) === _dragOverId);
-    _bets.splice(_dragOverPos === 'before' ? targetIdx : targetIdx + 1, 0, dragged);
-    const dateBets = _bets.filter(b => b.date === _dragBetDate);
+    const items   = getDayItems(_dragBetDate);
+    const dragIdx = items.findIndex(it => it.id === _dragBetId);
+    if (dragIdx === -1) return;
+    const [dragged] = items.splice(dragIdx, 1);
+    const targetIdx = items.findIndex(it => it.id === _dragOverId);
+    items.splice(_dragOverPos === 'before' ? targetIdx : targetIdx + 1, 0, dragged);
     // await 前に開閉状態を保存（dragend がawait中に発火してもDOM状態が変わらないよう保全）
     const savedMonths = new Set([...container.querySelectorAll('.month-group[open]')].map(el => el.dataset.month));
     const savedWeeks  = new Set([...container.querySelectorAll('.week-group[open]')].map(el => `${el.dataset.month}/${el.dataset.week}`));
     const savedDays   = new Set([...container.querySelectorAll('.day-group[open]')].map(el => el.dataset.date));
-    await saveSortOrders(dateBets);
+    await saveSortOrders(items);
     renderRecords(savedMonths, savedWeeks, savedDays);
+    renderCharts();
   }
 
   function updateDropTarget(clientX, clientY) {
@@ -1837,15 +1879,15 @@ function renderBalanceChart() {
     for (const bet of allBets) {
       const pnl = calcPnlForChart(bet);
       if (pnl === null) continue;
-      events.push({ date: bet.date, pnl, deposit: 0 });
+      events.push({ date: bet.date, pnl, deposit: 0, sort_order: bet.sortOrder ?? 0 });
     }
     for (const dep of _deposits) {
       const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
-      events.push({ date: dep.deposit_date, pnl: 0, deposit: signed });
+      events.push({ date: dep.deposit_date, pnl: 0, deposit: signed, sort_order: dep.sort_order ?? -1 });
     }
     events.sort((a, b) => {
       if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-      return b.deposit - a.deposit;
+      return (b.sort_order ?? 9999) - (a.sort_order ?? 9999); // 同日内は降順（recordsの下＝古い順）
     });
     for (const ev of events) {
       balance += ev.deposit + ev.pnl;
