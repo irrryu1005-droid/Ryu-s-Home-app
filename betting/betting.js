@@ -905,11 +905,17 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
   const wOpen = (mKey, wKey) => isFirstRender ? mKey === todayMonth : state.weeks.has(`${mKey}/${wKey}`);
   const dOpen = (dKey, mKey) => isFirstRender ? mKey === todayMonth : state.days.has(dKey);
 
-  // 月 → 週（月内の第N週）→ 日 の3段階グルーピング（ベット＋入出金の両方を対象）
+  // 月 → 週（月曜始まり・日曜終わり）→ 日 の3段階グルーピング（ベット＋入出金の両方を対象）
+  const getMondayStr = (dateStr) => {
+    const d = new Date(dateStr + 'T12:00:00');
+    const day = d.getDay(); // 0=日 1=月 ... 6=土
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+    return d.toISOString().slice(0, 10);
+  };
   const monthMap = new Map();
   const addToMonthMap = (dateStr) => {
     const mKey = dateStr.slice(0, 7);
-    const wKey = Math.ceil(parseInt(dateStr.slice(8, 10)) / 7);
+    const wKey = getMondayStr(dateStr); // その週の月曜日 YYYY-MM-DD
     const dKey = dateStr;
     if (!monthMap.has(mKey)) monthMap.set(mKey, new Map());
     const wMap = monthMap.get(mKey);
@@ -948,17 +954,16 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
         <span class="group-meta">${allMonthBets.length}件 ${pnlSpan(mPnl)}</span>
       </summary>`;
 
-    const sortedWeeks = [...wMap.entries()].sort((a, b) => b[0] - a[0]);
+    const sortedWeeks = [...wMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 
     for (const [wKey, dMap] of sortedWeeks) {
       const allWeekBets = [...dMap.values()].flat();
       const wPnl        = sumPnl(allWeekBets);
-      const sortedDays  = [...dMap.keys()].sort((a, b) => b.localeCompare(a));
-      const wStart      = sortedDays[sortedDays.length - 1];
-      const wEnd        = sortedDays[0];
-      const wLabel      = wStart === wEnd
-        ? `${parseInt(wStart.slice(5,7))}/${parseInt(wStart.slice(8,10))}`
-        : `${parseInt(wStart.slice(5,7))}/${parseInt(wStart.slice(8,10))} 〜 ${parseInt(wEnd.slice(5,7))}/${parseInt(wEnd.slice(8,10))}`;
+      // wKey はその週の月曜日 (YYYY-MM-DD)。日曜日 = 月曜 + 6日
+      const monDate = new Date(wKey + 'T12:00:00');
+      const sunDate = new Date(wKey + 'T12:00:00');
+      sunDate.setDate(sunDate.getDate() + 6);
+      const wLabel = `${monDate.getMonth()+1}/${monDate.getDate()} 〜 ${sunDate.getMonth()+1}/${sunDate.getDate()}`;
 
       html += `<details class="week-group" data-month="${mKey}" data-week="${wKey}" ${wOpen(mKey, wKey) ? 'open' : ''}>
         <summary class="group-summary week-summary">
