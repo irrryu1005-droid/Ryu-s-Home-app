@@ -882,7 +882,7 @@ function buildDepositRow(dep) {
   return `<tr class="bet-row records-deposit-row" draggable="true" data-id="dep-${dep.id}" data-date="${dep.deposit_date}" data-deposit-id="${dep.id}">
     <td class="drag-handle" title="ドラッグして並び替え">⠿</td>
     <td colspan="5"><span class="badge-deposit ${cls}">${label}</span> ¥${Math.abs(dep.amount).toLocaleString()}</td>
-    <td class="${isIn ? 'win' : 'loss'}">${isIn ? '+' : '−'}¥${Math.abs(signed).toLocaleString()}</td>
+    <td>—</td>
     <td></td>
   </tr>`;
 }
