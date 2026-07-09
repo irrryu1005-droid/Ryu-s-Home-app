@@ -864,10 +864,10 @@ function buildBetRow(bet) {
     <td class="drag-handle" title="ドラッグして並び替え">⠿</td>
     ${typeCell}
     ${detailCell}
-    <td>${oddsVal}</td>
-    <td>¥${Number(bet.stake).toLocaleString()}</td>
-    <td><select class="result-select" data-id="${bet.id}">${resultOpts(bet.result)}</select></td>
-    <td class="${pnlClass}">${formatPnl(pnl)}</td>
+    <td class="col-odds">${oddsVal}</td>
+    <td class="col-stake">¥${Number(bet.stake).toLocaleString()}</td>
+    <td class="col-result"><select class="result-select" data-id="${bet.id}">${resultOpts(bet.result)}</select></td>
+    <td class="col-pnl ${pnlClass}">${formatPnl(pnl)}</td>
     <td>
       <button class="small-btn btn-edit"   data-id="${bet.id}">編集</button>
       <button class="small-btn btn-delete" data-id="${bet.id}">削除</button>
@@ -883,7 +883,7 @@ function buildDepositRow(dep) {
   return `<tr class="bet-row records-deposit-row" draggable="true" data-id="dep-${dep.id}" data-date="${dep.deposit_date}" data-deposit-id="${dep.id}">
     <td class="drag-handle" title="ドラッグして並び替え">⠿</td>
     <td colspan="5"><span class="badge-deposit ${cls}">${label}</span> ¥${Math.abs(dep.amount).toLocaleString()}</td>
-    <td>—</td>
+    <td class="col-pnl">—</td>
     <td></td>
   </tr>`;
 }
@@ -994,7 +994,7 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
             <thead><tr>
               <th class="col-drag"></th>
               <th>種別</th><th>試合 / ベット</th>
-              <th>オッズ</th><th>賭け金</th><th>結果</th><th>損益</th><th></th>
+              <th class="col-odds">オッズ</th><th class="col-stake">賭け金</th><th class="col-result">結果</th><th class="col-pnl">損益</th><th></th>
             </tr></thead>
             <tbody>${rowsHtml}</tbody>
           </table></div>

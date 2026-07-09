@@ -213,9 +213,9 @@ body {
 }
 
 .small-btn {
-  padding: 4px 10px;
-  font-size: 11px;
-  border-radius: 7px;
+  padding: 2px 7px;
+  font-size: 10px;
+  border-radius: 6px;
   font-weight: 600;
   cursor: pointer;
   border: 1.5px solid var(--border);
@@ -700,6 +700,12 @@ td {
   vertical-align: top;
 }
 tr:last-child td { border-bottom: none; }
+
+.col-odds   { width: 52px;  text-align: right; white-space: nowrap; }
+.col-stake  { width: 76px;  text-align: right; white-space: nowrap; }
+.col-result { width: 90px;  text-align: center; }
+.col-pnl    { width: 80px;  text-align: right; white-space: nowrap; }
+.bet-row td:last-child { width: 1px; white-space: nowrap; padding-left: 4px; padding-right: 6px; }
 
 .win  { color: var(--win);  font-weight: 700; }
 .loss { color: var(--loss); font-weight: 700; }
