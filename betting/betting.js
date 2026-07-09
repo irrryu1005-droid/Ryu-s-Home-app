@@ -847,7 +847,7 @@ function buildBetRow(bet) {
     const legLines = bet.legs.map((l, i) => {
       const legLabel = l.league ? escapeHtml(l.league) : escapeHtml(l.sport || '');
       const legSel = `<select class="leg-result-select" data-id="${bet.id}" data-leg="${i}">${resultOpts(l.legResult)}</select>`;
-      return `<small>${i + 1}: <span class="badge-league">${legLabel}</span> ${escapeHtml(l.match || '')} — ${escapeHtml(l.bet || '')} (x${l.odds}) ${legSel}</small>`;
+      return `<small>${i + 1}: <span class="badge-league">${legLabel}</span> ${escapeHtml(l.match || '')} — ${escapeHtml(l.bet || '')} (x${Math.trunc(parseFloat(l.odds) * 100) / 100}) ${legSel}</small>`;
     }).join('<br>');
     detailCell = `<td>${legLines}${bet.memo ? `<br><small class="memo">${escapeHtml(bet.memo)}</small>` : ''}</td>`;
   } else {
@@ -3481,7 +3481,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (type === 'parlay') {
       const legs = getLegsFromForm();
       if (legs.length < 2)                                 { await showAlert('マルチは2レッグ以上必要です'); submitBtn.disabled = false; submitBtn.textContent = '保存'; return; }
-      if (legs.some(l => isNaN(l.odds) || l.odds < 1.01)) { await showAlert('すべてのレッグにオッズを入力してください'); submitBtn.disabled = false; submitBtn.textContent = '保存'; return; }
+      if (legs.some(l => isNaN(l.odds) || l.odds <= 0)) { await showAlert('すべてのレッグにオッズを入力してください'); submitBtn.disabled = false; submitBtn.textContent = '保存'; return; }
       const combinedOdds = Math.round(legs.reduce((acc, l) => acc * l.odds, 1) * 100) / 100;
       const comboBoost   = parseFloat(document.getElementById('input-combo-boost').value) || null;
       const campaignIdP  = f.elements.campaignId.value || null;
