@@ -453,7 +453,8 @@ function calcPnl(bet) {
 
 function formatPnl(pnl) {
   if (pnl === null) return '-';
-  return (pnl >= 0 ? '+' : '') + '¥' + pnl.toLocaleString();
+  const v = Math.round(pnl);
+  return (v >= 0 ? '+' : '') + '¥' + v.toLocaleString();
 }
 
 function resultLabel(result) {
@@ -858,7 +859,7 @@ function buildBetRow(bet) {
     </td>`;
   }
 
-  const oddsVal = isParlay ? calcEffectiveOdds(bet).toFixed(2) : bet.odds;
+  const oddsVal = isParlay ? calcEffectiveOdds(bet).toFixed(2) : Math.trunc(parseFloat(bet.odds) * 100) / 100;
   return `<tr class="bet-row" draggable="true" data-id="${bet.id}" data-date="${bet.date}">
     <td class="drag-handle" title="ドラッグして並び替え">⠿</td>
     ${typeCell}
@@ -1240,7 +1241,7 @@ function createLegHtml(idx, leg = {}) {
     </div>
     <div class="form-row">
       <div class="form-group"><label>スポーツ</label><select data-field="sport">${sportOptions(sport)}</select></div>
-      <div class="form-group"><label>オッズ</label><input type="number" data-field="odds" class="leg-odds" step="0.01" min="1.01" placeholder="2.10" value="${leg.odds || ''}"></div>
+      <div class="form-group"><label>オッズ</label><input type="number" data-field="odds" class="leg-odds" step="any" min="0.01" placeholder="2.10" value="${leg.odds || ''}"></div>
     </div>
     <div class="form-row">
       ${leagueEl}
@@ -1663,11 +1664,11 @@ function updateSummary() {
   const balanceEl = document.getElementById('balance');
   if (_settings.bankroll) {
     const balance = _settings.bankroll + totalPnl - pendingStake;
-    balanceEl.textContent = '¥' + balance.toLocaleString();
+    balanceEl.textContent = '¥' + Math.round(balance).toLocaleString();
     balanceEl.className   = 's-val ' + (balance < _settings.bankroll ? 'loss' : balance > _settings.bankroll ? 'win' : '');
   } else {
     const effectivePnl = totalPnl - pendingStake;
-    balanceEl.textContent = (effectivePnl >= 0 ? '+' : '') + '¥' + effectivePnl.toLocaleString();
+    balanceEl.textContent = (effectivePnl >= 0 ? '+' : '') + '¥' + Math.round(effectivePnl).toLocaleString();
     balanceEl.className   = 's-val ' + (effectivePnl > 0 ? 'win' : effectivePnl < 0 ? 'loss' : '');
   }
 
@@ -1726,7 +1727,7 @@ function renderPeriodStats() {
     _bets.filter(b => b.date >= start && b.date <= end)
          .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
 
-  const fmt = pnl => (pnl >= 0 ? '+' : '') + '¥' + pnl.toLocaleString();
+  const fmt = pnl => (pnl >= 0 ? '+' : '') + '¥' + Math.round(pnl).toLocaleString();
   const cls = pnl => pnl > 0 ? 'win' : pnl < 0 ? 'loss' : '';
 
   const dayPnl   = calcPeriod(dayStr, dayStr);
@@ -1809,7 +1810,7 @@ function renderGoalProgress() {
       </div>
       <div class="goal-meta">
         <span>${g.goalStart} 〜 ${g.goalEnd}</span>
-        <span class="${pnl >= 0 ? 'win' : 'loss'}">${(pnl >= 0 ? '+' : '') + '¥' + pnl.toLocaleString()} / ¥${Number(g.goalAmount).toLocaleString()}</span>
+        <span class="${pnl >= 0 ? 'win' : 'loss'}">${(pnl >= 0 ? '+' : '') + '¥' + Math.round(pnl).toLocaleString()} / ¥${Number(g.goalAmount).toLocaleString()}</span>
       </div>
       <div class="goal-bar-row">
         <span class="goal-bar-label">損益</span>
@@ -3490,7 +3491,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               campaignId: campaignIdP,
               result: f.elements.result.value, memo: f.elements.memo.value.trim() };
     } else {
-      if (!f.elements.odds.value) { await showAlert('オッズを入力してください'); submitBtn.disabled = false; submitBtn.textContent = '保存'; return; }
+      if (!f.elements.odds.value || parseFloat(f.elements.odds.value) <= 0) { await showAlert('オッズは0より大きい値を入力してください'); submitBtn.disabled = false; submitBtn.textContent = '保存'; return; }
       const sport      = f.elements.sport.value;
       const leagueSel  = document.getElementById('single-league-select');
       const campaignId = f.elements.campaignId.value || null;
