@@ -1615,6 +1615,7 @@ function initLoans() {
       remainingAmount: f.elements.remainingAmount.value || null,
       startDate:       f.elements.startDate.value  || null,
       endDate:         f.elements.endDate.value     || null,
+      billingDay:      f.elements.billingDay.value  || null,
       note:            f.elements.note.value.trim() || null,
     };
     if (id) {
