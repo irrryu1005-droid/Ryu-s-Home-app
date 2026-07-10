@@ -245,6 +245,67 @@
         <div id="loan-list"></div>
       </div>
 
+      <!-- フラッシュ: 支出登録完了 -->
+      <div id="pr-flash" hidden style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#22C55E;color:#fff;padding:10px 20px;border-radius:10px;font-weight:700;font-size:14px;z-index:2000;box-shadow:0 4px 16px rgba(0,0,0,0.2)"></div>
+
+      <!-- モーダル: 予定支出 → 実際の支出登録 -->
+      <div id="planned-register-modal" hidden>
+        <div class="day-override-card" style="min-width:300px">
+          <h3>💸 支出として登録</h3>
+          <form id="planned-register-form" novalidate style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label style="font-size:12px;color:#666">名前</label>
+              <input type="text" name="prName" readonly style="width:100%;padding:6px 8px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;background:#f9f9f9;box-sizing:border-box;color:#555">
+            </div>
+            <div style="display:flex;gap:10px">
+              <div style="flex:1">
+                <label style="font-size:12px;color:#666">日付</label>
+                <input type="date" name="prDate" required style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
+              </div>
+              <div style="flex:1">
+                <label style="font-size:12px;color:#666">金額 (¥)</label>
+                <input type="number" name="prAmount" required min="1" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:12px;color:#666">支払方法</label>
+              <select name="prPayment" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
+                <option value="deposit（銀行）">deposit（銀行）</option>
+                <option value="cash（現金）">cash（現金）</option>
+                <option value="PayPay">PayPay</option>
+                <option value="Rakuten Pay">Rakuten Pay</option>
+                <option value="non-trade payables">non-trade payables</option>
+                <option value="credit trade payable">credit trade payable</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;color:#666">メモ</label>
+              <input type="text" name="prMemo" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
+            </div>
+            <div class="day-override-actions">
+              <button type="button" id="btn-pr-cancel" class="planned-edit-btn" style="background:#f3f4f6;color:#555">キャンセル</button>
+              <button type="submit" id="btn-pr-save" class="planned-edit-btn" style="background:#22C55E;color:#fff">登録する</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- モーダル: サブスク支払日 今月だけ変更 -->
+      <div id="day-override-modal" hidden>
+        <div class="day-override-card">
+          <h3>📅 支払日を今月だけ変更</h3>
+          <div>
+            <label id="day-override-label"></label>
+            <input type="number" id="day-override-input" min="1" max="31" placeholder="例: 15">
+          </div>
+          <div class="day-override-actions">
+            <button id="btn-day-override-clear" class="btn-day-override-clear" hidden>元に戻す</button>
+            <button id="btn-day-override-cancel" class="planned-edit-btn" style="background:#f3f4f6;color:#555">キャンセル</button>
+            <button id="btn-day-override-save" class="planned-edit-btn">保存</button>
+          </div>
+        </div>
+      </div>
+
       <!-- モーダル: その他予定支出 -->
       <div id="planned-modal" hidden>
         <div class="form-card planned-modal-card">

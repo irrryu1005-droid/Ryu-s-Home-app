@@ -826,14 +826,22 @@ async function renderPlannedTab() {
   const month = _plannedMonth.getMonth();
   document.getElementById('planned-month-label').textContent = plannedMonthLabel(_plannedMonth);
 
-  // サブスク（Life）+ 予定支出 + ローン を並行取得
-  const [subRes, planRes, loanRes] = await Promise.all([
+  // サブスク（Life）+ 予定支出 + ローン + 日付オーバーライド を並行取得
+  const yearMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const [subRes, planRes, loanRes, overrideRes] = await Promise.all([
     db.from('subscriptions').select('*').eq('status', 'active'),
     db.from('planned_expenses').select('*').order('billing_day'),
     db.from('loans').select('*'),
+    db.from('subscription_billing_overrides').select('*').eq('year_month', yearMonthStr),
   ]);
+  const overrideMap = {};
+  for (const ov of (overrideRes.data || [])) overrideMap[ov.subscription_id] = ov;
 
   const usdRate = 150; // 簡易レート（Life と共有不可なため固定）
+
+  // 編集モーダルが使えるよう _subsF / _loans を補完
+  if (_subsF.length === 0 && subRes.data?.length) _subsF = subRes.data.map(normalizeSubF);
+  if (_loans.length === 0 && loanRes.data?.length) _loans = loanRes.data.map(normalizeLoan);
 
   // サブスクを統一フォーマットに変換
   const subItems = (subRes.data || []).map(r => ({
@@ -845,11 +853,13 @@ async function renderPlannedTab() {
                    : (r.currency === 'USD' ? Math.round((r.cost_per_month||0)*usdRate) : (r.cost_per_month||0)),
     category:    'subscription',
     frequency:   r.contract_form === 'year' ? 'yearly' : 'monthly',
-    billingDay:   (() => { const d = r.start_date ? new Date(r.start_date) : null; return r.billing_day || (d ? d.getDate() : null); })(),
+    billingDay:   overrideMap[r.id]?.billing_day ?? (() => { const d = r.start_date ? new Date(r.start_date) : null; return r.billing_day || (d ? d.getDate() : null); })(),
+    billingDayOverridden: !!overrideMap[r.id],
     billingMonth: r.start_date ? new Date(r.start_date).getMonth() : null,
     startDate:   r.start_date  || null,
     endDate:     null,
     note:        r.note        || null,
+    paymentMethod: r.payment_method || '',
   }));
 
   // planned_expenses を統一フォーマットに変換
@@ -865,6 +875,7 @@ async function renderPlannedTab() {
     startDate:   r.start_date   || null,
     endDate:     r.end_date     || null,
     note:        r.note         || null,
+    paymentMethod: '',
   }));
 
   // ローンを統一フォーマットに変換
@@ -881,6 +892,7 @@ async function renderPlannedTab() {
     startDate:   r.start_date || null,
     endDate:     r.end_date   || null,
     note:        r.note       || null,
+    paymentMethod: '',
   }));
 
   const all = [...subItems, ...planItems, ...loanItems].filter(it => isActiveInMonth(it, year, month));
@@ -908,15 +920,20 @@ async function renderPlannedTab() {
   list.innerHTML = Object.entries(groups).map(([cat, items]) => {
     const rows = items.map(it => {
       const dayLabel = it.billingDay ? it.billingDay + '日' : '-';
+      const overrideMark = it.billingDayOverridden ? ' <span class="badge-day-override">今月変更</span>' : '';
       const typeBadge = it.source === 'subscription'
         ? `<span class="badge-sub">サブスク</span><span class="badge-freq">${it.frequency === 'yearly' ? '年' : '月'}</span>`
         : it.source === 'loan'
         ? `<span class="badge-sub" style="background:#e8f4e8;color:#27ae60">ローン</span>`
         : '';
+      const dayOverrideBtn = it.source === 'subscription'
+        ? `<button class="planned-day-override-btn" data-id="${it.id}" data-current="${it.billingDay || ''}" data-overridden="${it.billingDayOverridden}" title="今月の支払日を変更">📅</button>`
+        : '';
       return `
         <div class="planned-item">
           <div class="planned-item-left">
-            <span class="planned-day">${dayLabel}</span>
+            <span class="planned-day">${dayLabel}${overrideMark}</span>
+            ${dayOverrideBtn}
             <div>
               <div class="planned-name">${escapeHtmlF(it.name)} ${typeBadge}</div>
               ${it.note ? `<div class="planned-note">${escapeHtmlF(it.note)}</div>` : ''}
@@ -926,7 +943,8 @@ async function renderPlannedTab() {
             <span class="planned-amount">${it.amountMax
               ? `¥${it.amount.toLocaleString()}〜¥${it.amountMax.toLocaleString()}`
               : `¥${it.amount.toLocaleString()}`}</span>
-            ${it.source === 'planned' ? `<button class="planned-edit-btn" data-id="${it.id}">編集</button>` : ''}
+            <button class="planned-register-btn" data-id="${it.id}" data-source="${it.source}" data-name="${escapeHtmlF(it.name)}" data-amount="${it.amount}" data-category="${it.category}" data-day="${it.billingDay || ''}" data-payment="${escapeHtmlF(it.paymentMethod)}" title="支出として登録">✓</button>
+            <button class="planned-edit-btn" data-id="${it.id}" data-source="${it.source}">編集</button>
           </div>
         </div>`;
     }).join('');
@@ -938,8 +956,103 @@ async function renderPlannedTab() {
   }).join('');
 
   list.querySelectorAll('.planned-edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => openPlannedEditForm(btn.dataset.id, planRes.data));
+    btn.addEventListener('click', () => {
+      const { id, source } = btn.dataset;
+      if (source === 'subscription') openEditSubF(id);
+      else if (source === 'loan')   openEditLoan(id);
+      else                          openPlannedEditForm(id, planRes.data);
+    });
   });
+
+  list.querySelectorAll('.planned-day-override-btn').forEach(btn => {
+    btn.addEventListener('click', () => openDayOverrideModal(btn.dataset.id, btn.dataset.current, btn.dataset.overridden === 'true', yearMonthStr));
+  });
+
+  list.querySelectorAll('.planned-register-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { name, amount, category, day, payment } = btn.dataset;
+      const billingDate = day
+        ? `${yearMonthStr}-${String(day).padStart(2, '0')}`
+        : new Date().toLocaleDateString('sv-SE');
+      openPlannedRegisterModal({ name, amount: parseInt(amount), category, date: billingDate, paymentMethod: payment });
+    });
+  });
+}
+
+function openDayOverrideModal(subId, currentDay, isOverridden, yearMonth) {
+  const modal = document.getElementById('day-override-modal');
+  const input = document.getElementById('day-override-input');
+  const label = document.getElementById('day-override-label');
+  const clearBtn = document.getElementById('btn-day-override-clear');
+  label.textContent = `今月（${yearMonth}）の支払日`;
+  input.value = currentDay || '';
+  clearBtn.hidden = !isOverridden;
+  modal.hidden = false;
+
+  const saveBtn = document.getElementById('btn-day-override-save');
+  const cancelBtn = document.getElementById('btn-day-override-cancel');
+
+  const close = () => { modal.hidden = true; };
+
+  const onSave = async () => {
+    const day = parseInt(input.value);
+    if (!day || day < 1 || day > 31) { alert('1〜31の日付を入力してください'); return; }
+    await db.from('subscription_billing_overrides')
+      .upsert({ subscription_id: subId, year_month: yearMonth, billing_day: day }, { onConflict: 'subscription_id,year_month' });
+    close();
+    renderPlannedTab();
+  };
+
+  const onClear = async () => {
+    await db.from('subscription_billing_overrides')
+      .delete().eq('subscription_id', subId).eq('year_month', yearMonth);
+    close();
+    renderPlannedTab();
+  };
+
+  saveBtn.onclick = onSave;
+  cancelBtn.onclick = close;
+  clearBtn.onclick = onClear;
+  modal.onclick = (e) => { if (e.target === modal) close(); };
+}
+
+function openPlannedRegisterModal({ name, amount, category, date, paymentMethod }) {
+  const modal = document.getElementById('planned-register-modal');
+  const form  = document.getElementById('planned-register-form');
+  form.elements.prName.value    = name;
+  form.elements.prAmount.value  = amount;
+  form.elements.prDate.value    = date;
+  form.elements.prPayment.value = paymentMethod || PAYMENT_METHODS[0];
+  form.elements.prMemo.value    = name;
+  modal.hidden = false;
+
+  const close = () => { modal.hidden = true; };
+  document.getElementById('btn-pr-cancel').onclick = close;
+  modal.onclick = (e) => { if (e.target === modal) close(); };
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const saveBtn = document.getElementById('btn-pr-save');
+    saveBtn.disabled = true;
+    const payload = {
+      date:           form.elements.prDate.value,
+      type:           'expense',
+      amount:         parseInt(form.elements.prAmount.value),
+      category:       category,
+      payment_method: form.elements.prPayment.value,
+      memo:           form.elements.prMemo.value.trim(),
+      location:       null,
+    };
+    const { error } = await db.from('transactions').insert([payload]);
+    if (error) { alert('登録エラー: ' + error.message); saveBtn.disabled = false; return; }
+    await updateAccountBalance(payload.payment_method, 'expense', payload.amount);
+    close();
+    saveBtn.disabled = false;
+    const flash = document.getElementById('pr-flash');
+    flash.textContent = `✓ ${name} を登録しました`;
+    flash.hidden = false;
+    setTimeout(() => { flash.hidden = true; }, 3000);
+  };
 }
 
 function escapeHtmlF(s) {
