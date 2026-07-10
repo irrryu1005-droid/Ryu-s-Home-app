@@ -1219,6 +1219,7 @@ function normalizeSubF(row) {
     costPerYear:   row.cost_per_year,
     status:        row.status         || 'active',
     startDate:     row.start_date     || '',
+    billingDay:    row.billing_day    ?? null,
     purpose:       row.purpose        || '',
     paymentMethod: row.payment_method || '',
     payer:         row.payer          || '自分',
@@ -1235,6 +1236,7 @@ function subFToRow(sub) {
     cost_per_year:  sub.costPerYear  ? parseInt(sub.costPerYear)  : null,
     status:         sub.status,
     start_date:     sub.startDate     || null,
+    billing_day:    sub.billingDay    ? parseInt(sub.billingDay)  : null,
     purpose:        sub.purpose       || null,
     payment_method: sub.paymentMethod || null,
     note:           sub.note          || null,
@@ -1372,6 +1374,7 @@ function openEditSubF(id) {
   form.elements.costPerYear.value   = s.costPerYear  || '';
   form.elements.purpose.value       = s.purpose;
   form.elements.startDate.value     = s.startDate;
+  form.elements.billingDay.value    = s.billingDay ?? '';
   form.elements.paymentMethod.value = s.paymentMethod;
   form.elements.status.value        = s.status;
   form.elements.note.value          = s.note;
