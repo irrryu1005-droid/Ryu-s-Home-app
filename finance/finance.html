@@ -171,11 +171,13 @@
     <!-- ======== 一覧タブ ======== -->
     <main id="tab-list" class="tab-content">
 
-      <div class="month-nav" style="position:relative">
+      <div class="month-nav">
         <button id="list-prev">＜</button>
         <h2 id="list-month-label"></h2>
-        <button id="list-next">＞</button>
-        <button id="btn-add-txn" class="btn-primary-sm" style="position:absolute;right:0;top:50%;transform:translateY(-50%)">＋ 追加</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="list-next">＞</button>
+          <button id="btn-add-txn" class="btn-primary-sm">＋ 追加</button>
+        </div>
       </div>
 
       <div class="list-sort-bar">
