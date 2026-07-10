@@ -393,6 +393,8 @@ async function renderChart() {
 // ============================================================
 // 一覧
 // ============================================================
+document.getElementById('btn-add-txn').addEventListener('click', () => openNewTxnModal('expense'));
+
 document.getElementById('list-prev').addEventListener('click', () => {
   listMonth = new Date(listMonth.getFullYear(), listMonth.getMonth() - 1, 1);
   renderList();
@@ -517,6 +519,39 @@ function updateEditCategoryOptions() {
   buildOptions(document.querySelector('#edit-form [name="category"]'), cats);
 }
 
+async function openNewTxnModal(defaultType = 'expense') {
+  _editingId = null;
+  _editType  = defaultType;
+
+  const f = document.getElementById('edit-form');
+  document.querySelectorAll('.edit-type-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === defaultType);
+  });
+
+  const today = new Date().toLocaleDateString('sv-SE');
+  f.elements.id.value     = '';
+  f.elements.date.value   = today;
+  f.elements.amount.value = '';
+  f.elements.memo.value   = '';
+
+  buildOptions(f.elements.payment_method, PAYMENT_METHODS);
+  f.elements.payment_method.value = PAYMENT_METHODS[0];
+
+  updateEditCategoryOptions();
+  f.elements.category.value = '';
+
+  const { data: locs } = await db.from('location_options').select('name').order('sort_order').order('id');
+  const locSel = f.elements.location;
+  locSel.innerHTML = '<option value="">-- 未選択 --</option>'
+    + (locs || []).map(l => `<option value="${l.name}">${l.name}</option>`).join('');
+  locSel.value = '';
+
+  const saveBtn = document.getElementById('btn-edit-save');
+  saveBtn.style.background = defaultType === 'income' ? 'var(--income)' : 'var(--expense)';
+
+  document.getElementById('edit-modal-overlay').style.display = 'flex';
+}
+
 async function openEditModal(txn) {
   _editingId = txn.id;
   _editType  = txn.type;
@@ -577,12 +612,6 @@ document.getElementById('edit-form').addEventListener('submit', async (e) => {
   const f = e.target;
   const id = f.elements.id.value;
 
-  const { data: oldTxn } = await db
-    .from('transactions')
-    .select('type, amount, payment_method')
-    .eq('id', id)
-    .single();
-
   const newPayload = {
     date:           f.elements.date.value,
     type:           _editType,
@@ -593,12 +622,21 @@ document.getElementById('edit-form').addEventListener('submit', async (e) => {
     location:       f.elements.location.value || null,
   };
 
-  const { error } = await db.from('transactions').update(newPayload).eq('id', id);
-
-  if (!error && oldTxn) {
-    const reverseOld = oldTxn.type === 'income' ? 'expense' : 'income';
-    await updateAccountBalance(oldTxn.payment_method, reverseOld, oldTxn.amount);
-    await updateAccountBalance(newPayload.payment_method, newPayload.type, newPayload.amount);
+  if (id) {
+    const { data: oldTxn } = await db
+      .from('transactions')
+      .select('type, amount, payment_method')
+      .eq('id', id)
+      .single();
+    const { error } = await db.from('transactions').update(newPayload).eq('id', id);
+    if (!error && oldTxn) {
+      const reverseOld = oldTxn.type === 'income' ? 'expense' : 'income';
+      await updateAccountBalance(oldTxn.payment_method, reverseOld, oldTxn.amount);
+      await updateAccountBalance(newPayload.payment_method, newPayload.type, newPayload.amount);
+    }
+  } else {
+    const { error } = await db.from('transactions').insert([newPayload]);
+    if (!error) await updateAccountBalance(newPayload.payment_method, newPayload.type, newPayload.amount);
   }
 
   closeEditModal();
