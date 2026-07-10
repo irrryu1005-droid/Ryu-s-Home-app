@@ -1940,6 +1940,7 @@ function renderBalanceChart() {
         backgroundColor: 'rgba(52,152,219,0.1)',
         fill: true,
         tension: 0.3,
+        clip: false,
         pointRadius: pointRadii,
         pointBackgroundColor: pointColors,
         pointBorderColor: pointColors,
@@ -1948,6 +1949,7 @@ function renderBalanceChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { right: 10 } },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -2061,6 +2063,7 @@ function renderPnlChart(settledBets) {
         backgroundColor: 'transparent',
         fill: false,
         tension: 0.3,
+        clip: false,
         pointRadius: iData.map(v => v === 0 ? 0 : 3),
         pointBackgroundColor: iData.map(v => v >= 0 ? GREEN : RED),
         pointBorderColor: iData.map(v => v >= 0 ? GREEN : RED),
@@ -2069,6 +2072,7 @@ function renderPnlChart(settledBets) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { right: 10 } },
       plugins: {
         legend: { display: false },
         tooltip: { filter: item => iData[item.dataIndex] !== 0 },
