@@ -925,7 +925,7 @@ async function renderPlannedTab() {
     amountMax:   r.min_monthly_payment ? r.monthly_payment : null,
     category:    'loan',
     frequency:   'monthly',
-    billingDay:  r.start_date ? new Date(r.start_date).getDate() : null,
+    billingDay:  r.billing_day ?? (r.start_date ? new Date(r.start_date).getDate() : null),
     billingMonth: null,
     startDate:   r.start_date || null,
     endDate:     r.end_date   || null,
@@ -1446,6 +1446,7 @@ function normalizeLoan(row) {
     remainingAmount: row.remaining_amount,
     startDate:       row.start_date || '',
     endDate:         row.end_date   || '',
+    billingDay:      row.billing_day ?? null,
     note:            row.note       || '',
   };
 }
@@ -1459,6 +1460,7 @@ function loanToRow(loan) {
     remaining_amount: loan.remainingAmount ? parseInt(loan.remainingAmount) : null,
     start_date:       loan.startDate || null,
     end_date:         loan.endDate   || null,
+    billing_day:      loan.billingDay ? parseInt(loan.billingDay) : null,
     note:             loan.note      || null,
   };
 }
@@ -1577,6 +1579,7 @@ function openEditLoan(id) {
   form.elements.remainingAmount.value = l.remainingAmount != null ? l.remainingAmount : '';
   form.elements.startDate.value       = l.startDate;
   form.elements.endDate.value         = l.endDate;
+  form.elements.billingDay.value      = l.billingDay ?? '';
   form.elements.note.value            = l.note;
   document.getElementById('loan-form-title').textContent = '編集';
   document.getElementById('loan-modal').hidden = false;
