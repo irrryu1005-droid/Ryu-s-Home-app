@@ -1416,6 +1416,7 @@ function initSubsF() {
       costPerYear:   f.elements.costPerYear.value  || null,
       purpose:       f.elements.purpose.value      || null,
       startDate:     f.elements.startDate.value    || null,
+      billingDay:    f.elements.billingDay.value   || null,
       paymentMethod: f.elements.paymentMethod.value || null,
       status:        f.elements.status.value,
       note:          f.elements.note.value.trim()  || null,
@@ -1428,6 +1429,7 @@ function initSubsF() {
     document.getElementById('sub-modal-f').hidden = true;
     await loadSubsF();
     renderSubsF();
+    renderPlannedTab();
   });
 }
 
@@ -1626,6 +1628,7 @@ function initLoans() {
     document.getElementById('loan-modal').hidden = true;
     await loadLoans();
     renderLoans();
+    renderPlannedTab();
   });
 }
 
