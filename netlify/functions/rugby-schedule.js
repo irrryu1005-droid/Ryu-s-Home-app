@@ -18,7 +18,7 @@ exports.handler = async (event) => {
         'User-Agent': 'Mozilla/5.0',
       },
     });
-    if (!res.ok) return { statusCode: res.status, headers: OK_HEADERS, body: JSON.stringify({ events: [] }) };
+    if (!res.ok) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: { apiStatus: res.status, apiUrl: url } }) };
 
     const data = await res.json();
     const allContent = data.content || [];
