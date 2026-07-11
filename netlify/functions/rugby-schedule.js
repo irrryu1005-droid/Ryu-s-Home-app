@@ -21,7 +21,9 @@ exports.handler = async (event) => {
     if (!res.ok) return { statusCode: res.status, headers: OK_HEADERS, body: JSON.stringify({ events: [] }) };
 
     const data = await res.json();
-    const matches = (data.content || []).filter(m => {
+    const allContent = data.content || [];
+    const allCompNames = allContent.map(m => (m.events || []).map(e => e.label || '').join(' / '));
+    const matches = allContent.filter(m => {
       const compName = (m.events || []).map(e => e.label || '').join(' ');
       return INCLUDE_RE.test(compName) && !EXCLUDE_RE.test(compName);
     }).map(m => {
@@ -36,7 +38,7 @@ exports.handler = async (event) => {
       };
     });
 
-    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: matches }) };
+    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: matches, debug: { total: allContent.length, compNames: allCompNames } }) };
   } catch (e) {
     return { statusCode: 500, headers: OK_HEADERS, body: JSON.stringify({ events: [], error: e.message }) };
   }
