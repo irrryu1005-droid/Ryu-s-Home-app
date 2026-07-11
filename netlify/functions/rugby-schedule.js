@@ -1,7 +1,7 @@
 const OK_HEADERS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 
 // Rugby League系は除外
-const EXCLUDE_RE = /super league|nrl|state of origin|league cup|women|u20|under.?20|aupiki/i;
+const EXCLUDE_RE = /super league|nrl|state of origin|league cup|shute shield|top 12|currie cup|premiership|pro14|pro16|urc|top14|women|u20|under.?20|aupiki/i;
 
 exports.handler = async (event) => {
   const date = (event.queryStringParameters || {}).date;
