@@ -10,7 +10,8 @@ exports.handler = async (event) => {
   if (!date) return { statusCode: 400, headers: OK_HEADERS, body: JSON.stringify({ error: 'date required' }) };
 
   try {
-    const url = `https://api.wr-rims-prod.pulselive.com/rugby/v3/match?language=en&startDate=${date}&endDate=${date}`;
+    const compact = date.replace(/-/g, '');
+    const url = `https://api.wr-rims-prod.pulselive.com/rugby/v3/match?startDate=${compact}&endDate=${compact}`;
     const res = await fetch(url, {
       headers: {
         'Origin': 'https://www.world.rugby',
