@@ -8,7 +8,7 @@ exports.handler = async (event) => {
 
   try {
     const compact = date.replace(/-/g, '');
-    const url = `https://site.api.espn.com/apis/site/v2/sports/rugby-union/scoreboard?dates=${compact}`;
+    const url = `https://site.api.espn.com/apis/site/v2/sports/rugby/scoreboard?dates=${compact}`;
     const res = await fetch(url);
 
     if (!res.ok) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: { apiStatus: res.status, source: 'espn' } }) };
