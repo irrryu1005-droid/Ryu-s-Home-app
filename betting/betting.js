@@ -2706,10 +2706,22 @@ async function fetchTableTennis(dateStr) {
   return evs.map(ev => ({ ...ev, sportKey: 'TableTennis' }));
 }
 
-// ---- 🏉 ラグビー（TheSportsDB）----
+// ---- 🏉 ラグビー（World Rugby API → Netlify Function + TheSportsDB補完）----
 async function fetchRugby(dateStr) {
+  const SUPER_LEAGUE_RE = /super league/i;
+  try {
+    const res = await fetch(`/.netlify/functions/rugby-schedule?date=${dateStr}`);
+    if (res.ok) {
+      const data = await res.json();
+      const wrEvents = (data.events || []).map(ev => ({ ...ev, sportKey: 'Rugby' }));
+      if (wrEvents.length > 0) return wrEvents;
+    }
+  } catch {}
+  // フォールバック: TheSportsDB（Super Leagueは除外）
   const evs = await fetchTSDB('Rugby', dateStr);
-  return evs.map(ev => ({ ...ev, sportKey: 'Rugby' }));
+  return evs
+    .filter(ev => !SUPER_LEAGUE_RE.test(ev.league || ''))
+    .map(ev => ({ ...ev, sportKey: 'Rugby' }));
 }
 
 // ---- 🏐 バレー（Netlify Function → api-sports.io + TheSportsDB）----
