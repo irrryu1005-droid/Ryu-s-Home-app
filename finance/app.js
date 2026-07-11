@@ -289,12 +289,14 @@ async function renderDashboard() {
   document.getElementById('dash-month-label').textContent = monthLabel(dashMonth);
 
   const { start, end } = monthRange(dashMonth);
+  const today = new Date().toISOString().split('T')[0];
+  const effectiveEnd = end > today ? today : end;
 
   const { data: txns } = await db
     .from('transactions')
     .select('*')
     .gte('date', start)
-    .lte('date', end);
+    .lte('date', effectiveEnd);
 
   const rows = txns || [];
 
@@ -333,12 +335,14 @@ async function renderChart() {
   const sixAgo = new Date(dashMonth.getFullYear(), dashMonth.getMonth() - 5, 1);
   const { start } = { start: sixAgo.toISOString().split('T')[0] };
   const { end }   = monthRange(dashMonth);
+  const today = new Date().toISOString().split('T')[0];
+  const effectiveEnd = end > today ? today : end;
 
   const { data: all } = await db
     .from('transactions')
     .select('date, type, amount')
     .gte('date', start)
-    .lte('date', end);
+    .lte('date', effectiveEnd);
 
   const labels      = [];
   const incomeData  = [];
@@ -758,10 +762,12 @@ async function renderFinancePnl() {
 // 口座残高
 // ============================================================
 async function renderAccounts() {
-  const { data: accounts } = await db
-    .from('accounts')
-    .select('*')
-    .order('sort_order');
+  const today = new Date().toISOString().split('T')[0];
+
+  const [{ data: accounts }, { data: futureTxns }] = await Promise.all([
+    db.from('accounts').select('*').order('sort_order'),
+    db.from('transactions').select('type, amount, payment_method').gt('date', today),
+  ]);
 
   const container = document.getElementById('accounts-list');
 
@@ -770,13 +776,22 @@ async function renderAccounts() {
     return;
   }
 
+  // 未来の取引が残高に与える影響をアカウント別に集計
+  const futureDelta = {};
+  for (const t of (futureTxns || [])) {
+    const pm = t.payment_method;
+    if (!futureDelta[pm]) futureDelta[pm] = 0;
+    futureDelta[pm] += t.type === 'income' ? t.amount : -t.amount;
+  }
+
   container.innerHTML = accounts.map(a => {
-    const cls = a.balance > 0 ? 'positive' : a.balance < 0 ? 'negative' : 'zero';
+    const todayBalance = a.balance - (futureDelta[a.account_name] || 0);
+    const cls = todayBalance > 0 ? 'positive' : todayBalance < 0 ? 'negative' : 'zero';
     return `
       <div class="account-item" data-name="${a.account_name}">
         <div class="account-name">${a.account_name}</div>
         <div class="account-balance ${cls}" data-value="${a.balance}">
-          ${yen(a.balance)}
+          ${yen(todayBalance)}
         </div>
       </div>
     `;
