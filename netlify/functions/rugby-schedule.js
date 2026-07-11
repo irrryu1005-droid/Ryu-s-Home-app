@@ -1,9 +1,6 @@
 const OK_HEADERS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 
-// 含めるコンペティション（部分一致）
-const INCLUDE_RE = /nations championship|nations cup|rugby championship|six nations|world rugby/i;
-// 除外するコンペティション
-const EXCLUDE_RE = /women|u20|under.?20|super rugby|aupiki/i;
+const EXCLUDE_RE = /women|u20|under.?20|super league|aupiki/i;
 
 exports.handler = async (event) => {
   const date = (event.queryStringParameters || {}).date;
@@ -11,35 +8,34 @@ exports.handler = async (event) => {
 
   try {
     const compact = date.replace(/-/g, '');
-    const url = `https://api.wr-rims-prod.pulselive.com/rugby/v3/match?startDate=${compact}&endDate=${compact}`;
-    const res = await fetch(url, {
-      headers: {
-        'Origin': 'https://www.world.rugby',
-        'Referer': 'https://www.world.rugby/',
-        'User-Agent': 'Mozilla/5.0',
-      },
-    });
-    if (!res.ok) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: { apiStatus: res.status, apiUrl: url } }) };
+    const url = `https://site.api.espn.com/apis/site/v2/sports/rugby-union/scoreboard?dates=${compact}`;
+    const res = await fetch(url);
+
+    if (!res.ok) return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: [], debug: { apiStatus: res.status, source: 'espn' } }) };
 
     const data = await res.json();
-    const allContent = data.content || [];
-    const allCompNames = allContent.map(m => (m.events || []).map(e => e.label || '').join(' / '));
-    const matches = allContent.filter(m => {
-      const compName = (m.events || []).map(e => e.label || '').join(' ');
-      return INCLUDE_RE.test(compName) && !EXCLUDE_RE.test(compName);
-    }).map(m => {
-      const teams = (m.teams || []).map(t => t.name || '').filter(Boolean);
-      const compName = (m.events || []).map(e => e.label || '').join(' / ');
-      const millis = m.time?.millis;
-      return {
-        title:    teams.join(' vs '),
-        league:   compName,
-        startUtc: millis ? new Date(millis).toISOString() : null,
-        dateStr:  date,
-      };
-    });
+    const allEvents = data.events || [];
 
-    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: matches, debug: { total: allContent.length, compNames: allCompNames } }) };
+    const matches = allEvents
+      .filter(ev => !EXCLUDE_RE.test(ev.name || ''))
+      .map(ev => {
+        const comp = (ev.competitions || [])[0] || {};
+        const competitors = comp.competitors || [];
+        const home = competitors.find(c => c.homeAway === 'home');
+        const away = competitors.find(c => c.homeAway === 'away');
+        const homeTeam = home?.team?.displayName || '';
+        const awayTeam = away?.team?.displayName || '';
+        const league = (comp.notes || []).map(n => n.headline || '').filter(Boolean).join(' / ')
+                    || ev.season?.slug || 'Rugby Union';
+        return {
+          title:    `${homeTeam} vs ${awayTeam}`,
+          league,
+          startUtc: comp.date || null,
+          dateStr:  date,
+        };
+      });
+
+    return { statusCode: 200, headers: OK_HEADERS, body: JSON.stringify({ events: matches, debug: { total: allEvents.length, source: 'espn' } }) };
   } catch (e) {
     return { statusCode: 500, headers: OK_HEADERS, body: JSON.stringify({ events: [], error: e.message }) };
   }
