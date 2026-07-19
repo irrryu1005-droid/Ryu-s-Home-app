@@ -1659,10 +1659,11 @@ function renderCampaigns() {
   // ---- 過去の結果 ----
   if (completed.length > 0) {
     const rows = completed.map(c => {
-      const isFailed = c.completionType === 'failed';
-      const betPnl   = isFailed ? 0 : _bets
+      const isFailed     = c.completionType === 'failed';
+      const rawBetPnl    = _bets
         .filter(b => String(b.campaignId) === String(c.id))
         .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
+      const betPnl = isFailed ? 0 : rawBetPnl - (c.fbReward || 0);
       const pnlClass = betPnl > 0 ? 'win' : betPnl < 0 ? 'loss' : '';
       const statusBadge = isFailed
         ? '<span class="badge-failed">条件未達</span>'
