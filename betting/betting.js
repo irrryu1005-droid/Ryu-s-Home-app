@@ -1253,6 +1253,12 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
   }
 
   const sumPnl  = bets => bets.reduce((s, b) => s + (calcPnl(b) ?? 0), 0);
+  const fbBonusForPeriod = (start, end) =>
+    _campaigns
+      .filter(c => c.status === 'completed' && c.completionType === 'success'
+                && !c.fbRewardInBankroll && (c.fbReward || 0) > 0
+                && c.completedDate >= start && c.completedDate <= end)
+      .reduce((s, c) => s + (c.fbReward || 0), 0);
   const pnlSpan = (pnl) => {
     const cls = pnl > 0 ? 'win' : pnl < 0 ? 'loss' : '';
     return `<span class="group-pnl ${cls}">${formatPnl(pnl)}</span>`;
@@ -1266,7 +1272,7 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
     const [year, monStr] = mKey.split('-');
     const mon            = parseInt(monStr);
     const allMonthBets   = [...wMap.values()].flatMap(d => [...d.values()].flat());
-    const mPnl           = sumPnl(allMonthBets);
+    const mPnl           = sumPnl(allMonthBets) + fbBonusForPeriod(`${mKey}-01`, `${mKey}-31`);
 
     html += `<details class="month-group" data-month="${mKey}" ${mOpen(mKey) ? 'open' : ''}>
       <summary class="group-summary month-summary">
@@ -1279,7 +1285,9 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
 
     for (const [wKey, dMap] of sortedWeeks) {
       const allWeekBets = [...dMap.values()].flat();
-      const wPnl        = sumPnl(allWeekBets);
+      const wSun = new Date(wKey + 'T12:00:00'); wSun.setDate(wSun.getDate() + 6);
+      const wSunStr = wSun.toISOString().slice(0, 10);
+      const wPnl = sumPnl(allWeekBets) + fbBonusForPeriod(wKey, wSunStr);
       // wKey はその週の月曜日 (YYYY-MM-DD)。日曜日 = 月曜 + 6日
       const monDate = new Date(wKey + 'T12:00:00');
       const sunDate = new Date(wKey + 'T12:00:00');
@@ -1296,7 +1304,7 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
       for (const [dKey, bets] of [...dMap.entries()].sort((a, b) => b[0].localeCompare(a[0]))) {
         const d      = new Date(dKey + 'T12:00:00');
         const dLabel = `${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
-        const dPnl   = sumPnl(bets);
+        const dPnl   = sumPnl(bets) + fbBonusForPeriod(dKey, dKey);
 
         // ベットと入金を sort_order で並べて混合表示
         const dayItems = getDayItems(dKey);
