@@ -439,7 +439,7 @@ function calcPnl(bet) {
   if (bet.isFreebet && bet.campaignId) {
     const campaign = _campaigns.find(c => c.id === bet.campaignId);
     if (!campaign || campaign.status !== 'completed') return null;
-    if (campaign.completionType === 'failed') return 0; // 条件未達: FB損益は常に0
+    if (campaign.completionType === 'failed') return 0;
   }
   const odds = bet.type === 'parlay' ? calcEffectiveOdds(bet) : bet.odds;
   if (bet.result === 'win')  return Math.round(bet.stake * (odds - 1));
@@ -1660,10 +1660,19 @@ function renderCampaigns() {
   if (completed.length > 0) {
     const rows = completed.map(c => {
       const isFailed     = c.completionType === 'failed';
-      const rawBetPnl    = _bets
-        .filter(b => String(b.campaignId) === String(c.id))
-        .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
-      const betPnl = isFailed ? 0 : rawBetPnl - (c.fbReward || 0);
+      // FBウォレット方式：fbRewardを初期残高として、勝ち=純利益加算、負け/未確認=賭け金減算
+      const betPnl = (() => {
+        if (isFailed) return 0;
+        const campaignBets = _bets.filter(b => String(b.campaignId) === String(c.id));
+        const wallet = campaignBets.reduce((sum, b) => {
+          const odds = b.type === 'parlay' ? calcEffectiveOdds(b) : b.odds;
+          if (b.result === 'win')  return sum + Math.round(b.stake * (odds - 1));
+          if (b.result === 'loss') return sum - b.stake;
+          if (b.isFreebet && b.result === 'pending') return sum - b.stake;
+          return sum;
+        }, c.fbReward || 0);
+        return wallet;
+      })();
       const pnlClass = betPnl > 0 ? 'win' : betPnl < 0 ? 'loss' : '';
       const statusBadge = isFailed
         ? '<span class="badge-failed">条件未達</span>'
