@@ -121,14 +121,15 @@ function normalizeGoal(row) {
 
 function normalizeCampaign(row) {
   return {
-    id:             row.id,
-    name:           row.name,
-    wagerRequired:  row.wager_required,
-    fbReward:       row.fb_reward,
-    startDate:      row.start_date,
-    status:         row.status         || 'active',
-    completedDate:  row.completed_date,
-    completionType: row.completion_type || 'success',
+    id:                row.id,
+    name:              row.name,
+    wagerRequired:     row.wager_required,
+    fbReward:          row.fb_reward,
+    startDate:         row.start_date,
+    status:            row.status         || 'active',
+    completedDate:     row.completed_date,
+    completionType:    row.completion_type || 'success',
+    fbRewardInBankroll: !!row.fb_reward_in_bankroll,
   };
 }
 
@@ -230,7 +231,8 @@ async function updateCampaign(id, updates) {
   if (updates.name          !== undefined) row.name           = updates.name;
   if (updates.startDate     !== undefined) row.start_date     = updates.startDate || null;
   if (updates.wagerRequired !== undefined) row.wager_required = updates.wagerRequired;
-  if (updates.fbReward      !== undefined) row.fb_reward      = updates.fbReward;
+  if (updates.fbReward          !== undefined) row.fb_reward           = updates.fbReward;
+  if (updates.fbRewardInBankroll !== undefined) row.fb_reward_in_bankroll = updates.fbRewardInBankroll;
   const { error } = await db.from('bet_campaigns').update(row).eq('id', id);
   if (error) { console.error('updateCampaign error:', error); return; }
   // String() で型不一致を回避
@@ -1650,6 +1652,12 @@ function renderCampaigns() {
               <input type="number" name="fbReward" value="${c.fbReward}" step="500" required>
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group" style="flex-direction:row;align-items:center;gap:8px;">
+              <input type="checkbox" name="fbRewardInBankroll" id="fbRIB_${c.id}" ${c.fbRewardInBankroll ? 'checked' : ''}>
+              <label for="fbRIB_${c.id}" style="margin:0;font-size:0.85em;">FB報酬は元手設定に含む（既に元手に手動追加済みの場合）</label>
+            </div>
+          </div>
           <div class="campaign-edit-btns">
             <button type="submit" class="btn-secondary">保存</button>
             <button type="button" class="btn-secondary btn-campaign-edit-cancel" data-id="${c.id}">キャンセル</button>
@@ -1728,10 +1736,11 @@ function renderCampaigns() {
       const id   = form.dataset.id;
       const f    = form.elements;
       await updateCampaign(id, {
-        name:          f.campaignName.value.trim(),
-        startDate:     f.campaignStart.value || null,
-        wagerRequired: parseInt(f.wagerRequired.value),
-        fbReward:      parseInt(f.fbReward.value),
+        name:              f.campaignName.value.trim(),
+        startDate:         f.campaignStart.value || null,
+        wagerRequired:     parseInt(f.wagerRequired.value),
+        fbReward:          parseInt(f.fbReward.value),
+        fbRewardInBankroll: f.fbRewardInBankroll.checked,
       });
       refreshAll();
     });
@@ -1821,9 +1830,9 @@ function calcStreak() {
 function updateSummary() {
   const settled   = _bets.filter(b => b.result === 'win' || b.result === 'loss');
   const wins      = settled.filter(b => b.result === 'win');
-  // FB成功キャンペーンのfbRewardをtotalPnlに加算（ウォレット初期残高分）
+  // 元手設定に含まれていないFBリワードは残高に加算（元手設定に含む場合はスキップ）
   const fbRewardBonus = _campaigns
-    .filter(c => c.status === 'completed' && c.completionType === 'success')
+    .filter(c => c.status === 'completed' && c.completionType === 'success' && !c.fbRewardInBankroll)
     .reduce((sum, c) => sum + (c.fbReward || 0), 0);
   const totalPnl  = _bets.reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0) + fbRewardBonus;
   const winRate   = settled.length > 0 ? (wins.length / settled.length * 100).toFixed(1) + '%' : '-%';
@@ -2057,6 +2066,11 @@ function renderBalanceChart() {
   // 全ベット（pending含む）を時系列順に並べる（settled と pending を統合）
   const allBets = _bets.slice().reverse(); // renderCharts で reverse 済みのものを再利用
 
+  // 元手未含のFBリワードをグラフ用仮想イベントとして収集
+  const fbBonusEvents = _campaigns
+    .filter(c => c.status === 'completed' && c.completionType === 'success' && !c.fbRewardInBankroll && c.completedDate)
+    .map(c => ({ date: c.completedDate, amount: c.fbReward || 0 }));
+
   if (_balanceViewBy === 'bet') {
     const events = [];
     for (const bet of allBets) {
@@ -2067,6 +2081,9 @@ function renderBalanceChart() {
     for (const dep of _deposits) {
       const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
       events.push({ date: dep.deposit_date, pnl: 0, deposit: signed, sort_order: dep.sort_order ?? -1 });
+    }
+    for (const ev of fbBonusEvents) {
+      events.push({ date: ev.date, pnl: 0, deposit: ev.amount, sort_order: -1 });
     }
     events.sort((a, b) => {
       if (a.date !== b.date) return a.date < b.date ? -1 : 1;
@@ -2092,6 +2109,10 @@ function renderBalanceChart() {
       const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
       if (!dayMap[dep.deposit_date]) dayMap[dep.deposit_date] = { pnl: 0, deposit: 0 };
       dayMap[dep.deposit_date].deposit += signed;
+    }
+    for (const ev of fbBonusEvents) {
+      if (!dayMap[ev.date]) dayMap[ev.date] = { pnl: 0, deposit: 0 };
+      dayMap[ev.date].deposit += ev.amount;
     }
     for (const d of Object.keys(dayMap).sort()) {
       const ev = dayMap[d];
