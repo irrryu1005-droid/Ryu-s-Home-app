@@ -436,14 +436,17 @@ function calcEffectiveOdds(bet) {
 }
 
 function calcPnl(bet) {
+  let isFbSuccess = false;
   if (bet.isFreebet && bet.campaignId) {
     const campaign = _campaigns.find(c => c.id === bet.campaignId);
     if (!campaign || campaign.status !== 'completed') return null;
     if (campaign.completionType === 'failed') return 0;
+    isFbSuccess = true;
   }
   const odds = bet.type === 'parlay' ? calcEffectiveOdds(bet) : bet.odds;
   if (bet.result === 'win')  return Math.round(bet.stake * (odds - 1));
-  if (bet.result === 'loss') return bet.isFreebet ? 0 : -bet.stake;
+  // FB成功キャンペーンの負けは -stake（通常ベットと同じ）、それ以外のFBは 0
+  if (bet.result === 'loss') return (bet.isFreebet && !isFbSuccess) ? 0 : -bet.stake;
   if (bet.result === 'void') return 0;
   return null;
 }
@@ -1818,7 +1821,11 @@ function calcStreak() {
 function updateSummary() {
   const settled   = _bets.filter(b => b.result === 'win' || b.result === 'loss');
   const wins      = settled.filter(b => b.result === 'win');
-  const totalPnl  = _bets.reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
+  // FB成功キャンペーンのfbRewardをtotalPnlに加算（ウォレット初期残高分）
+  const fbRewardBonus = _campaigns
+    .filter(c => c.status === 'completed' && c.completionType === 'success')
+    .reduce((sum, c) => sum + (c.fbReward || 0), 0);
+  const totalPnl  = _bets.reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0) + fbRewardBonus;
   const winRate   = settled.length > 0 ? (wins.length / settled.length * 100).toFixed(1) + '%' : '-%';
 
   document.getElementById('total-bets').textContent = _bets.length;
