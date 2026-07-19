@@ -1012,27 +1012,44 @@ function renderPnlStatement() {
   const revenues = {};
 
   for (const bet of filtered) {
+    const pnl = calcPnl(bet);
+    if (pnl === null) continue; // 未完了キャンペーンのFB → 集計対象外
+
     const sport  = bet.type === 'parlay' ? 'マルチ' : (bet.sport  || 'その他');
     const league = bet.type === 'parlay'
       ? `${(bet.legs || []).length}連`
       : (bet.league || '未設定');
     const odds = bet.type === 'parlay' ? calcEffectiveOdds(bet) : (bet.odds || 1);
 
-    // FB は実費ゼロなので費用に計上しない
-    if (!bet.isFreebet) {
-      if (!expenses[sport]) expenses[sport] = {};
-      expenses[sport][league] = (expenses[sport][league] || 0) + bet.stake;
-    }
-
-    if (bet.result === 'win') {
-      // FB勝ちは元手が戻らないため純利益分のみ収益
-      const revenue = bet.isFreebet
+    if (pnl > 0) {
+      // 勝ち：通常=全回収額(stake×odds)、FB=純利益のみ(stake×(odds-1))
+      const returnAmt = bet.isFreebet
         ? Math.round(bet.stake * (odds - 1))
         : Math.round(bet.stake * odds);
       if (!revenues[sport]) revenues[sport] = {};
-      revenues[sport][league] = (revenues[sport][league] || 0) + revenue;
+      revenues[sport][league] = (revenues[sport][league] || 0) + returnAmt;
+      if (!bet.isFreebet) {
+        if (!expenses[sport]) expenses[sport] = {};
+        expenses[sport][league] = (expenses[sport][league] || 0) + bet.stake;
+      }
+    } else if (pnl < 0) {
+      // 負け：費用 = -pnl（通常=stake、FB成功キャンペーン=stake、その他FB=0でここに来ない）
+      if (!expenses[sport]) expenses[sport] = {};
+      expenses[sport][league] = (expenses[sport][league] || 0) + (-pnl);
     }
+    // pnl === 0: void / 失敗キャンペーンFB → 費用・収益とも¥0
   }
+
+  // FB報酬（成功キャンペーン報酬）を収益に追加
+  const fbDs = isAll ? null : `${y}-${String(m).padStart(2,'0')}-01`;
+  const fbDe = isAll ? null : `${y}-${String(m).padStart(2,'0')}-31`;
+  _campaigns
+    .filter(c => c.status === 'completed' && c.completionType === 'success' && !c.fbRewardInBankroll && (c.fbReward || 0) > 0)
+    .filter(c => !fbDs || (c.completedDate && c.completedDate >= fbDs && c.completedDate <= fbDe))
+    .forEach(c => {
+      if (!revenues['FB報酬']) revenues['FB報酬'] = {};
+      revenues['FB報酬'][c.name] = (revenues['FB報酬'][c.name] || 0) + (c.fbReward || 0);
+    });
 
   const expTotal = Object.values(expenses).flatMap(Object.values).reduce((a, b) => a + b, 0);
   const revTotal = Object.values(revenues).flatMap(Object.values).reduce((a, b) => a + b, 0);
@@ -2047,9 +2064,16 @@ function renderPeriodStats() {
   const monthEnd   = dateStr(mLast);
   const monthLabel = _periodMonthOfs === 0 ? '今月' : `${mBase.getFullYear()}/${mBase.getMonth()+1}月`;
 
-  const calcPeriod = (start, end) =>
-    _bets.filter(b => b.date >= start && b.date <= end)
-         .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
+  const calcPeriod = (start, end) => {
+    const betPnl = _bets.filter(b => b.date >= start && b.date <= end)
+                        .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
+    const fbBonus = _campaigns
+      .filter(c => c.status === 'completed' && c.completionType === 'success'
+                && !c.fbRewardInBankroll && (c.fbReward || 0) > 0
+                && c.completedDate >= start && c.completedDate <= end)
+      .reduce((sum, c) => sum + (c.fbReward || 0), 0);
+    return betPnl + fbBonus;
+  };
 
   const fmt = pnl => (pnl >= 0 ? '+' : '') + '¥' + Math.round(pnl).toLocaleString();
   const cls = pnl => pnl > 0 ? 'win' : pnl < 0 ? 'loss' : '';
@@ -2105,9 +2129,15 @@ function renderGoalProgress() {
 
   const today = new Date(); today.setHours(0,0,0,0);
 
-  const pnl = _bets
+  const betPnl = _bets
     .filter(b => b.date >= g.goalStart && b.date <= g.goalEnd)
     .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
+  const fbBonus = _campaigns
+    .filter(c => c.status === 'completed' && c.completionType === 'success'
+              && !c.fbRewardInBankroll && (c.fbReward || 0) > 0
+              && c.completedDate >= g.goalStart && c.completedDate <= g.goalEnd)
+    .reduce((sum, c) => sum + (c.fbReward || 0), 0);
+  const pnl = betPnl + fbBonus;
 
   const pct   = Math.min(100, Math.max(0, Math.round(pnl / g.goalAmount * 100)));
   const color = pct >= 100 ? '#27AE60' : pct >= 50 ? '#F39C12' : '#9B59B6';
