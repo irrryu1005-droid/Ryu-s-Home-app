@@ -38,7 +38,6 @@ let _campaigns     = [];
 let _settings      = { bankroll: null };
 let _goals         = [];
 let _deposits      = [];
-let _consultations = [];
 let _detailsOpenState = null; // null=初回レンダリング。toggle イベントで常に最新を保持
 
 const _now = new Date();
@@ -134,21 +133,19 @@ function normalizeCampaign(row) {
 }
 
 async function loadAll() {
-  const [betsRes, campsRes, settingsRes, goalsRes, depositsRes, leaguesRes, consultRes] = await Promise.all([
+  const [betsRes, campsRes, settingsRes, goalsRes, depositsRes, leaguesRes] = await Promise.all([
     db.from('bets').select('*').order('date', { ascending: false }).order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
     db.from('bet_campaigns').select('*').eq('hidden', false).order('created_at'),
     db.from('bet_settings').select('*').eq('id', 1).single(),
     db.from('bet_goals').select('*').order('created_at'),
     db.from('bet_deposits').select('*').order('deposit_date', { ascending: false }),
     db.from('bet_leagues').select('*').order('sport').order('sort_order'),
-    db.from('bet_consultations').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
   ]);
   _bets          = (betsRes.data     || []).map(normalizeBet);
   _campaigns     = (campsRes.data    || []).map(normalizeCampaign);
   _settings      =  settingsRes.data || { bankroll: null };
   _goals         = (goalsRes.data    || []).map(normalizeGoal);
   _deposits      =  depositsRes.data || [];
-  _consultations =  consultRes.data  || [];
   _leaguesMap = {};
   _sportsOrder = [];
   for (const row of (leaguesRes.data || [])) {
@@ -472,212 +469,375 @@ function escapeHtml(str) {
 // 分析タブ
 // ============================================================
 function renderAI() {
-  const rows = _consultations;
-  const el   = document.getElementById('ai-container');
+  // Analysis tab removed — placeholder for future reimplementation
+}
 
-  // --- サマリー集計 ---
-  const settled = rows.filter(r => r.result === 'win' || r.result === 'loss');
-  const wins    = settled.filter(r => r.result === 'win').length;
-  const losses  = settled.filter(r => r.result === 'loss').length;
-  const pending = rows.filter(r => r.result === 'pending' || !r.result).length;
-  const hitRate = settled.length > 0 ? Math.round(wins / settled.length * 100) : null;
-  const avgPred = rows.length > 0
-    ? (rows.reduce((s, r) => s + (parseFloat(r.predicted_win_rate) || 0), 0) / rows.length).toFixed(1)
-    : null;
+// ============================================================
+// スポーツカレンダー
+// ============================================================
 
-  // --- キャリブレーション（勝率帯ごと）---
-  const BANDS = [
-    { label: '〜60%',  min: 0,  max: 60  },
-    { label: '61〜70%', min: 60, max: 70  },
-    { label: '71〜80%', min: 70, max: 80  },
-    { label: '81%〜',   min: 80, max: 100 },
-  ];
-  const calib = BANDS.map(band => {
-    const inBand  = settled.filter(r => {
-      const p = parseFloat(r.predicted_win_rate);
-      return p > band.min && p <= band.max;
-    });
-    const w = inBand.filter(r => r.result === 'win').length;
-    return { ...band, total: inBand.length, wins: w,
-             actual: inBand.length > 0 ? Math.round(w / inBand.length * 100) : null };
-  });
+const DAY_MS         = 86400000;
+const CAL_SPORT_ORDER = ['Rugby', 'Volleyball', 'Football', 'Tennis'];
+const CAL_WW         = 42;  // 週カラム幅 (px)
+const CAL_MW         = 54;  // 月カラム幅 (px)
+const CAL_WEEKS      = 18;  // 週ビューで表示する週数
+const CAL_PRESET_COLORS = [
+  '#C0392B','#E74C3C','#E67E22','#F39C12',
+  '#27AE60','#117A65','#2980B9','#5DADE2',
+  '#8E44AD','#9B59B6','#641E16','#2C3E50',
+];
 
-  const resultSelect = (r, id) => `
-    <select class="consult-result-select result-select" data-id="${id}">
-      <option value="pending" ${(!r || r === 'pending') ? 'selected' : ''}>未</option>
-      <option value="win"     ${r === 'win'  ? 'selected' : ''}>勝</option>
-      <option value="loss"    ${r === 'loss' ? 'selected' : ''}>負</option>
-    </select>`;
+let _calEvents  = [];
+let _calLoaded  = false;
+let _calView    = 'week';   // 'week' | 'month'
+let _calWeekOff = 0;        // 今週を0とした週オフセット
+let _calYear    = new Date().getFullYear();
+let _calEditId  = null;     // null=新規, number=編集中
 
-  const evColor = ev => {
-    const v = parseFloat(ev);
-    if (isNaN(v)) return '';
-    return v >= 5 ? 'style="color:var(--win);font-weight:700"'
-         : v >= 0 ? 'style="color:var(--text)"'
-         : 'style="color:var(--loss)"';
-  };
+function calDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 
-  // --- 補正詳細カード ---
-  const withCorr = rows.filter(r => r.corrections_json);
-  const corrCards = withCorr.map(r => {
-    const cj       = r.corrections_json;
-    const isSettled = r.result === 'win' || r.result === 'loss';
-    const badge    = r.result === 'win' ? '<span class="ai-badge ai-win">勝</span>'
-                   : r.result === 'loss' ? '<span class="ai-badge ai-loss">負</span>'
-                   : '<span class="ai-badge ai-pending">未</span>';
-    const factorRows = (cj.factors || []).map((f, i) => {
-      const fbVal  = f.feedback || '';
-      const fbOpts = [
-        ['', '—'],
-        ['accurate', '○ 正確'],
-        ['over',     '△ 過大'],
-        ['under',    '▽ 過小'],
-        ['miss',     '✗ 外れ'],
-      ].map(([v, l]) => `<option value="${v}" ${fbVal === v ? 'selected' : ''}>${l}</option>`).join('');
-      const corrColor = f.correction >= 0 ? 'var(--win)' : 'var(--loss)';
-      return `<tr style="border-top:1px solid var(--border)">
-        <td style="padding:5px 6px;font-weight:600;white-space:nowrap">${f.factor}</td>
-        <td style="padding:5px 6px;font-size:11px">${f.team_a || '—'}</td>
-        <td style="padding:5px 6px;font-size:11px">${f.team_b || '—'}</td>
-        <td style="padding:5px 6px;text-align:center;font-weight:700;color:${corrColor};white-space:nowrap">
-          ${f.correction >= 0 ? '+' : ''}${f.correction}%
-        </td>
-        <td style="padding:5px 6px;text-align:center">
-          <select class="factor-fb-sel result-select"
-            data-consult-id="${r.id}" data-factor-idx="${i}"
-            ${!isSettled ? 'disabled title="結果確定後に評価できます"' : ''}>
-            ${fbOpts}
-          </select>
-        </td>
-      </tr>`;
-    }).join('');
+function calParseDate(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
 
-    return `<div class="correction-card">
-      <div class="correction-card-head">
-        <span>${r.date} ${r.sport} / ${r.league || ''}</span>
-        <span>オッズ ${r.odds} &nbsp;|&nbsp; ベース <b>${cj.base_rate}%</b> → 予想 <b>${r.predicted_win_rate}%</b>
-          (EV <span ${evColor(r.expected_value)}>${r.expected_value}%</span>)
-          ${badge}
-        </span>
-      </div>
-      <div class="table-scroll" style="margin-top:6px">
-        <table style="width:100%;font-size:12px;border-collapse:collapse">
-          <thead><tr style="background:var(--bg)">
-            <th style="padding:5px 6px;text-align:left">要素</th>
-            <th style="padding:5px 6px">チームA</th>
-            <th style="padding:5px 6px">チームB</th>
-            <th style="padding:5px 6px;text-align:center">補正値</th>
-            <th style="padding:5px 6px;text-align:center">評価</th>
-          </tr></thead>
-          <tbody>${factorRows}</tbody>
-        </table>
-      </div>
-      ${cj.reliability_items != null
-        ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">取得項目 ${cj.reliability_items}件${cj.reliability_penalty ? ' / 信頼度ペナルティ ' + cj.reliability_penalty + '%' : ''}</div>`
-        : ''}
+function getMondayOf(d) {
+  const dt = new Date(d); dt.setHours(0,0,0,0);
+  const day = dt.getDay();
+  dt.setDate(dt.getDate() - (day === 0 ? 6 : day - 1));
+  return dt;
+}
+
+async function loadCalendarEvents() {
+  const { data } = await db.from('sport_calendar_events').select('*').order('sort_order').order('created_at');
+  _calEvents = (data || []).map(r => ({ ...r, periods: r.periods_json || [] }));
+}
+
+function renderCalendar() {
+  if (_calView === 'week') _renderCalWeek();
+  else                     _renderCalMonth();
+}
+
+function _calSportRows(startStr, endStr) {
+  const visible = _calEvents.filter(ev => ev.periods.some(p => p.start <= endStr && p.end >= startStr));
+  const ordered = CAL_SPORT_ORDER.filter(s => visible.some(ev => ev.sport === s));
+  const extras  = [...new Set(visible.map(ev => ev.sport))].filter(s => !CAL_SPORT_ORDER.includes(s));
+  return [...ordered, ...extras];
+}
+
+// ---- 週ビュー ----
+function _renderCalWeek() {
+  const today      = new Date(); today.setHours(0,0,0,0);
+  const todayStr   = calDateStr(today);
+  const baseMonday = getMondayOf(today);
+  const viewStart  = new Date(baseMonday.getTime() + _calWeekOff * 7 * DAY_MS);
+  const viewEnd    = new Date(viewStart.getTime() + CAL_WEEKS * 7 * DAY_MS - 1);
+  const vstStr     = calDateStr(viewStart);
+  const vedStr     = calDateStr(viewEnd);
+  const totalW     = CAL_WEEKS * CAL_WW;
+
+  const vs = viewStart, ve = viewEnd;
+  document.getElementById('cal-period-label').textContent =
+    `${vs.getFullYear()}年 ${vs.getMonth()+1}/${vs.getDate()} 〜 ${ve.getMonth()+1}/${ve.getDate()}`;
+
+  const sports = _calSportRows(vstStr, vedStr);
+
+  // ラベル
+  const labelsEl = document.getElementById('cal-labels');
+  labelsEl.innerHTML = '<div class="cal-label-header"></div>' +
+    (sports.length
+      ? sports.map(s => `<div class="cal-label-row">${s}</div>`).join('')
+      : '<div class="cal-label-row cal-label-empty">—</div>');
+
+  // ヘッダー（週）
+  const headerEl = document.getElementById('cal-header');
+  headerEl.style.width = totalW + 'px';
+  const MONTH_JP = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  let lastMonth = -1;
+  headerEl.innerHTML = Array.from({length: CAL_WEEKS}, (_, i) => {
+    const wd  = new Date(viewStart.getTime() + i * 7 * DAY_MS);
+    const wdE = new Date(wd.getTime() + 6 * DAY_MS);
+    const isNow = today >= wd && today <= wdE;
+    const showMonth = wd.getMonth() !== lastMonth;
+    if (showMonth) lastMonth = wd.getMonth();
+    return `<div class="cal-week-header${isNow ? ' current-col' : ''}" style="left:${i*CAL_WW}px;width:${CAL_WW}px">
+      ${showMonth ? `<div class="cal-col-month">${MONTH_JP[wd.getMonth()]}</div>` : '<div class="cal-col-month"></div>'}
+      <div class="cal-col-label">${wd.getMonth()+1}/${wd.getDate()}</div>
     </div>`;
   }).join('');
 
-  el.innerHTML = `
-    <!-- サマリー -->
-    <div class="ai-summary-row">
-      <div class="ai-s-item"><div class="ai-s-label">相談件数</div><div class="ai-s-val">${rows.length}</div></div>
-      <div class="ai-s-item"><div class="ai-s-label">勝/負/未</div><div class="ai-s-val">${wins}/${losses}/${pending}</div></div>
-      <div class="ai-s-item"><div class="ai-s-label">的中率</div><div class="ai-s-val ${hitRate !== null && hitRate >= 50 ? 'win' : hitRate !== null ? 'loss' : ''}">${hitRate !== null ? hitRate + '%' : '—'}</div></div>
-      <div class="ai-s-item"><div class="ai-s-label">平均予想勝率</div><div class="ai-s-val">${avgPred !== null ? avgPred + '%' : '—'}</div></div>
-    </div>
+  // 行
+  const rowsEl = document.getElementById('cal-rows');
+  rowsEl.innerHTML = '';
+  rowsEl.style.width = totalW + 'px';
 
-    <!-- キャリブレーション -->
-    <div class="chart-card" style="margin-bottom:14px">
-      <h3>精度キャリブレーション</h3>
-      ${settled.length < 5
-        ? `<p class="empty-msg" style="padding:10px 0">データが5件以上で集計されます（現在 ${settled.length} 件）</p>`
-        : `<table style="width:100%;font-size:12px">
-            <thead><tr>
-              <th>予想勝率帯</th><th style="text-align:center">件数</th>
-              <th style="text-align:center">予想</th><th style="text-align:center">実際</th>
-              <th style="text-align:center">差</th>
-            </tr></thead>
-            <tbody>
-              ${calib.map(b => {
-                const mid  = b.total > 0 ? ((b.min + b.max) / 2).toFixed(0) : '—';
-                const diff = b.actual !== null ? b.actual - parseInt(mid) : null;
-                const diffStr = diff !== null
-                  ? `<span style="color:${diff >= 0 ? 'var(--win)' : 'var(--loss)'}">${diff >= 0 ? '+' : ''}${diff}%</span>`
-                  : '—';
-                return `<tr>
-                  <td>${b.label}</td>
-                  <td style="text-align:center">${b.total}</td>
-                  <td style="text-align:center">${b.total > 0 ? mid + '%' : '—'}</td>
-                  <td style="text-align:center">${b.actual !== null ? b.actual + '%' : '—'}</td>
-                  <td style="text-align:center">${diffStr}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>`
-      }
-    </div>
+  if (!sports.length) {
+    rowsEl.innerHTML = `<div class="cal-empty-msg">この期間に大会はありません</div>`;
+    return;
+  }
 
-    <!-- 補正詳細カード -->
-    ${withCorr.length > 0 ? `
-    <div class="chart-card" style="margin-bottom:14px">
-      <h3>補正詳細フィードバック</h3>
-      <p style="font-size:11px;color:var(--muted);margin-bottom:12px">結果確定後に各補正要素が正しかったか評価してください</p>
-      ${corrCards}
-    </div>` : ''}
+  const todayFrac = (today - viewStart) / (7 * DAY_MS);
 
-    <!-- 履歴テーブル -->
-    <div class="table-scroll">
-      <table>
-        <thead><tr>
-          <th>日付</th><th>スポーツ</th><th>リーグ</th><th>オッズ</th>
-          <th>必要勝率</th><th>予想勝率</th><th>EV</th><th>推奨</th><th>結果</th>
-        </tr></thead>
-        <tbody>
-          ${rows.length === 0
-            ? `<tr><td colspan="9" class="empty-msg">まだ記録がありません</td></tr>`
-            : rows.map(r => `<tr>
-                <td style="white-space:nowrap">${r.date || ''}</td>
-                <td>${r.sport || ''}</td>
-                <td>${r.league || ''}</td>
-                <td>${r.odds || ''}</td>
-                <td style="text-align:right">${r.required_win_rate ? r.required_win_rate + '%' : '—'}</td>
-                <td style="text-align:right;font-weight:700">${r.predicted_win_rate ? r.predicted_win_rate + '%' : '—'}</td>
-                <td style="text-align:right" ${evColor(r.expected_value)}>${r.expected_value ? r.expected_value + '%' : '—'}</td>
-                <td style="font-size:11px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.recommendation || '—'}</td>
-                <td>${resultSelect(r.result, r.id)}</td>
-              </tr>`).join('')
-          }
-        </tbody>
-      </table>
-    </div>
-  `;
+  sports.forEach(sport => {
+    const evs = _calEvents.filter(ev => ev.sport === sport);
+    const row = document.createElement('div');
+    row.className = 'cal-row'; row.style.width = totalW + 'px';
 
-  // 結果更新
-  el.querySelectorAll('.consult-result-select').forEach(sel => {
-    sel.addEventListener('change', async () => {
-      const { error } = await db.from('bet_consultations').update({ result: sel.value }).eq('id', sel.dataset.id);
-      if (error) { console.error('consult update error:', error); return; }
-      const row = _consultations.find(r => String(r.id) === sel.dataset.id);
-      if (row) row.result = sel.value;
-      renderAI();
+    // 背景セル
+    for (let i = 0; i < CAL_WEEKS; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      cell.style.cssText = `left:${i*CAL_WW}px;width:${CAL_WW}px`;
+      row.appendChild(cell);
+    }
+
+    // 今日ライン
+    if (todayFrac >= 0 && todayFrac < CAL_WEEKS) {
+      const m = document.createElement('div');
+      m.className = 'cal-today-line';
+      m.style.left = `${todayFrac * CAL_WW}px`;
+      row.appendChild(m);
+    }
+
+    // バー（period ごと）
+    evs.forEach(ev => {
+      (ev.periods || []).forEach(p => {
+        const sd = calParseDate(p.start), ed = calParseDate(p.end);
+        const sf = (sd - viewStart) / (7 * DAY_MS);
+        const ef = (ed.getTime() + DAY_MS - viewStart) / (7 * DAY_MS);
+        if (ef <= 0 || sf >= CAL_WEEKS) return;
+        const cs = Math.max(0, sf), ce = Math.min(CAL_WEEKS, ef);
+        _appendBar(row, ev, p, cs * CAL_WW, (ce - cs) * CAL_WW, sf < 0, ef > CAL_WEEKS);
+      });
+    });
+
+    rowsEl.appendChild(row);
+  });
+
+  // 今日が見えるようにスクロール
+  if (todayFrac >= 0 && todayFrac < CAL_WEEKS) {
+    const sc = document.getElementById('cal-scroll');
+    sc.scrollLeft = Math.max(0, todayFrac * CAL_WW - sc.clientWidth / 2);
+  }
+}
+
+// ---- 月ビュー ----
+function _renderCalMonth() {
+  const MONTHS  = 12;
+  const totalW  = MONTHS * CAL_MW;
+  const today   = new Date();
+  const yStart  = `${_calYear}-01-01`;
+  const yEnd    = `${_calYear}-12-31`;
+  const MONTH_JP = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+  document.getElementById('cal-period-label').textContent = `${_calYear}年`;
+
+  const sports = _calSportRows(yStart, yEnd);
+
+  const labelsEl = document.getElementById('cal-labels');
+  labelsEl.innerHTML = '<div class="cal-label-header"></div>' +
+    (sports.length
+      ? sports.map(s => `<div class="cal-label-row">${s}</div>`).join('')
+      : '<div class="cal-label-row cal-label-empty">—</div>');
+
+  const headerEl = document.getElementById('cal-header');
+  headerEl.style.width = totalW + 'px';
+  headerEl.innerHTML = MONTH_JP.map((name, i) => {
+    const isCur = today.getFullYear() === _calYear && today.getMonth() === i;
+    return `<div class="cal-month-header${isCur ? ' current-col' : ''}" style="left:${i*CAL_MW}px;width:${CAL_MW}px">
+      <div class="cal-col-label">${name}</div>
+    </div>`;
+  }).join('');
+
+  function mFrac(dateStr) {
+    const [y,m,d] = dateStr.split('-').map(Number);
+    return (y - _calYear) * 12 + (m - 1) + (d - 1) / new Date(y, m, 0).getDate();
+  }
+
+  const rowsEl = document.getElementById('cal-rows');
+  rowsEl.innerHTML = '';
+  rowsEl.style.width = totalW + 'px';
+
+  if (!sports.length) {
+    rowsEl.innerHTML = `<div class="cal-empty-msg">この年に大会はありません</div>`;
+    return;
+  }
+
+  const todayMF = today.getFullYear() === _calYear
+    ? mFrac(calDateStr(today)) : -1;
+
+  sports.forEach(sport => {
+    const evs = _calEvents.filter(ev => ev.sport === sport);
+    const row = document.createElement('div');
+    row.className = 'cal-row'; row.style.width = totalW + 'px';
+
+    for (let i = 0; i < MONTHS; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      cell.style.cssText = `left:${i*CAL_MW}px;width:${CAL_MW}px`;
+      row.appendChild(cell);
+    }
+
+    if (todayMF >= 0 && todayMF < MONTHS) {
+      const m = document.createElement('div');
+      m.className = 'cal-today-line';
+      m.style.left = `${todayMF * CAL_MW}px`;
+      row.appendChild(m);
+    }
+
+    evs.forEach(ev => {
+      (ev.periods || []).forEach(p => {
+        const sf = mFrac(p.start);
+        const ef = mFrac(p.end) + 1 / new Date(...p.end.split('-').map((v,i)=>i===1?v:Number(v)), 0).getDate();
+        if (ef <= 0 || sf >= MONTHS) return;
+        const cs = Math.max(0, sf), ce = Math.min(MONTHS, ef);
+        _appendBar(row, ev, p, cs * CAL_MW, (ce - cs) * CAL_MW, sf < 0, ef > MONTHS);
+      });
+    });
+
+    rowsEl.appendChild(row);
+  });
+}
+
+function _appendBar(row, ev, p, left, width, truncL, truncR) {
+  if (width < 2) return;
+  const bar = document.createElement('div');
+  bar.className = 'cal-bar';
+  bar.style.cssText = `left:${left + 1}px;width:${width - 2}px;background:${ev.color}`;
+  bar.title = `${ev.name}  ${p.start} 〜 ${p.end}`;
+  const span = document.createElement('span');
+  span.className   = 'cal-bar-text';
+  span.textContent = `${truncL ? '◀ ' : ''}${ev.name}${truncR ? ' ▶' : ''}`;
+  bar.appendChild(span);
+  bar.addEventListener('click', e => { e.stopPropagation(); openCalModal(ev); });
+  row.appendChild(bar);
+}
+
+// ---- CRUD モーダル ----
+function openCalModal(ev = null) {
+  _calEditId = ev ? ev.id : null;
+  const form = document.getElementById('cal-event-form');
+  document.getElementById('cal-modal-title').textContent = ev ? '大会を編集' : '大会を追加';
+  document.getElementById('cal-modal-delete').hidden = !ev;
+
+  // フォームリセット
+  form.elements.sport.value = ev ? ev.sport : 'Rugby';
+  form.elements.name.value  = ev ? ev.name  : '';
+  const color = ev ? ev.color : CAL_PRESET_COLORS[0];
+  form.elements.color.value = color;
+  _renderColorSwatches(color);
+  _renderPeriodsList(ev ? (ev.periods || []) : [{ start: calDateStr(new Date()), end: calDateStr(new Date()) }]);
+
+  document.getElementById('cal-modal-backdrop').hidden = false;
+  document.getElementById('cal-modal').hidden = false;
+}
+
+function closeCalModal() {
+  document.getElementById('cal-modal-backdrop').hidden = true;
+  document.getElementById('cal-modal').hidden = true;
+  _calEditId = null;
+}
+
+function _renderColorSwatches(selected) {
+  const c = document.getElementById('cal-color-swatches');
+  c.innerHTML = CAL_PRESET_COLORS.map(col =>
+    `<div class="cal-swatch${col === selected ? ' active' : ''}" style="background:${col}" data-color="${col}"></div>`
+  ).join('');
+  c.querySelectorAll('.cal-swatch').forEach(sw => {
+    sw.addEventListener('click', () => {
+      document.getElementById('cal-event-form').elements.color.value = sw.dataset.color;
+      c.querySelectorAll('.cal-swatch').forEach(s => s.classList.remove('active'));
+      sw.classList.add('active');
+    });
+  });
+}
+
+function _renderPeriodsList(periods) {
+  const container = document.getElementById('cal-periods-list');
+  container.innerHTML = '';
+  periods.forEach((p, i) => _addPeriodRow(container, p.start, p.end));
+}
+
+function _addPeriodRow(container, start = '', end = '') {
+  const row = document.createElement('div');
+  row.className = 'cal-period-row';
+  row.innerHTML = `
+    <input type="date" class="cal-period-start" value="${start}" required>
+    <span class="cal-period-sep">〜</span>
+    <input type="date" class="cal-period-end"   value="${end}"   required>
+    <button type="button" class="cal-period-del">✕</button>`;
+  row.querySelector('.cal-period-del').addEventListener('click', () => {
+    if (container.querySelectorAll('.cal-period-row').length > 1) row.remove();
+  });
+  container.appendChild(row);
+}
+
+function _getPeriodsFromForm() {
+  return [...document.querySelectorAll('.cal-period-row')].map(r => ({
+    start: r.querySelector('.cal-period-start').value,
+    end:   r.querySelector('.cal-period-end').value,
+  })).filter(p => p.start && p.end);
+}
+
+async function _saveCalEvent(e) {
+  e.preventDefault();
+  const form = document.getElementById('cal-event-form');
+  const payload = {
+    sport:        form.elements.sport.value,
+    name:         form.elements.name.value.trim(),
+    color:        form.elements.color.value,
+    periods_json: _getPeriodsFromForm(),
+  };
+  if (!payload.name || !payload.periods_json.length) return;
+
+  if (_calEditId) {
+    await db.from('sport_calendar_events').update(payload).eq('id', _calEditId);
+  } else {
+    await db.from('sport_calendar_events').insert([payload]);
+  }
+  await loadCalendarEvents();
+  renderCalendar();
+  closeCalModal();
+}
+
+async function _deleteCalEvent() {
+  if (!_calEditId) return;
+  if (!await showConfirm('この大会を削除しますか？')) return;
+  await db.from('sport_calendar_events').delete().eq('id', _calEditId);
+  await loadCalendarEvents();
+  renderCalendar();
+  closeCalModal();
+}
+
+function initCalendarTab() {
+  document.getElementById('cal-prev').addEventListener('click', () => {
+    if (_calView === 'week') _calWeekOff -= Math.floor(CAL_WEEKS / 2);
+    else _calYear--;
+    renderCalendar();
+  });
+  document.getElementById('cal-next').addEventListener('click', () => {
+    if (_calView === 'week') _calWeekOff += Math.floor(CAL_WEEKS / 2);
+    else _calYear++;
+    renderCalendar();
+  });
+  document.querySelectorAll('.cal-view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cal-view-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _calView = btn.dataset.view;
+      renderCalendar();
     });
   });
 
-  // 補正要素フィードバック更新
-  el.querySelectorAll('.factor-fb-sel').forEach(sel => {
-    sel.addEventListener('change', async () => {
-      const consultId = sel.dataset.consultId;
-      const factorIdx = parseInt(sel.dataset.factorIdx);
-      const row = _consultations.find(r => String(r.id) === consultId);
-      if (!row || !row.corrections_json) return;
-      const updated = JSON.parse(JSON.stringify(row.corrections_json));
-      updated.factors[factorIdx].feedback = sel.value || null;
-      const { error } = await db.from('bet_consultations')
-        .update({ corrections_json: updated }).eq('id', consultId);
-      if (error) { console.error('factor feedback error:', error); return; }
-      row.corrections_json = updated;
-    });
+  document.getElementById('cal-add-btn').addEventListener('click', () => openCalModal());
+  document.getElementById('cal-modal-cancel').addEventListener('click', closeCalModal);
+  document.getElementById('cal-modal-backdrop').addEventListener('click', closeCalModal);
+  document.getElementById('cal-modal-delete').addEventListener('click', _deleteCalEvent);
+  document.getElementById('cal-event-form').addEventListener('submit', _saveCalEvent);
+  document.getElementById('cal-add-period').addEventListener('click', () => {
+    _addPeriodRow(document.getElementById('cal-periods-list'), calDateStr(new Date()), calDateStr(new Date()));
   });
 }
 
@@ -3395,8 +3555,12 @@ function initTabs() {
       if (btn.dataset.tab === 'pnl') {
         renderPnlStatement();
       }
-      if (btn.dataset.tab === 'ai') {
-        renderAI();
+      if (btn.dataset.tab === 'calendar') {
+        if (!_calLoaded) {
+          loadCalendarEvents().then(() => { _calLoaded = true; renderCalendar(); });
+        } else {
+          renderCalendar();
+        }
       }
     });
   });
@@ -3426,6 +3590,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTabs();
   initSettings();
   initScheduleTab();
+  initCalendarTab();
 
   // 記録フォーム
   document.getElementById('btn-add').addEventListener('click', openAddForm);

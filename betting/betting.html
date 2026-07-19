@@ -46,9 +46,9 @@
         <span class="nav-icon">📒</span>
         <span class="nav-label">P/L</span>
       </button>
-      <button class="nav-btn" data-tab="ai">
-        <span class="nav-icon">🔬</span>
-        <span class="nav-label">Analysis</span>
+      <button class="nav-btn" data-tab="calendar">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">Calendar</span>
       </button>
     </nav>
 
@@ -377,16 +377,68 @@
       <div id="pnl-container"></div>
     </main>
 
-    <!-- ======== 分析タブ ======== -->
-    <main id="tab-ai" class="tab-content" hidden>
-      <div class="tab-header">
-        <h2>予想精度 分析</h2>
+    <!-- ======== カレンダータブ ======== -->
+    <main id="tab-calendar" class="tab-content" hidden>
+      <div class="cal-toolbar">
+        <div class="cal-view-toggle">
+          <button class="cal-view-btn active" data-view="week">週</button>
+          <button class="cal-view-btn" data-view="month">月</button>
+        </div>
+        <div class="cal-nav">
+          <button id="cal-prev">＜</button>
+          <span id="cal-period-label"></span>
+          <button id="cal-next">＞</button>
+        </div>
+        <button id="cal-add-btn" class="btn-primary cal-add-btn">＋</button>
       </div>
-      <div id="ai-container"></div>
+      <div class="cal-container">
+        <div class="cal-labels" id="cal-labels"></div>
+        <div class="cal-scroll" id="cal-scroll">
+          <div class="cal-header" id="cal-header"></div>
+          <div class="cal-rows" id="cal-rows"></div>
+        </div>
+      </div>
     </main>
 
   </div>
   <script src="betting.js"></script>
+
+  <!-- カレンダー編集モーダル -->
+  <div id="cal-modal-backdrop" class="cal-modal-backdrop" hidden></div>
+  <div id="cal-modal" class="cal-modal" hidden>
+    <h3 id="cal-modal-title">大会を追加</h3>
+    <form id="cal-event-form" novalidate>
+      <div class="cal-form-group">
+        <label>スポーツ</label>
+        <select name="sport">
+          <option value="Rugby">Rugby</option>
+          <option value="Volleyball">Volleyball</option>
+          <option value="Football">Football</option>
+          <option value="Tennis">Tennis</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="cal-form-group">
+        <label>大会名</label>
+        <input type="text" name="name" placeholder="例: Six Nations" required>
+      </div>
+      <div class="cal-form-group">
+        <label>カラー</label>
+        <div class="cal-color-swatches" id="cal-color-swatches"></div>
+        <input type="hidden" name="color" value="#9B59B6">
+      </div>
+      <div class="cal-form-group">
+        <label>期間</label>
+        <div id="cal-periods-list"></div>
+        <button type="button" id="cal-add-period" class="cal-add-period-btn">＋ 期間を追加</button>
+      </div>
+      <div class="cal-modal-btns">
+        <button type="button" id="cal-modal-cancel" class="cal-btn-cancel">キャンセル</button>
+        <button type="button" id="cal-modal-delete" class="cal-btn-delete" hidden>削除</button>
+        <button type="submit" class="cal-btn-save">保存</button>
+      </div>
+    </form>
+  </div>
 
   <!-- 試合ピッカーモーダル -->
   <div id="match-picker-backdrop" hidden></div>

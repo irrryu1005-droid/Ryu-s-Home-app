@@ -1557,3 +1557,349 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   font-weight: 600;
   vertical-align: middle;
 }
+
+/* ============================================================
+   スポーツカレンダー
+============================================================ */
+
+/* ツールバー */
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px 10px;
+}
+.cal-view-toggle {
+  display: flex;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.cal-view-btn {
+  padding: 5px 14px;
+  background: var(--white);
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.cal-view-btn + .cal-view-btn { border-left: 1.5px solid var(--border); }
+.cal-view-btn.active { background: var(--purple); color: var(--white); }
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+.cal-nav button {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.cal-nav button:hover { color: var(--text); border-color: var(--purple); }
+#cal-period-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  min-width: 130px;
+  text-align: center;
+}
+.cal-add-btn {
+  flex-shrink: 0;
+  padding: 6px 14px !important;
+  font-size: 15px !important;
+}
+
+/* コンテナ */
+.cal-container {
+  display: flex;
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin: 0 0 16px;
+}
+
+/* 左ラベル列 */
+.cal-labels {
+  flex-shrink: 0;
+  width: 100px;
+  border-right: 1.5px solid var(--border);
+  background: var(--white);
+  z-index: 2;
+}
+.cal-label-header {
+  height: 48px;
+  border-bottom: 1.5px solid var(--border);
+  background: var(--bg);
+}
+.cal-label-row {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.cal-label-empty { color: var(--muted); font-weight: 400; }
+
+/* スクロールエリア */
+.cal-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.cal-scroll::-webkit-scrollbar { height: 6px; }
+.cal-scroll::-webkit-scrollbar-track { background: var(--bg); }
+.cal-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ヘッダー行 */
+.cal-header {
+  height: 48px;
+  position: relative;
+  border-bottom: 1.5px solid var(--border);
+  background: var(--bg);
+}
+.cal-week-header,
+.cal-month-header {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--border);
+  gap: 1px;
+}
+.cal-week-header.current-col,
+.cal-month-header.current-col { background: rgba(155,89,182,0.08); }
+.cal-col-month { font-size: 9px; color: var(--purple); font-weight: 700; height: 12px; }
+.cal-col-label { font-size: 11px; font-weight: 700; color: var(--text); }
+.cal-week-header.current-col .cal-col-label,
+.cal-month-header.current-col .cal-col-label { color: var(--purple); }
+
+/* 行 */
+.cal-rows { position: relative; }
+.cal-row {
+  position: relative;
+  height: 40px;
+  border-bottom: 1px solid var(--border);
+}
+.cal-cell {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-right: 1px solid var(--border);
+}
+
+.cal-today-line {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--purple);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.cal-bar {
+  position: absolute;
+  top: 8px;
+  height: 24px;
+  border-radius: 5px;
+  color: #fff;
+  z-index: 2;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  transition: filter 0.12s;
+}
+.cal-bar:hover { filter: brightness(1.12); }
+.cal-bar-text {
+  padding: 0 7px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.cal-empty-msg {
+  padding: 28px 16px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ---- モーダル ---- */
+.cal-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 200;
+}
+.cal-modal {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  padding: 22px 22px 18px;
+  width: min(420px, 94vw);
+  z-index: 201;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+.cal-modal h3 {
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+.cal-form-group {
+  margin-bottom: 14px;
+}
+.cal-form-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cal-form-group select,
+.cal-form-group input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--white);
+  color: var(--text);
+}
+.cal-form-group select:focus,
+.cal-form-group input[type="text"]:focus {
+  outline: none;
+  border-color: var(--purple);
+}
+
+/* カラースウォッチ */
+.cal-color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cal-swatch {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2.5px solid transparent;
+  transition: transform 0.12s;
+}
+.cal-swatch:hover { transform: scale(1.15); }
+.cal-swatch.active { border-color: var(--text); transform: scale(1.15); }
+
+/* 期間リスト */
+.cal-period-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.cal-period-row input[type="date"] {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--white);
+}
+.cal-period-row input[type="date"]:focus { outline: none; border-color: var(--purple); }
+.cal-period-sep { color: var(--muted); font-size: 13px; flex-shrink: 0; }
+.cal-period-del {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 6px;
+  flex-shrink: 0;
+}
+.cal-period-del:hover { color: var(--loss); }
+.cal-add-period-btn {
+  background: none;
+  border: 1.5px dashed var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 2px;
+  transition: all 0.15s;
+}
+.cal-add-period-btn:hover { border-color: var(--purple); color: var(--purple); }
+
+/* モーダルボタン群 */
+.cal-modal-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+  justify-content: flex-end;
+}
+.cal-btn-cancel {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+.cal-btn-cancel:hover { color: var(--text); border-color: var(--text); }
+.cal-btn-delete {
+  background: #fde8e8;
+  border: 1.5px solid #fde8e8;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--loss);
+  cursor: pointer;
+  margin-right: auto;
+}
+.cal-btn-delete:hover { background: var(--loss); color: #fff; }
+.cal-btn-save {
+  background: var(--purple);
+  border: 1.5px solid var(--purple);
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+.cal-btn-save:hover { opacity: 0.88; }
