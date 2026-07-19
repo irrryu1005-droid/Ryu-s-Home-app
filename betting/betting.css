@@ -1646,7 +1646,7 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   background: var(--bg);
 }
 .cal-label-row {
-  height: 40px;
+  min-height: 32px;
   display: flex;
   align-items: center;
   padding: 0 10px;
@@ -1698,7 +1698,7 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
 .cal-rows { position: relative; }
 .cal-row {
   position: relative;
-  height: 40px;
+  min-height: 32px;
   border-bottom: 1px solid var(--border);
 }
 .cal-cell {
@@ -1721,7 +1721,7 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
 
 .cal-bar {
   position: absolute;
-  top: 8px;
+  top: 4px;
   height: 24px;
   border-radius: 5px;
   color: #fff;
@@ -1749,6 +1749,29 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   font-size: 13px;
   text-align: center;
 }
+
+/* ---- 日別ビュー ヘッダー ---- */
+.cal-day-col-header {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--border);
+  gap: 1px;
+}
+.cal-day-col-header.current-col { background: rgba(155,89,182,0.08); }
+.cal-day-col-header.current-col .cal-col-label { color: var(--purple); }
+.cal-hdr-sun .cal-col-label { color: #E74C3C; }
+.cal-hdr-sat .cal-col-label { color: #2980B9; }
+.cal-col-dow {
+  font-size: 8px;
+  margin-left: 2px;
+  opacity: 0.7;
+}
+.cal-cell-weekend { background: rgba(0,0,0,0.025); }
 
 /* ---- モーダル ---- */
 .cal-modal-backdrop {

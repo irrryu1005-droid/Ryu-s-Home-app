@@ -491,12 +491,16 @@ const CAL_PRESET_COLORS = [
   '#27AE60','#117A65','#2980B9','#5DADE2',
   '#8E44AD','#9B59B6','#641E16','#2C3E50',
 ];
+const CAL_ROW_H = 32; // レーン1本あたりの高さ(px)
+const CAL_DW    = 36; // 日別ビューの1日カラム幅(px)
+const CAL_DAYS  = 28; // 日別ビューで表示する日数
 
 let _calEvents  = [];
 let _calLoaded  = false;
-let _calView    = 'week';   // 'week' | 'month'
+let _calView    = 'week';   // 'week' | 'month' | 'day'
 let _calWeekOff = 0;        // 今週を0とした週オフセット
 let _calYear    = new Date().getFullYear();
+let _calDayOff  = 0;        // 今週を0とした日別ビューの週オフセット
 let _calEditId  = null;     // null=新規, number=編集中
 
 function calDateStr(d) {
@@ -520,9 +524,27 @@ async function loadCalendarEvents() {
   _calEvents = (data || []).map(r => ({ ...r, periods: r.periods_json || [] }));
 }
 
+// 大会ごとに固定レーンを割り当てる（大会が違えば必ず別レーン）
+function _assignLanes(sportEvents) {
+  const items = [];
+  sportEvents.forEach((ev, lane) => {
+    (ev.periods || []).forEach(p => items.push({ p, ev, lane }));
+  });
+  return { items, numLanes: Math.max(1, sportEvents.length) };
+}
+
+// 指定期間に表示対象となる大会を返す
+function _visibleEventsForSport(sport, startStr, endStr) {
+  return _calEvents.filter(ev =>
+    ev.sport === sport &&
+    (ev.periods || []).some(p => p.start <= endStr && p.end >= startStr)
+  );
+}
+
 function renderCalendar() {
-  if (_calView === 'week') _renderCalWeek();
-  else                     _renderCalMonth();
+  if (_calView === 'week')  _renderCalWeek();
+  else if (_calView === 'day') _renderCalDay();
+  else                      _renderCalMonth();
 }
 
 function _calSportRows(startStr, endStr) {
@@ -548,12 +570,17 @@ function _renderCalWeek() {
     `${vs.getFullYear()}年 ${vs.getMonth()+1}/${vs.getDate()} 〜 ${ve.getMonth()+1}/${ve.getDate()}`;
 
   const sports = _calSportRows(vstStr, vedStr);
+  const sportLanes = sports.map(sport => ({
+    sport,
+    ..._assignLanes(_visibleEventsForSport(sport, vstStr, vedStr)),
+  }));
 
   // ラベル
   const labelsEl = document.getElementById('cal-labels');
   labelsEl.innerHTML = '<div class="cal-label-header"></div>' +
-    (sports.length
-      ? sports.map(s => `<div class="cal-label-row">${s}</div>`).join('')
+    (sportLanes.length
+      ? sportLanes.map(({ sport, numLanes }) =>
+          `<div class="cal-label-row" style="height:${numLanes * CAL_ROW_H}px">${sport}</div>`).join('')
       : '<div class="cal-label-row cal-label-empty">—</div>');
 
   // ヘッダー（週）
@@ -578,17 +605,17 @@ function _renderCalWeek() {
   rowsEl.innerHTML = '';
   rowsEl.style.width = totalW + 'px';
 
-  if (!sports.length) {
+  if (!sportLanes.length) {
     rowsEl.innerHTML = `<div class="cal-empty-msg">この期間に大会はありません</div>`;
     return;
   }
 
   const todayFrac = (today - viewStart) / (7 * DAY_MS);
 
-  sports.forEach(sport => {
-    const evs = _calEvents.filter(ev => ev.sport === sport);
+  sportLanes.forEach(({ items, numLanes }) => {
     const row = document.createElement('div');
-    row.className = 'cal-row'; row.style.width = totalW + 'px';
+    row.className = 'cal-row';
+    row.style.cssText = `width:${totalW}px;height:${numLanes * CAL_ROW_H}px`;
 
     // 背景セル
     for (let i = 0; i < CAL_WEEKS; i++) {
@@ -606,16 +633,14 @@ function _renderCalWeek() {
       row.appendChild(m);
     }
 
-    // バー（period ごと）
-    evs.forEach(ev => {
-      (ev.periods || []).forEach(p => {
-        const sd = calParseDate(p.start), ed = calParseDate(p.end);
-        const sf = (sd - viewStart) / (7 * DAY_MS);
-        const ef = (ed.getTime() + DAY_MS - viewStart) / (7 * DAY_MS);
-        if (ef <= 0 || sf >= CAL_WEEKS) return;
-        const cs = Math.max(0, sf), ce = Math.min(CAL_WEEKS, ef);
-        _appendBar(row, ev, p, cs * CAL_WW, (ce - cs) * CAL_WW, sf < 0, ef > CAL_WEEKS);
-      });
+    // バー（レーン考慮）
+    items.forEach(({ p, ev, lane }) => {
+      const sd = calParseDate(p.start), ed = calParseDate(p.end);
+      const sf = (sd - viewStart) / (7 * DAY_MS);
+      const ef = (ed.getTime() + DAY_MS - viewStart) / (7 * DAY_MS);
+      if (ef <= 0 || sf >= CAL_WEEKS) return;
+      const cs = Math.max(0, sf), ce = Math.min(CAL_WEEKS, ef);
+      _appendBar(row, ev, p, cs * CAL_WW, (ce - cs) * CAL_WW, sf < 0, ef > CAL_WEEKS, lane);
     });
 
     rowsEl.appendChild(row);
@@ -640,11 +665,16 @@ function _renderCalMonth() {
   document.getElementById('cal-period-label').textContent = `${_calYear}年`;
 
   const sports = _calSportRows(yStart, yEnd);
+  const sportLanes = sports.map(sport => ({
+    sport,
+    ..._assignLanes(_visibleEventsForSport(sport, yStart, yEnd)),
+  }));
 
   const labelsEl = document.getElementById('cal-labels');
   labelsEl.innerHTML = '<div class="cal-label-header"></div>' +
-    (sports.length
-      ? sports.map(s => `<div class="cal-label-row">${s}</div>`).join('')
+    (sportLanes.length
+      ? sportLanes.map(({ sport, numLanes }) =>
+          `<div class="cal-label-row" style="height:${numLanes * CAL_ROW_H}px">${sport}</div>`).join('')
       : '<div class="cal-label-row cal-label-empty">—</div>');
 
   const headerEl = document.getElementById('cal-header');
@@ -665,7 +695,7 @@ function _renderCalMonth() {
   rowsEl.innerHTML = '';
   rowsEl.style.width = totalW + 'px';
 
-  if (!sports.length) {
+  if (!sportLanes.length) {
     rowsEl.innerHTML = `<div class="cal-empty-msg">この年に大会はありません</div>`;
     return;
   }
@@ -673,10 +703,10 @@ function _renderCalMonth() {
   const todayMF = today.getFullYear() === _calYear
     ? mFrac(calDateStr(today)) : -1;
 
-  sports.forEach(sport => {
-    const evs = _calEvents.filter(ev => ev.sport === sport);
+  sportLanes.forEach(({ items, numLanes }) => {
     const row = document.createElement('div');
-    row.className = 'cal-row'; row.style.width = totalW + 'px';
+    row.className = 'cal-row';
+    row.style.cssText = `width:${totalW}px;height:${numLanes * CAL_ROW_H}px`;
 
     for (let i = 0; i < MONTHS; i++) {
       const cell = document.createElement('div');
@@ -692,25 +722,131 @@ function _renderCalMonth() {
       row.appendChild(m);
     }
 
-    evs.forEach(ev => {
-      (ev.periods || []).forEach(p => {
-        const sf = mFrac(p.start);
-        const ef = mFrac(p.end) + 1 / new Date(...p.end.split('-').map((v,i)=>i===1?v:Number(v)), 0).getDate();
-        if (ef <= 0 || sf >= MONTHS) return;
-        const cs = Math.max(0, sf), ce = Math.min(MONTHS, ef);
-        _appendBar(row, ev, p, cs * CAL_MW, (ce - cs) * CAL_MW, sf < 0, ef > MONTHS);
-      });
+    items.forEach(({ p, ev, lane }) => {
+      const sf = mFrac(p.start);
+      const ef = mFrac(p.end) + 1 / new Date(...p.end.split('-').map((v,i)=>i===1?v:Number(v)), 0).getDate();
+      if (ef <= 0 || sf >= MONTHS) return;
+      const cs = Math.max(0, sf), ce = Math.min(MONTHS, ef);
+      _appendBar(row, ev, p, cs * CAL_MW, (ce - cs) * CAL_MW, sf < 0, ef > MONTHS, lane);
     });
 
     rowsEl.appendChild(row);
   });
 }
 
-function _appendBar(row, ev, p, left, width, truncL, truncR) {
+// ---- 日別ビュー（ガントチャート形式） ----
+function _renderCalDay() {
+  const today      = new Date(); today.setHours(0,0,0,0);
+  const todayStr   = calDateStr(today);
+  const viewStart  = new Date(getMondayOf(today).getTime() + _calDayOff * 7 * DAY_MS);
+  const viewEnd    = new Date(viewStart.getTime() + CAL_DAYS * DAY_MS - 1);
+  const vstStr     = calDateStr(viewStart);
+  const vedStr     = calDateStr(viewEnd);
+  const totalW     = CAL_DAYS * CAL_DW;
+
+  const vs = viewStart, ve = viewEnd;
+  document.getElementById('cal-period-label').textContent =
+    `${vs.getFullYear()}年 ${vs.getMonth()+1}/${vs.getDate()} 〜 ${ve.getMonth()+1}/${ve.getDate()}`;
+
+  const sports = _calSportRows(vstStr, vedStr);
+  const sportLanes = sports.map(sport => ({
+    sport,
+    ..._assignLanes(_visibleEventsForSport(sport, vstStr, vedStr)),
+  }));
+
+  // ラベル
+  const labelsEl = document.getElementById('cal-labels');
+  labelsEl.innerHTML = '<div class="cal-label-header"></div>' +
+    (sportLanes.length
+      ? sportLanes.map(({ sport, numLanes }) =>
+          `<div class="cal-label-row" style="height:${numLanes * CAL_ROW_H}px">${sport}</div>`).join('')
+      : '<div class="cal-label-row cal-label-empty">—</div>');
+
+  // ヘッダー（日）
+  const headerEl = document.getElementById('cal-header');
+  headerEl.style.width = totalW + 'px';
+  const MONTH_JP = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const DAYS_JP  = ['日','月','火','水','木','金','土'];
+  let lastMonth = -1;
+  headerEl.innerHTML = Array.from({length: CAL_DAYS}, (_, i) => {
+    const d = new Date(viewStart.getTime() + i * DAY_MS);
+    const dStr = calDateStr(d);
+    const isToday = dStr === todayStr;
+    const showMonth = d.getMonth() !== lastMonth;
+    if (showMonth) lastMonth = d.getMonth();
+    const dow = d.getDay();
+    const cls = ['cal-day-col-header',
+      isToday ? 'current-col' : '',
+      dow === 0 ? 'cal-hdr-sun' : dow === 6 ? 'cal-hdr-sat' : ''
+    ].filter(Boolean).join(' ');
+    return `<div class="${cls}" style="left:${i*CAL_DW}px;width:${CAL_DW}px">
+      ${showMonth ? `<div class="cal-col-month">${MONTH_JP[d.getMonth()]}</div>` : '<div class="cal-col-month"></div>'}
+      <div class="cal-col-label">${d.getDate()}<span class="cal-col-dow">${DAYS_JP[dow]}</span></div>
+    </div>`;
+  }).join('');
+
+  // 行
+  const rowsEl = document.getElementById('cal-rows');
+  rowsEl.innerHTML = '';
+  rowsEl.style.width = totalW + 'px';
+
+  if (!sportLanes.length) {
+    rowsEl.innerHTML = `<div class="cal-empty-msg">この期間に大会はありません</div>`;
+    return;
+  }
+
+  const todayFrac = (today - viewStart) / DAY_MS;
+
+  sportLanes.forEach(({ items, numLanes }) => {
+    const row = document.createElement('div');
+    row.className = 'cal-row';
+    row.style.cssText = `width:${totalW}px;height:${numLanes * CAL_ROW_H}px`;
+
+    // 背景セル（日ごと・週末は薄くハイライト）
+    for (let i = 0; i < CAL_DAYS; i++) {
+      const d = new Date(viewStart.getTime() + i * DAY_MS);
+      const dow = d.getDay();
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell' + (dow === 0 || dow === 6 ? ' cal-cell-weekend' : '');
+      cell.style.cssText = `left:${i*CAL_DW}px;width:${CAL_DW}px`;
+      row.appendChild(cell);
+    }
+
+    // 今日ライン
+    if (todayFrac >= 0 && todayFrac < CAL_DAYS) {
+      const m = document.createElement('div');
+      m.className = 'cal-today-line';
+      m.style.left = `${todayFrac * CAL_DW}px`;
+      row.appendChild(m);
+    }
+
+    // バー
+    items.forEach(({ p, ev, lane }) => {
+      const sd = calParseDate(p.start);
+      const ed = calParseDate(p.end);
+      const sf = (sd - viewStart) / DAY_MS;
+      const ef = (ed.getTime() + DAY_MS - viewStart) / DAY_MS;
+      if (ef <= 0 || sf >= CAL_DAYS) return;
+      const cs = Math.max(0, sf), ce = Math.min(CAL_DAYS, ef);
+      _appendBar(row, ev, p, cs * CAL_DW, (ce - cs) * CAL_DW, sf < 0, ef > CAL_DAYS, lane);
+    });
+
+    rowsEl.appendChild(row);
+  });
+
+  // 今日が見えるようにスクロール
+  if (todayFrac >= 0 && todayFrac < CAL_DAYS) {
+    const sc = document.getElementById('cal-scroll');
+    sc.scrollLeft = Math.max(0, todayFrac * CAL_DW - sc.clientWidth / 2);
+  }
+}
+
+function _appendBar(row, ev, p, left, width, truncL, truncR, lane = 0) {
   if (width < 2) return;
   const bar = document.createElement('div');
   bar.className = 'cal-bar';
-  bar.style.cssText = `left:${left + 1}px;width:${width - 2}px;background:${ev.color}`;
+  const topPx = lane * CAL_ROW_H + 4;
+  bar.style.cssText = `left:${left + 1}px;width:${width - 2}px;background:${ev.color};top:${topPx}px`;
   bar.title = `${ev.name}  ${p.start} 〜 ${p.end}`;
   const span = document.createElement('span');
   span.className   = 'cal-bar-text';
@@ -818,13 +954,15 @@ async function _deleteCalEvent() {
 
 function initCalendarTab() {
   document.getElementById('cal-prev').addEventListener('click', () => {
-    if (_calView === 'week') _calWeekOff -= Math.floor(CAL_WEEKS / 2);
-    else _calYear--;
+    if      (_calView === 'week') _calWeekOff -= Math.floor(CAL_WEEKS / 2);
+    else if (_calView === 'day')  _calDayOff  -= 2;
+    else                          _calYear--;
     renderCalendar();
   });
   document.getElementById('cal-next').addEventListener('click', () => {
-    if (_calView === 'week') _calWeekOff += Math.floor(CAL_WEEKS / 2);
-    else _calYear++;
+    if      (_calView === 'week') _calWeekOff += Math.floor(CAL_WEEKS / 2);
+    else if (_calView === 'day')  _calDayOff  += 2;
+    else                          _calYear++;
     renderCalendar();
   });
   document.querySelectorAll('.cal-view-btn').forEach(btn => {
