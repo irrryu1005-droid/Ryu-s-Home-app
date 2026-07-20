@@ -687,7 +687,6 @@ function _renderCalWeek() {
       const txt = document.createElement('span');
       txt.className = 'cal-bar-label-text';
       txt.textContent = ev.name;
-      txt.style.background = ev.color;
       lbl.appendChild(txt);
       row.appendChild(lbl);
     });
@@ -821,7 +820,6 @@ function _renderCalMonth() {
       const txt = document.createElement('span');
       txt.className = 'cal-bar-label-text';
       txt.textContent = ev.name;
-      txt.style.background = ev.color;
       lbl.appendChild(txt);
       row.appendChild(lbl);
     });
@@ -971,7 +969,6 @@ function _renderCalDay() {
       const txt = document.createElement('span');
       txt.className = 'cal-bar-label-text';
       txt.textContent = ev.name;
-      txt.style.background = ev.color;
       lbl.appendChild(txt);
       row.appendChild(lbl);
     });
