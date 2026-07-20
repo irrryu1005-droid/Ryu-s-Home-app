@@ -1734,6 +1734,40 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   transition: filter 0.12s;
 }
 .cal-bar:hover { filter: brightness(1.12); }
+.cal-bar-label {
+  position: absolute;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 3;
+  overflow: hidden;
+}
+.cal-bar-label-text {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.cal-bar-connector {
+  position: absolute;
+  height: 24px;
+  border-top: 2px dashed;
+  border-bottom: 2px dashed;
+  border-left: none;
+  border-right: none;
+  background: transparent;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.75;
+}
 .cal-bar-text {
   padding: 0 7px;
   font-size: 10px;

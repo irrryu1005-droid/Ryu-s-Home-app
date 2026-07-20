@@ -634,13 +634,62 @@ function _renderCalWeek() {
     }
 
     // バー（レーン考慮）
-    items.forEach(({ p, ev, lane }) => {
+    const connFlagsW = items.map(() => ({ l: false, r: false }));
+    for (let i = 0; i < items.length - 1; i++) {
+      const { p: pA, ev: evA } = items[i], { p: pB, ev: evB } = items[i + 1];
+      if (evA !== evB) continue;
+      if (calParseDate(pB.start).getTime() > calParseDate(pA.end).getTime() + DAY_MS) {
+        connFlagsW[i].r = true; connFlagsW[i + 1].l = true;
+      }
+    }
+    items.forEach(({ p, ev, lane }, idx) => {
       const sd = calParseDate(p.start), ed = calParseDate(p.end);
       const sf = (sd - viewStart) / (7 * DAY_MS);
       const ef = (ed.getTime() + DAY_MS - viewStart) / (7 * DAY_MS);
       if (ef <= 0 || sf >= CAL_WEEKS) return;
       const cs = Math.max(0, sf), ce = Math.min(CAL_WEEKS, ef);
-      _appendBar(row, ev, p, cs * CAL_WW, (ce - cs) * CAL_WW, sf < 0, ef > CAL_WEEKS, lane);
+      const { l: connL, r: connR } = connFlagsW[idx];
+      _appendBar(row, ev, p, cs * CAL_WW, (ce - cs) * CAL_WW, sf < 0, ef > CAL_WEEKS, lane, connL, connR);
+    });
+
+    // 同一大会の期間ギャップを点線でつなぐ（週ビュー）
+    for (let i = 0; i < items.length - 1; i++) {
+      const { p: pA, ev: evA, lane: laneA } = items[i];
+      const { p: pB, ev: evB } = items[i + 1];
+      if (evA !== evB) continue;
+      const aEnd = calParseDate(pA.end);
+      const bStart = calParseDate(pB.start);
+      const gSF = (aEnd.getTime() + DAY_MS - viewStart) / (7 * DAY_MS);
+      const gEF = (bStart - viewStart) / (7 * DAY_MS);
+      if (gEF <= gSF || gEF <= 0 || gSF >= CAL_WEEKS) continue;
+      const cl = Math.max(0, gSF) * CAL_WW;
+      const cr = Math.min(CAL_WEEKS, gEF) * CAL_WW;
+      if (cr > cl) _appendConnector(row, evA, cl, cr - cl, laneA);
+    }
+
+    // 複数期間イベントに全体中央テキストを1つ追加（週ビュー）
+    const multiEvsW = new Map();
+    items.forEach(({ p, ev, lane }) => {
+      if ((ev.periods || []).length <= 1) return;
+      const sd = calParseDate(p.start), ed = calParseDate(p.end);
+      const sf = (sd - viewStart) / (7 * DAY_MS);
+      const ef = (ed.getTime() + DAY_MS - viewStart) / (7 * DAY_MS);
+      if (ef <= 0 || sf >= CAL_WEEKS) return;
+      const cl = Math.max(0, sf) * CAL_WW, cr = Math.min(CAL_WEEKS, ef) * CAL_WW;
+      const cur = multiEvsW.get(ev);
+      if (!cur) multiEvsW.set(ev, { cl, cr, lane });
+      else { cur.cl = Math.min(cur.cl, cl); cur.cr = Math.max(cur.cr, cr); }
+    });
+    multiEvsW.forEach(({ cl, cr, lane }, ev) => {
+      const lbl = document.createElement('div');
+      lbl.className = 'cal-bar-label';
+      lbl.style.cssText = `left:${cl}px;width:${cr - cl}px;top:${lane * CAL_ROW_H + 4}px`;
+      const txt = document.createElement('span');
+      txt.className = 'cal-bar-label-text';
+      txt.textContent = ev.name;
+      txt.style.background = ev.color;
+      lbl.appendChild(txt);
+      row.appendChild(lbl);
     });
 
     rowsEl.appendChild(row);
@@ -722,12 +771,59 @@ function _renderCalMonth() {
       row.appendChild(m);
     }
 
-    items.forEach(({ p, ev, lane }) => {
+    const connFlagsM = items.map(() => ({ l: false, r: false }));
+    for (let i = 0; i < items.length - 1; i++) {
+      const { p: pA, ev: evA } = items[i], { p: pB, ev: evB } = items[i + 1];
+      if (evA !== evB) continue;
+      if (calParseDate(pB.start).getTime() > calParseDate(pA.end).getTime() + DAY_MS) {
+        connFlagsM[i].r = true; connFlagsM[i + 1].l = true;
+      }
+    }
+    items.forEach(({ p, ev, lane }, idx) => {
       const sf = mFrac(p.start);
       const ef = mFrac(p.end) + 1 / new Date(...p.end.split('-').map((v,i)=>i===1?v:Number(v)), 0).getDate();
       if (ef <= 0 || sf >= MONTHS) return;
       const cs = Math.max(0, sf), ce = Math.min(MONTHS, ef);
-      _appendBar(row, ev, p, cs * CAL_MW, (ce - cs) * CAL_MW, sf < 0, ef > MONTHS, lane);
+      const { l: connL, r: connR } = connFlagsM[idx];
+      _appendBar(row, ev, p, cs * CAL_MW, (ce - cs) * CAL_MW, sf < 0, ef > MONTHS, lane, connL, connR);
+    });
+
+    // 同一大会の期間ギャップを点線でつなぐ（月ビュー）
+    for (let i = 0; i < items.length - 1; i++) {
+      const { p: pA, ev: evA, lane: laneA } = items[i];
+      const { p: pB, ev: evB } = items[i + 1];
+      if (evA !== evB) continue;
+      const [yA, mA] = pA.end.split('-').map(Number);
+      const gSF = mFrac(pA.end) + 1 / new Date(yA, mA, 0).getDate();
+      const gEF = mFrac(pB.start);
+      if (gEF <= gSF || gEF <= 0 || gSF >= MONTHS) continue;
+      const cl = Math.max(0, gSF) * CAL_MW;
+      const cr = Math.min(MONTHS, gEF) * CAL_MW;
+      if (cr > cl) _appendConnector(row, evA, cl, cr - cl, laneA);
+    }
+
+    // 複数期間イベントに全体中央テキストを1つ追加（月ビュー）
+    const multiEvsM = new Map();
+    items.forEach(({ p, ev, lane }) => {
+      if ((ev.periods || []).length <= 1) return;
+      const sf = mFrac(p.start);
+      const ef = mFrac(p.end) + 1 / new Date(...p.end.split('-').map((v,i)=>i===1?v:Number(v)), 0).getDate();
+      if (ef <= 0 || sf >= MONTHS) return;
+      const cl = Math.max(0, sf) * CAL_MW, cr = Math.min(MONTHS, ef) * CAL_MW;
+      const cur = multiEvsM.get(ev);
+      if (!cur) multiEvsM.set(ev, { cl, cr, lane });
+      else { cur.cl = Math.min(cur.cl, cl); cur.cr = Math.max(cur.cr, cr); }
+    });
+    multiEvsM.forEach(({ cl, cr, lane }, ev) => {
+      const lbl = document.createElement('div');
+      lbl.className = 'cal-bar-label';
+      lbl.style.cssText = `left:${cl}px;width:${cr - cl}px;top:${lane * CAL_ROW_H + 4}px`;
+      const txt = document.createElement('span');
+      txt.className = 'cal-bar-label-text';
+      txt.textContent = ev.name;
+      txt.style.background = ev.color;
+      lbl.appendChild(txt);
+      row.appendChild(lbl);
     });
 
     rowsEl.appendChild(row);
@@ -821,14 +917,63 @@ function _renderCalDay() {
     }
 
     // バー
-    items.forEach(({ p, ev, lane }) => {
+    const connFlagsD = items.map(() => ({ l: false, r: false }));
+    for (let i = 0; i < items.length - 1; i++) {
+      const { p: pA, ev: evA } = items[i], { p: pB, ev: evB } = items[i + 1];
+      if (evA !== evB) continue;
+      if (calParseDate(pB.start).getTime() > calParseDate(pA.end).getTime() + DAY_MS) {
+        connFlagsD[i].r = true; connFlagsD[i + 1].l = true;
+      }
+    }
+    items.forEach(({ p, ev, lane }, idx) => {
       const sd = calParseDate(p.start);
       const ed = calParseDate(p.end);
       const sf = (sd - viewStart) / DAY_MS;
       const ef = (ed.getTime() + DAY_MS - viewStart) / DAY_MS;
       if (ef <= 0 || sf >= CAL_DAYS) return;
       const cs = Math.max(0, sf), ce = Math.min(CAL_DAYS, ef);
-      _appendBar(row, ev, p, cs * CAL_DW, (ce - cs) * CAL_DW, sf < 0, ef > CAL_DAYS, lane);
+      const { l: connL, r: connR } = connFlagsD[idx];
+      _appendBar(row, ev, p, cs * CAL_DW, (ce - cs) * CAL_DW, sf < 0, ef > CAL_DAYS, lane, connL, connR);
+    });
+
+    // 同一大会の期間ギャップを点線でつなぐ（日ビュー）
+    for (let i = 0; i < items.length - 1; i++) {
+      const { p: pA, ev: evA, lane: laneA } = items[i];
+      const { p: pB, ev: evB } = items[i + 1];
+      if (evA !== evB) continue;
+      const aEnd = calParseDate(pA.end);
+      const bStart = calParseDate(pB.start);
+      const gSF = (aEnd.getTime() + DAY_MS - viewStart) / DAY_MS;
+      const gEF = (bStart - viewStart) / DAY_MS;
+      if (gEF <= gSF || gEF <= 0 || gSF >= CAL_DAYS) continue;
+      const cl = Math.max(0, gSF) * CAL_DW;
+      const cr = Math.min(CAL_DAYS, gEF) * CAL_DW;
+      if (cr > cl) _appendConnector(row, evA, cl, cr - cl, laneA);
+    }
+
+    // 複数期間イベントに全体中央テキストを1つ追加（日ビュー）
+    const multiEvsD = new Map();
+    items.forEach(({ p, ev, lane }) => {
+      if ((ev.periods || []).length <= 1) return;
+      const sd = calParseDate(p.start), ed = calParseDate(p.end);
+      const sf = (sd - viewStart) / DAY_MS;
+      const ef = (ed.getTime() + DAY_MS - viewStart) / DAY_MS;
+      if (ef <= 0 || sf >= CAL_DAYS) return;
+      const cl = Math.max(0, sf) * CAL_DW, cr = Math.min(CAL_DAYS, ef) * CAL_DW;
+      const cur = multiEvsD.get(ev);
+      if (!cur) multiEvsD.set(ev, { cl, cr, lane });
+      else { cur.cl = Math.min(cur.cl, cl); cur.cr = Math.max(cur.cr, cr); }
+    });
+    multiEvsD.forEach(({ cl, cr, lane }, ev) => {
+      const lbl = document.createElement('div');
+      lbl.className = 'cal-bar-label';
+      lbl.style.cssText = `left:${cl}px;width:${cr - cl}px;top:${lane * CAL_ROW_H + 4}px`;
+      const txt = document.createElement('span');
+      txt.className = 'cal-bar-label-text';
+      txt.textContent = ev.name;
+      txt.style.background = ev.color;
+      lbl.appendChild(txt);
+      row.appendChild(lbl);
     });
 
     rowsEl.appendChild(row);
@@ -841,19 +986,33 @@ function _renderCalDay() {
   }
 }
 
-function _appendBar(row, ev, p, left, width, truncL, truncR, lane = 0) {
+function _appendBar(row, ev, p, left, width, truncL, truncR, lane = 0, connL = false, connR = false) {
   if (width < 2) return;
   const bar = document.createElement('div');
   bar.className = 'cal-bar';
   const topPx = lane * CAL_ROW_H + 4;
-  bar.style.cssText = `left:${left + 1}px;width:${width - 2}px;background:${ev.color};top:${topPx}px`;
+  const lOff = connL ? 0 : 1;
+  const rOff = connR ? 0 : 1;
+  const tl = connL ? '0' : '5px', tr = connR ? '0' : '5px';
+  bar.style.cssText = `left:${left + lOff}px;width:${width - lOff - rOff}px;background:${ev.color};top:${topPx}px;border-radius:${tl} ${tr} ${tr} ${tl}`;
   bar.title = `${ev.name}  ${p.start} 〜 ${p.end}`;
-  const span = document.createElement('span');
-  span.className   = 'cal-bar-text';
-  span.textContent = `${truncL ? '◀ ' : ''}${ev.name}${truncR ? ' ▶' : ''}`;
-  bar.appendChild(span);
+  if ((ev.periods || []).length <= 1) {
+    const span = document.createElement('span');
+    span.className   = 'cal-bar-text';
+    span.textContent = `${truncL ? '◀ ' : ''}${ev.name}${truncR ? ' ▶' : ''}`;
+    bar.appendChild(span);
+  }
   bar.addEventListener('click', e => { e.stopPropagation(); openCalModal(ev); });
   row.appendChild(bar);
+}
+
+function _appendConnector(row, ev, left, width, lane) {
+  if (width < 1) return;
+  const conn = document.createElement('div');
+  conn.className = 'cal-bar-connector';
+  const topPx = lane * CAL_ROW_H + 4;
+  conn.style.cssText = `left:${left}px;width:${width}px;top:${topPx}px;border-color:${ev.color}`;
+  row.appendChild(conn);
 }
 
 // ---- CRUD モーダル ----
