@@ -1689,6 +1689,12 @@ function updateLeagueSelect(sport, selected = '') {
 function setFormType(type) {
   document.getElementById('single-fields').hidden = type === 'parlay';
   document.getElementById('parlay-fields').hidden = type === 'single';
+  if (type === 'parlay') {
+    const container = document.getElementById('legs-container');
+    if (container.querySelectorAll('.leg-item').length === 0) {
+      addLeg(); addLeg();
+    }
+  }
 }
 
 function getLegsFromForm() {
@@ -1854,9 +1860,9 @@ function openEditForm(id) {
 
   if (bet.type === 'parlay') {
     form.querySelector('input[name="type"][value="parlay"]').checked = true;
-    setFormType('parlay');
     document.getElementById('legs-container').innerHTML = '';
     (bet.legs || []).forEach(leg => addLeg(leg));
+    setFormType('parlay');
     document.getElementById('input-combo-boost').value = bet.comboBoost ?? 0;
     updateCombinedOdds();
   } else {
