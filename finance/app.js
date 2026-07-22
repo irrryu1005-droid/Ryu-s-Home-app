@@ -70,7 +70,8 @@ let currentType = 'expense';
 let dashMonth   = new Date();
 let listMonth   = new Date();
 let chart       = null;
-let _listSort   = { key: 'date', asc: false };
+let _listSort           = { key: 'date', asc: false };
+let _listCategoryFilter = '';
 let _editType   = 'expense';
 let _editingId  = null;
 let _finPnlYear  = new Date().getFullYear();
@@ -419,6 +420,17 @@ async function renderList() {
     .gte('date', start)
     .lte('date', end);
 
+  // 支払い科目フィルターの選択肢を更新
+  const payments = [...new Set((txns || []).map(t => t.payment_method).filter(Boolean))].sort();
+  const catSel = document.getElementById('list-category-filter');
+  catSel.innerHTML = '<option value="">すべて</option>' + payments.map(p => `<option value="${escapeHtmlF(p)}">${escapeHtmlF(p)}</option>`).join('');
+  if (!payments.includes(_listCategoryFilter)) _listCategoryFilter = '';
+  catSel.value = _listCategoryFilter;
+
+  const filtered = _listCategoryFilter
+    ? (txns || []).filter(t => t.payment_method === _listCategoryFilter)
+    : (txns || []);
+
   const container = document.getElementById('transaction-list');
 
   const sortFn = (a, b) => {
@@ -429,8 +441,8 @@ async function renderList() {
     return 0;
   };
 
-  const income  = (txns || []).filter(t => t.type === 'income').sort(sortFn);
-  const expense = (txns || []).filter(t => t.type === 'expense').sort(sortFn);
+  const income  = filtered.filter(t => t.type === 'income').sort(sortFn);
+  const expense = filtered.filter(t => t.type === 'expense').sort(sortFn);
 
   const buildItems = list => list.length === 0
     ? '<div class="txn-empty">なし</div>'
@@ -513,6 +525,11 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
     _listSort = { key: btn.dataset.key, asc: btn.dataset.asc === 'true' };
     renderList();
   });
+});
+
+document.getElementById('list-category-filter').addEventListener('change', e => {
+  _listCategoryFilter = e.target.value;
+  renderList();
 });
 
 // ============================================================

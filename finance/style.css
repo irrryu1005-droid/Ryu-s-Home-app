@@ -1070,6 +1070,21 @@ h3.section-title {
   color: var(--white);
   border-color: var(--expense);
 }
+.list-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.list-category-select {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  background: var(--white);
+  color: var(--text);
+  cursor: pointer;
+}
 
 /* 編集ボタン */
 .txn-edit {
