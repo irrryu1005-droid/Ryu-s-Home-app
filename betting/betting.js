@@ -453,6 +453,11 @@ function calcPnl(bet) {
   return null;
 }
 
+function calcPnlForChart(bet) {
+  if (bet.result === 'pending') return bet.isFreebet ? null : -bet.stake;
+  return calcPnl(bet);
+}
+
 function formatPnl(pnl) {
   if (pnl === null) return '-';
   const v = Math.round(pnl);
@@ -2378,8 +2383,7 @@ function getTableKey(sport, league) {
 }
 
 function renderCharts() {
-  const settled = _bets.filter(b => b.result !== 'pending').slice().reverse();
-  renderPnlChart(settled);
+  renderPnlChart(_bets.slice().reverse());
   renderBalanceChart();
   renderSportChart();
   renderStatsTable();
@@ -2390,14 +2394,8 @@ function renderBalanceChart() {
   const netDeposited = _deposits.reduce((s, d) => s + (d.type === 'withdrawal' ? -d.amount : d.amount), 0);
   const initialBankroll = (_settings.bankroll || 0) - netDeposited;
 
-  // ベット時点でスタークを控除し、確定時に払い戻しを加算する方式
   // pending非FB: -stake（ベット時点で即控除）
   // 勝ち: stake*(odds-1)  負け: 0  無効: 0  ※いずれも確定P&Lとして加算
-  const calcPnlForChart = (bet) => {
-    if (bet.result === 'pending') return bet.isFreebet ? null : -bet.stake;
-    return calcPnl(bet);
-  };
-
   const labels = [], data = [], pointColors = [], pointRadii = [], tooltipDeposits = [];
   let balance = initialBankroll;
 
@@ -2506,22 +2504,22 @@ function renderBalanceChart() {
   });
 }
 
-function renderPnlChart(settledBets) {
+function renderPnlChart(allBets) {
   const labels = [], data = [];
   let cum = 0;
 
   if (_pnlViewBy === 'day') {
     const dayMap = {};
-    for (const bet of settledBets) {
-      const pnl = calcPnl(bet);
+    for (const bet of allBets) {
+      const pnl = calcPnlForChart(bet);
       if (pnl === null) continue;
       cum += pnl;
       dayMap[bet.date] = cum;
     }
     for (const d of Object.keys(dayMap).sort()) { labels.push(d); data.push(dayMap[d]); }
   } else {
-    for (const bet of settledBets) {
-      const pnl = calcPnl(bet);
+    for (const bet of allBets) {
+      const pnl = calcPnlForChart(bet);
       if (pnl === null) continue;
       cum += pnl;
       labels.push(bet.date);
@@ -3897,8 +3895,7 @@ function initTabs() {
       document.querySelectorAll('.stats-toggle-btn[data-pnl]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       _pnlViewBy = btn.dataset.pnl;
-      const settled = _bets.filter(b => b.result !== 'pending').slice().reverse();
-      renderPnlChart(settled);
+      renderPnlChart(_bets.slice().reverse());
     });
   });
 
