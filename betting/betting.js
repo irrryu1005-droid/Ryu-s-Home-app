@@ -2323,6 +2323,8 @@ function renderGoalProgress() {
   const totalDays = Math.max(1, (endD - startD) / 86400000);
   const elapsed   = Math.max(0, Math.min(totalDays, (today - startD) / 86400000));
   const datePct   = Math.round(elapsed / totalDays * 100);
+  const tomorrowPct = datePct >= 100 ? 100 : Math.min(100, Math.round((elapsed + 1) / totalDays * 100));
+  const tomorrowDelta = tomorrowPct - datePct;
   const daysLeft  = Math.max(0, Math.ceil((endD - today) / 86400000));
   const dateLabel = datePct >= 100 ? '期間終了' : `残${daysLeft}日`;
 
@@ -2348,7 +2350,10 @@ function renderGoalProgress() {
       </div>
       <div class="goal-bar-row">
         <span class="goal-bar-label">日付</span>
-        <div class="goal-track"><div class="goal-fill goal-fill-date" style="width:${datePct}%"></div></div>
+        <div class="goal-track">
+          ${tomorrowDelta > 0 ? `<div class="goal-fill-tomorrow" style="width:${tomorrowPct}%"></div>` : ''}
+          <div class="goal-fill goal-fill-date" style="width:${datePct}%;position:relative;z-index:1"></div>
+        </div>
         <span class="goal-bar-pct goal-date-label">${dateLabel}</span>
       </div>
     </div>`;
