@@ -556,7 +556,7 @@ async function openNewTxnModal(defaultType = 'expense') {
   f.elements.memo.value   = '';
 
   buildOptions(f.elements.payment_method, PAYMENT_METHODS);
-  f.elements.payment_method.value = PAYMENT_METHODS[0];
+  f.elements.payment_method.value = _listCategoryFilter || PAYMENT_METHODS[0];
 
   updateEditCategoryOptions();
   f.elements.category.value = '';
