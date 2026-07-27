@@ -2484,8 +2484,16 @@ function renderGoalProgress() {
 let pnlChart = null, sportChart = null, sportAmountChart = null, balanceChart = null;
 let _statsGroupBy      = 'sport'; // 'league' | 'sport'  ← グラフ用
 let _statsTableGroupBy = 'sport'; // 'league' | 'sport'  ← テーブル用（独立）
-let _pnlViewBy         = 'bet';   // 'bet' | 'day'
-let _balanceViewBy     = 'bet';   // 'bet' | 'day'
+let _pnlViewBy         = 'bet';   // 'bet' | 'day' | 'week' | 'month'
+let _balanceViewBy     = 'bet';   // 'bet' | 'day' | 'week' | 'month'
+
+// 週の月曜日を YYYY-MM-DD で返す
+function weekKey(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const dow = d.getDay();
+  d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+  return d.toISOString().split('T')[0];
+}
 
 function getStatKey(sport, league) {
   if (_statsGroupBy === 'sport') return sportDisplay(sport || 'Other');
@@ -2549,26 +2557,32 @@ function renderBalanceChart() {
       tooltipDeposits.push(ev.deposit);
     }
   } else {
-    const dayMap = {};
+    const keyFn = _balanceViewBy === 'week'  ? weekKey
+                : _balanceViewBy === 'month' ? d => d.slice(0, 7)
+                :                              d => d; // day
+    const groupMap = {};
+    const addGroup = (date, pnl, deposit) => {
+      const k = keyFn(date);
+      if (!groupMap[k]) groupMap[k] = { pnl: 0, deposit: 0 };
+      groupMap[k].pnl     += pnl;
+      groupMap[k].deposit += deposit;
+    };
     for (const bet of allBets) {
       const pnl = calcPnlForChart(bet);
       if (pnl === null) continue;
-      if (!dayMap[bet.date]) dayMap[bet.date] = { pnl: 0, deposit: 0 };
-      dayMap[bet.date].pnl += pnl;
+      addGroup(bet.date, pnl, 0);
     }
     for (const dep of _deposits) {
       const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
-      if (!dayMap[dep.deposit_date]) dayMap[dep.deposit_date] = { pnl: 0, deposit: 0 };
-      dayMap[dep.deposit_date].deposit += signed;
+      addGroup(dep.deposit_date, 0, signed);
     }
     for (const ev of fbBonusEvents) {
-      if (!dayMap[ev.date]) dayMap[ev.date] = { pnl: 0, deposit: 0 };
-      dayMap[ev.date].deposit += ev.amount;
+      addGroup(ev.date, 0, ev.amount);
     }
-    for (const d of Object.keys(dayMap).sort()) {
-      const ev = dayMap[d];
+    for (const k of Object.keys(groupMap).sort()) {
+      const ev = groupMap[k];
       balance += ev.deposit + ev.pnl;
-      labels.push(d);
+      labels.push(k);
       data.push(balance);
       pointColors.push(ev.deposit !== 0 ? '#F59E0B' : '#3498DB');
       pointRadii.push(ev.deposit !== 0 ? 6 : 3);
@@ -2623,21 +2637,28 @@ function renderPnlChart(allBets) {
   const labels = [], data = [];
   let cum = 0;
 
-  if (_pnlViewBy === 'day') {
-    const dayMap = {};
-    for (const bet of allBets) {
-      const pnl = calcPnlForChart(bet);
-      if (pnl === null) continue;
-      cum += pnl;
-      dayMap[bet.date] = cum;
-    }
-    for (const d of Object.keys(dayMap).sort()) { labels.push(d); data.push(dayMap[d]); }
-  } else {
+  if (_pnlViewBy === 'bet') {
     for (const bet of allBets) {
       const pnl = calcPnlForChart(bet);
       if (pnl === null) continue;
       cum += pnl;
       labels.push(bet.date);
+      data.push(cum);
+    }
+  } else {
+    const keyFn = _pnlViewBy === 'week'  ? weekKey
+                : _pnlViewBy === 'month' ? d => d.slice(0, 7)
+                :                          d => d; // day
+    const groupMap = {};
+    for (const bet of allBets) {
+      const pnl = calcPnlForChart(bet);
+      if (pnl === null) continue;
+      const k = keyFn(bet.date);
+      groupMap[k] = (groupMap[k] || 0) + pnl;
+    }
+    for (const k of Object.keys(groupMap).sort()) {
+      cum += groupMap[k];
+      labels.push(k);
       data.push(cum);
     }
   }
@@ -4198,7 +4219,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.querySelector('#campaign-add-form [name="campaignStart"]').value = todayJST();
 
-  // 目標追加フォーム
+  // 目標追加モーダル
+  const goalModal = document.getElementById('goal-add-modal');
+  const openGoalModal = () => {
+    document.getElementById('goal-add-form').reset();
+    goalModal.hidden = false;
+  };
+  const closeGoalModal = () => { goalModal.hidden = true; };
+  document.getElementById('btn-add-goal').addEventListener('click', openGoalModal);
+  document.getElementById('btn-goal-modal-close').addEventListener('click', closeGoalModal);
+  goalModal.addEventListener('click', e => { if (e.target === goalModal) closeGoalModal(); });
+
   document.getElementById('goal-add-form').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
@@ -4210,7 +4241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       goalStart:     f.elements.goalStart.value,
       goalEnd:       f.elements.goalEnd.value,
     });
-    f.reset();
+    closeGoalModal();
     renderGoalProgress();
   });
 

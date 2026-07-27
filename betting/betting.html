@@ -250,10 +250,18 @@
       <div class="goals-section">
         <div class="goals-section-header">
           <h3>🎯 目標進捗</h3>
+          <button id="btn-add-goal" class="small-btn">＋ 追加</button>
         </div>
         <div id="goals-list"></div>
-        <details class="goal-add-section">
-          <summary>＋ 目標を追加</summary>
+      </div>
+
+      <!-- 目標追加モーダル -->
+      <div id="goal-add-modal" class="goal-modal-overlay" hidden>
+        <div class="goal-modal-card">
+          <div class="goal-modal-header">
+            <h4>目標を追加</h4>
+            <button type="button" id="btn-goal-modal-close" class="goal-modal-close">✕</button>
+          </div>
           <form id="goal-add-form" novalidate>
             <div class="form-row">
               <div class="form-group">
@@ -285,9 +293,9 @@
                 <input type="date" name="goalEnd" required>
               </div>
             </div>
-            <button type="submit" class="btn-secondary">追加</button>
+            <button type="submit" class="btn-secondary" style="width:100%;margin-top:4px">追加</button>
           </form>
-        </details>
+        </div>
       </div>
 
       <div class="chart-card">
@@ -296,6 +304,8 @@
           <div class="stats-toggle">
             <button class="stats-toggle-btn active" data-pnl="bet">ベット別</button>
             <button class="stats-toggle-btn" data-pnl="day">日別</button>
+            <button class="stats-toggle-btn" data-pnl="week">週別</button>
+            <button class="stats-toggle-btn" data-pnl="month">月別</button>
             <button class="stats-toggle-btn zoom-reset-btn" id="btn-reset-pnl-zoom">リセット</button>
           </div>
         </div>
@@ -307,6 +317,8 @@
           <div class="stats-toggle">
             <button class="stats-toggle-btn active" data-balance="bet">ベット別</button>
             <button class="stats-toggle-btn" data-balance="day">日別</button>
+            <button class="stats-toggle-btn" data-balance="week">週別</button>
+            <button class="stats-toggle-btn" data-balance="month">月別</button>
             <button class="stats-toggle-btn zoom-reset-btn" id="btn-reset-balance-zoom">リセット</button>
           </div>
         </div>
