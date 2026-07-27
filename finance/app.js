@@ -187,6 +187,10 @@ document.getElementById('input-date').value = new Date().toISOString().split('T'
 // カテゴリ初期化（Supabase から追加分を読み込んでから表示）
 loadCategories().then(() => updateCategoryOptions());
 
+document.getElementById('input-category').addEventListener('change', function () {
+  setInputConversionMode(this.value === '科目変換');
+});
+
 // カテゴリ管理ボタン
 document.getElementById('btn-manage-categories').addEventListener('click', () => {
   const wrap = document.getElementById('new-category-wrap');
@@ -208,9 +212,11 @@ document.getElementById('btn-save-new-category').addEventListener('click', async
 // 収入/支出トグル
 document.querySelectorAll('.type-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (btn.classList.contains('edit-type-btn')) return;
     currentType = btn.dataset.type;
-    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.type-btn:not(.edit-type-btn)').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    setInputConversionMode(false);
     updateCategoryOptions();
 
     const submitBtn = document.getElementById('submit-btn');
@@ -251,21 +257,39 @@ document.getElementById('transaction-form').addEventListener('submit', async (e)
     location:       location || null,
   };
 
-  const { error } = await db.from('transactions').insert([payload]);
+  let error;
+  if (payload.category === '科目変換') {
+    const fromPM = document.getElementById('input-conversion-from').value;
+    const toPM   = document.getElementById('input-conversion-to').value;
+    const base   = { date: payload.date, amount: payload.amount, category: payload.category, memo: payload.memo, location: payload.location };
+    const res = await db.from('transactions').insert([
+      { ...base, type: 'expense', payment_method: fromPM },
+      { ...base, type: 'income',  payment_method: toPM  },
+    ]);
+    error = res.error;
+    if (!error) {
+      await Promise.all([
+        updateAccountBalance(fromPM, 'expense', payload.amount),
+        updateAccountBalance(toPM,   'income',  payload.amount),
+      ]);
+    }
+  } else {
+    const res = await db.from('transactions').insert([payload]);
+    error = res.error;
+    if (!error) await updateAccountBalance(payload.payment_method, payload.type, payload.amount);
+  }
 
   if (error) {
     msgEl.style.color = 'var(--profit-neg)';
     msgEl.textContent = 'エラー: ' + error.message;
   } else {
-    // 口座残高を自動更新（収入なら+、支出なら−）
-    await updateAccountBalance(payload.payment_method, payload.type, payload.amount);
-
     msgEl.style.color = 'var(--profit-pos)';
     msgEl.textContent = '✓ 登録しました';
     document.getElementById('input-amount').value = '';
     document.getElementById('input-memo').value   = '';
     document.getElementById('input-location-new').value   = '';
     document.getElementById('input-location-new').style.display = 'none';
+    setInputConversionMode(false);
     await buildLocationOptions();
     setTimeout(() => { msgEl.textContent = ''; }, 2500);
   }
@@ -540,6 +564,27 @@ function updateEditCategoryOptions() {
   buildOptions(document.querySelector('#edit-form [name="category"]'), cats);
 }
 
+function setConversionMode(on) {
+  const f = document.getElementById('edit-form');
+  document.querySelector('#edit-modal-overlay .type-toggle').hidden = on;
+  document.getElementById('edit-payment-group').hidden = on;
+  document.getElementById('edit-conversion-wrap').hidden = !on;
+  if (on) {
+    buildOptions(f.elements.conversion_from, PAYMENT_METHODS);
+    buildOptions(f.elements.conversion_to, PAYMENT_METHODS);
+  }
+}
+
+function setInputConversionMode(on) {
+  document.querySelector('#transaction-form .type-toggle').hidden = on;
+  document.getElementById('input-payment-group').hidden = on;
+  document.getElementById('input-conversion-wrap').hidden = !on;
+  if (on) {
+    buildOptions(document.getElementById('input-conversion-from'), PAYMENT_METHODS);
+    buildOptions(document.getElementById('input-conversion-to'), PAYMENT_METHODS);
+  }
+}
+
 async function openNewTxnModal(defaultType = 'expense') {
   _editingId = null;
   _editType  = defaultType;
@@ -560,6 +605,8 @@ async function openNewTxnModal(defaultType = 'expense') {
 
   updateEditCategoryOptions();
   f.elements.category.value = '';
+  setConversionMode(false);
+  f.elements.category.onchange = () => setConversionMode(f.elements.category.value === '科目変換');
 
   const { data: locs } = await db.from('location_options').select('name').order('sort_order').order('id');
   const locSel = f.elements.location;
@@ -593,6 +640,8 @@ async function openEditModal(txn) {
 
   updateEditCategoryOptions();
   f.elements.category.value = txn.category;
+  setConversionMode(false);
+  f.elements.category.onchange = () => setConversionMode(f.elements.category.value === '科目変換');
 
   const { data: locs } = await db.from('location_options').select('name').order('sort_order').order('id');
   const locSel = f.elements.location;
@@ -655,6 +704,17 @@ document.getElementById('edit-form').addEventListener('submit', async (e) => {
       await updateAccountBalance(oldTxn.payment_method, reverseOld, oldTxn.amount);
       await updateAccountBalance(newPayload.payment_method, newPayload.type, newPayload.amount);
     }
+  } else if (newPayload.category === '科目変換') {
+    const fromPM = f.elements.conversion_from.value;
+    const toPM   = f.elements.conversion_to.value;
+    await db.from('transactions').insert([
+      { ...newPayload, type: 'expense', payment_method: fromPM },
+      { ...newPayload, type: 'income',  payment_method: toPM  },
+    ]);
+    await Promise.all([
+      updateAccountBalance(fromPM, 'expense', newPayload.amount),
+      updateAccountBalance(toPM,   'income',  newPayload.amount),
+    ]);
   } else {
     const { error } = await db.from('transactions').insert([newPayload]);
     if (!error) await updateAccountBalance(newPayload.payment_method, newPayload.type, newPayload.amount);
