@@ -2306,6 +2306,64 @@ function renderPeriodStats() {
 let _goalIdx     = 0;
 let _goalEditing = false;
 
+function attachGoalTrackTooltip(container) {
+  let tip = document.getElementById('goal-marker-tip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'goal-marker-tip';
+    tip.className = 'goal-marker-tip';
+    tip.hidden = true;
+    document.body.appendChild(tip);
+  }
+
+  // P&L バーのトラック（1つ目の .goal-track）のみ対象
+  const track = container.querySelector('.goal-card .goal-track');
+  if (!track) return;
+  const markers = [...track.querySelectorAll('.goal-marker')];
+  if (!markers.length) return;
+
+  let hoverTimer;
+  const show = (text, x, y) => {
+    tip.textContent = text;
+    tip.hidden = false;
+    const above = y > 60;
+    tip.style.left = `${x}px`;
+    tip.style.top  = above ? `${y - 38}px` : `${y + 10}px`;
+  };
+  const hide = () => { clearTimeout(hoverTimer); tip.hidden = true; };
+  const nearest = (xPct, threshold) => {
+    let best = null, minDist = threshold;
+    for (const m of markers) {
+      const d = Math.abs(xPct - parseFloat(m.style.left));
+      if (d < minDist) { minDist = d; best = m; }
+    }
+    return best;
+  };
+  const xPctFromEvent = e => {
+    const r = track.getBoundingClientRect();
+    return (e.clientX - r.left) / r.width * 100;
+  };
+
+  track.addEventListener('mousemove', e => {
+    clearTimeout(hoverTimer);
+    const m = nearest(xPctFromEvent(e), 4);
+    if (m) {
+      hoverTimer = setTimeout(() => show(m.title, e.clientX, e.clientY), 350);
+    } else {
+      tip.hidden = true;
+    }
+  });
+  track.addEventListener('mouseleave', hide);
+  track.addEventListener('click', e => {
+    hide();
+    const m = nearest(xPctFromEvent(e), 6);
+    if (m) {
+      show(m.title, e.clientX, e.clientY);
+      hoverTimer = setTimeout(hide, 2500);
+    }
+  });
+}
+
 function renderGoalProgress() {
   const container = document.getElementById('goals-list');
   if (!container) return;
@@ -2401,13 +2459,19 @@ function renderGoalProgress() {
     .reduce((sum, c) => sum + (c.fbReward || 0), 0);
   const pnl = betPnl + fbBonus;
 
-  const pct   = Math.min(100, Math.max(0, Math.round(pnl / g.goalAmount * 100)));
+  // 現実目標未達成中は現実を100%基準、達成後は理想を100%基準
+  const effectiveMax = (g.goalRealistic && pnl < g.goalRealistic) ? g.goalRealistic : g.goalAmount;
+  const pct   = Math.min(100, Math.max(0, Math.round(pnl / effectiveMax * 100)));
   const color = pct >= 100 ? '#27AE60' : pct >= 50 ? '#F39C12' : '#9B59B6';
-  const done  = pct >= 100 ? ' 🎉 達成！' : '';
+  const done  = pct >= 100
+    ? (effectiveMax === g.goalAmount ? ' 🎉 理想達成！' : ' ✅ 現実達成！')
+    : '';
 
-  // 最低・現実目標マーカー位置
-  const minPct  = g.goalMin       ? Math.min(99, Math.round(g.goalMin       / g.goalAmount * 100)) : null;
-  const realPct = g.goalRealistic ? Math.min(99, Math.round(g.goalRealistic / g.goalAmount * 100)) : null;
+  // マーカー位置は effectiveMax 基準
+  const minPct  = g.goalMin ? Math.min(99, Math.round(g.goalMin / effectiveMax * 100)) : null;
+  // 現実マーカーは「理想モード（effectiveMax=goalAmount）」のときのみ表示
+  const realPct = (g.goalRealistic && effectiveMax === g.goalAmount)
+    ? Math.min(99, Math.round(g.goalRealistic / effectiveMax * 100)) : null;
 
   const startD = new Date(g.goalStart); startD.setHours(0,0,0,0);
   const endD   = new Date(g.goalEnd);   endD.setHours(0,0,0,0);
@@ -2419,7 +2483,27 @@ function renderGoalProgress() {
   const daysLeft  = Math.max(0, Math.ceil((endD - today) / 86400000));
   const dateLabel = datePct >= 100 ? '期間終了' : `残${daysLeft}日`;
 
-  const hasTiers = g.goalMin || g.goalRealistic;
+  // 各ティアの今日時点の理論値（期間比例）
+  const pace    = elapsed / totalDays;
+  const thMin   = g.goalMin       ? Math.round(g.goalMin       * pace) : null;
+  const thReal  = g.goalRealistic ? Math.round(g.goalRealistic * pace) : null;
+  const thIdeal = Math.round(g.goalAmount * pace);
+
+  const fmt = n => Math.round(n).toLocaleString();
+
+  // 理想マーカーは理想モード（effectiveMax=goalAmount）のときのみバーに表示
+  const idealPct = effectiveMax === g.goalAmount ? 99 : null;
+
+  // 各ティアの理論値をバー上の位置（%）に変換（cap 99）
+  const thMinPct   = thMin   !== null ? Math.min(99, Math.round(thMin   / effectiveMax * 100)) : null;
+  const thRealPct  = thReal  !== null ? Math.min(99, Math.round(thReal  / effectiveMax * 100)) : null;
+  const thIdealPct = Math.min(99, Math.round(thIdeal / effectiveMax * 100));
+
+  // meta 行：各ティアの目標額のみ（理論値は線でバーに表示）
+  const gtc = (cls, label, amount) =>
+    `<span class="gtc ${cls}"><span class="gtc-label">${label}</span><span class="gtc-amount">¥${fmt(amount)}</span></span>`;
+
+  const pnlSign = (pnl >= 0 ? '+' : '') + '¥' + fmt(Math.round(pnl));
 
   container.innerHTML = `
     <div class="goal-nav">
@@ -2430,29 +2514,34 @@ function renderGoalProgress() {
     <div class="goal-card">
       <div class="goal-header">
         <span class="goal-name">${escapeHtml(g.name)}</span>
-        <div class="goal-header-btns">
-          <button class="small-btn btn-goal-edit">編集</button>
-          <button class="small-btn btn-goal-delete" data-id="${g.id}">削除</button>
+        <div class="goal-header-right">
+          <div class="goal-header-btns">
+            <button class="small-btn btn-goal-edit">編集</button>
+            <button class="small-btn btn-goal-delete" data-id="${g.id}">削除</button>
+          </div>
+          <div class="goal-pnl-main ${pnl >= 0 ? 'win' : 'loss'}">${pnlSign} / ¥${fmt(effectiveMax)}</div>
         </div>
       </div>
       <div class="goal-meta">
-        <span>${g.goalStart} 〜 ${g.goalEnd}</span>
-        <span class="${pnl >= 0 ? 'win' : 'loss'}">${(pnl >= 0 ? '+' : '') + '¥' + Math.round(pnl).toLocaleString()} / ¥${Number(g.goalAmount).toLocaleString()}</span>
+        <span class="goal-dates">${g.goalStart} 〜 ${g.goalEnd}</span>
+        <div class="goal-tiers-meta">
+          ${g.goalMin       ? gtc('gtc-min',  '最低', g.goalMin)       : ''}
+          ${g.goalRealistic ? gtc('gtc-real', '現実', g.goalRealistic) : ''}
+          ${gtc('gtc-ideal', '理想', g.goalAmount)}
+        </div>
       </div>
-      ${hasTiers ? `
-      <div class="goal-tier-row">
-        ${g.goalMin       ? `<span class="goal-tier-tag tier-min">最低 ¥${Number(g.goalMin).toLocaleString()}</span>` : ''}
-        ${g.goalRealistic ? `<span class="goal-tier-tag tier-real">現実 ¥${Number(g.goalRealistic).toLocaleString()}</span>` : ''}
-        <span class="goal-tier-tag tier-ideal">理想 ¥${Number(g.goalAmount).toLocaleString()}</span>
-      </div>` : ''}
       <div class="goal-bar-row">
         <span class="goal-bar-label">損益</span>
         <div class="goal-track">
           <div class="goal-fill" style="width:${pct}%;background:${color}"></div>
-          ${minPct  !== null ? `<div class="goal-marker goal-marker-min"  style="left:${minPct}%"  title="最低目標 ¥${Number(g.goalMin).toLocaleString()}"></div>`       : ''}
-          ${realPct !== null ? `<div class="goal-marker goal-marker-real" style="left:${realPct}%" title="現実目標 ¥${Number(g.goalRealistic).toLocaleString()}"></div>` : ''}
+          ${minPct   !== null ? `<div class="goal-marker goal-marker-min"   style="left:${minPct}%"   title="最低目標 ¥${fmt(g.goalMin)}"></div>`       : ''}
+          ${realPct  !== null ? `<div class="goal-marker goal-marker-real"  style="left:${realPct}%"  title="現実目標 ¥${fmt(g.goalRealistic)}"></div>` : ''}
+          ${idealPct !== null ? `<div class="goal-marker goal-marker-ideal" style="left:${idealPct}%" title="理想目標 ¥${fmt(g.goalAmount)}"></div>`    : ''}
+          ${thMinPct   !== null ? `<div class="goal-marker goal-marker-theory gtm-min"   style="left:${thMinPct}%"   title="最低 今日ペース ¥${fmt(thMin)}"></div>`   : ''}
+          ${thRealPct  !== null ? `<div class="goal-marker goal-marker-theory gtm-real"  style="left:${thRealPct}%"  title="現実 今日ペース ¥${fmt(thReal)}"></div>`  : ''}
+          <div class="goal-marker goal-marker-theory gtm-ideal" style="left:${thIdealPct}%" title="理想 今日ペース ¥${fmt(thIdeal)}"></div>
         </div>
-        <span class="goal-bar-pct">${pct}%${done}</span>
+        <span class="goal-bar-pct goal-date-label">${pct}%${done}</span>
       </div>
       <div class="goal-bar-row">
         <span class="goal-bar-label">日付</span>
@@ -2464,6 +2553,7 @@ function renderGoalProgress() {
       </div>
     </div>`;
 
+  attachGoalTrackTooltip(container);
   document.getElementById('btn-goal-prev').addEventListener('click', () => { _goalIdx++; renderGoalProgress(); });
   document.getElementById('btn-goal-next').addEventListener('click', () => { _goalIdx--; renderGoalProgress(); });
   container.querySelector('.btn-goal-edit').addEventListener('click', () => {

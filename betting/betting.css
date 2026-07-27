@@ -545,19 +545,20 @@ details[open].settings-section > summary::before { content: '▼ '; }
 
 .goal-meta {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 10px;
   font-size: 12px;
   color: var(--muted);
   margin-bottom: 8px;
 }
-.goal-meta span:last-child { font-weight: 700; font-size: 13px; }
 .goal-bar-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
+.goal-bar-row:has(.goal-bar-pct:not(.goal-date-label)) { align-items: flex-start; padding-top: 1px; }
 .goal-bar-row:last-child { margin-bottom: 0; }
 .goal-bar-label {
   font-size: 11px;
@@ -570,10 +571,12 @@ details[open].settings-section > summary::before { content: '▼ '; }
   font-size: 11px;
   color: var(--muted);
   font-weight: 700;
-  width: 56px;
+  width: 64px;
   flex-shrink: 0;
-  white-space: nowrap;
+  text-align: right;
+  line-height: 1.3;
 }
+.goal-bar-pct small { font-size: 9px; font-weight: 400; }
 .goal-date-label { color: var(--muted); font-weight: 400; }
 .goal-track {
   position: relative;
@@ -597,12 +600,30 @@ details[open].settings-section > summary::before { content: '▼ '; }
 }
 .goal-pct  { font-size: 12px; color: var(--muted); font-weight: 700; text-align: right; }
 
-/* 目標ティアタグ */
-.goal-tier-row { display: flex; gap: 5px; flex-wrap: wrap; margin: 4px 0 6px; }
-.goal-tier-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
-.tier-min  { background: rgba(243,156,18,0.15); color: #F39C12; }
-.tier-real { background: rgba(59,130,246,0.15);  color: #3B82F6; }
-.tier-ideal{ background: rgba(39,174,96,0.15);   color: #27AE60; }
+/* 目標カード メイン損益表示 */
+.goal-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.goal-pnl-main {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: right;
+}
+
+/* 目標 meta 行のティア表示 */
+.goal-meta { align-items: center; flex-wrap: wrap; }
+.goal-dates { font-size: 11px; color: var(--muted); white-space: nowrap; padding-top: 2px; }
+.goal-tiers-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.gtc { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.gtc-label  { font-size: 9px; font-weight: 700; opacity: 0.75; }
+.gtc-amount { font-size: 9px; font-weight: 800; }
+.gtc-min  { color: #F39C12; }
+.gtc-real { color: #3B82F6; }
+.gtc-ideal{ color: #27AE60; }
 
 /* 損益バーの点線マーカー */
 .goal-marker {
@@ -616,6 +637,29 @@ details[open].settings-section > summary::before { content: '▼ '; }
 }
 .goal-marker-min  { border-color: #F39C12; }
 .goal-marker-real { border-color: #3B82F6; }
+.goal-marker-ideal { border-color: #27AE60; border-right-style: solid; }
+/* 理論値マーカー（今日ペース）: solid・半透明でゴール目標線と区別 */
+.goal-marker-theory { border-right-style: solid; opacity: 0.35; z-index: 2; }
+.gtm-min   { border-color: #F39C12; }
+.gtm-real  { border-color: #3B82F6; }
+.gtm-ideal { border-color: #27AE60; }
+
+/* マーカーツールチップ */
+.goal-marker-tip {
+  position: fixed;
+  background: rgba(15,23,42,0.88);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 9999;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.goal-marker-tip[hidden] { display: none; }
 
 /* 編集フォーム */
 .goal-header-btns { display: flex; gap: 4px; }
