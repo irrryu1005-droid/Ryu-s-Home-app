@@ -597,6 +597,36 @@ details[open].settings-section > summary::before { content: '▼ '; }
 }
 .goal-pct  { font-size: 12px; color: var(--muted); font-weight: 700; text-align: right; }
 
+/* 目標ティアタグ */
+.goal-tier-row { display: flex; gap: 5px; flex-wrap: wrap; margin: 4px 0 6px; }
+.goal-tier-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+.tier-min  { background: rgba(243,156,18,0.15); color: #F39C12; }
+.tier-real { background: rgba(59,130,246,0.15);  color: #3B82F6; }
+.tier-ideal{ background: rgba(39,174,96,0.15);   color: #27AE60; }
+
+/* 損益バーの点線マーカー */
+.goal-marker {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 0;
+  border-right: 2px dashed;
+  z-index: 3;
+  pointer-events: none;
+}
+.goal-marker-min  { border-color: #F39C12; }
+.goal-marker-real { border-color: #3B82F6; }
+
+/* 編集フォーム */
+.goal-header-btns { display: flex; gap: 4px; }
+.goal-edit-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.btn-cancel-sm {
+  padding: 5px 12px; font-size: 12px; border-radius: 6px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text); cursor: pointer;
+}
+.btn-cancel-sm:hover { background: var(--border); }
+
 .goal-add-section {
   background: var(--white);
   border-radius: var(--radius);

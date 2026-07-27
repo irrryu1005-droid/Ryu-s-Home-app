@@ -111,11 +111,13 @@ function normalizeBet(row) {
 
 function normalizeGoal(row) {
   return {
-    id:         row.id,
-    name:       row.name,
-    goalAmount: row.goal_amount,
-    goalStart:  row.goal_start,
-    goalEnd:    row.goal_end,
+    id:            row.id,
+    name:          row.name,
+    goalAmount:    row.goal_amount,
+    goalMin:       row.goal_min       || null,
+    goalRealistic: row.goal_realistic || null,
+    goalStart:     row.goal_start,
+    goalEnd:       row.goal_end,
   };
 }
 
@@ -287,13 +289,28 @@ async function saveBankroll(bankroll) {
 
 async function addGoal(goal) {
   const { data, error } = await db.from('bet_goals').insert([{
-    name:        goal.name,
-    goal_amount: goal.goalAmount,
-    goal_start:  goal.goalStart,
-    goal_end:    goal.goalEnd,
+    name:            goal.name,
+    goal_amount:     goal.goalAmount,
+    goal_min:        goal.goalMin        || null,
+    goal_realistic:  goal.goalRealistic  || null,
+    goal_start:      goal.goalStart,
+    goal_end:        goal.goalEnd,
   }]).select().single();
   if (error) { console.error('addGoal error:', error); return; }
   _goals.push(normalizeGoal(data));
+}
+
+async function updateGoal(id, goal) {
+  const { error } = await db.from('bet_goals').update({
+    name:            goal.name,
+    goal_amount:     goal.goalAmount,
+    goal_min:        goal.goalMin        || null,
+    goal_realistic:  goal.goalRealistic  || null,
+    goal_start:      goal.goalStart,
+    goal_end:        goal.goalEnd,
+  }).eq('id', id);
+  if (error) { console.error('updateGoal error:', error); return; }
+  _goals = _goals.map(g => g.id === id ? { ...g, ...goal } : g);
 }
 
 async function deleteGoal(id) {
@@ -2286,7 +2303,8 @@ function renderPeriodStats() {
 // ============================================================
 // 目標進捗（ナビゲーション付き）
 // ============================================================
-let _goalIdx = 0;
+let _goalIdx     = 0;
+let _goalEditing = false;
 
 function renderGoalProgress() {
   const container = document.getElementById('goals-list');
@@ -2302,6 +2320,75 @@ function renderGoalProgress() {
   _goalIdx = Math.max(0, Math.min(_goalIdx, sorted.length - 1));
   const g = sorted[_goalIdx];
 
+  // ---- 編集フォームモード ----
+  if (_goalEditing) {
+    container.innerHTML = `
+      <div class="goal-nav">
+        <button class="goal-nav-btn" disabled>‹</button>
+        <span class="goal-nav-label">${escapeHtml(g.name)}</span>
+        <button class="goal-nav-btn" disabled>›</button>
+      </div>
+      <div class="goal-card">
+        <form id="goal-edit-form" novalidate>
+          <div class="form-row">
+            <div class="form-group">
+              <label>目標名</label>
+              <input name="goalName" value="${escapeHtml(g.name)}" required>
+            </div>
+            <div class="form-group">
+              <label>理想目標 (¥)</label>
+              <input type="number" name="goalAmount" value="${g.goalAmount}" step="1000" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>最低目標 (¥)</label>
+              <input type="number" name="goalMin" value="${g.goalMin || ''}" step="1000" placeholder="任意">
+            </div>
+            <div class="form-group">
+              <label>現実目標 (¥)</label>
+              <input type="number" name="goalRealistic" value="${g.goalRealistic || ''}" step="1000" placeholder="任意">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>開始日</label>
+              <input type="date" name="goalStart" value="${g.goalStart}" required>
+            </div>
+            <div class="form-group">
+              <label>終了日</label>
+              <input type="date" name="goalEnd" value="${g.goalEnd}" required>
+            </div>
+          </div>
+          <div class="goal-edit-btns">
+            <button type="button" id="btn-goal-edit-cancel" class="btn-cancel-sm">キャンセル</button>
+            <button type="submit" class="btn-secondary">保存</button>
+          </div>
+        </form>
+      </div>`;
+
+    container.querySelector('#btn-goal-edit-cancel').addEventListener('click', () => {
+      _goalEditing = false;
+      renderGoalProgress();
+    });
+    container.querySelector('#goal-edit-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target;
+      await updateGoal(g.id, {
+        name:          f.elements.goalName.value.trim(),
+        goalAmount:    parseInt(f.elements.goalAmount.value),
+        goalMin:       f.elements.goalMin.value       ? parseInt(f.elements.goalMin.value)       : null,
+        goalRealistic: f.elements.goalRealistic.value ? parseInt(f.elements.goalRealistic.value) : null,
+        goalStart:     f.elements.goalStart.value,
+        goalEnd:       f.elements.goalEnd.value,
+      });
+      _goalEditing = false;
+      renderGoalProgress();
+    });
+    return;
+  }
+
+  // ---- 通常表示モード ----
   const today = new Date(); today.setHours(0,0,0,0);
 
   const betPnl = _bets
@@ -2318,34 +2405,53 @@ function renderGoalProgress() {
   const color = pct >= 100 ? '#27AE60' : pct >= 50 ? '#F39C12' : '#9B59B6';
   const done  = pct >= 100 ? ' 🎉 達成！' : '';
 
+  // 最低・現実目標マーカー位置
+  const minPct  = g.goalMin       ? Math.min(99, Math.round(g.goalMin       / g.goalAmount * 100)) : null;
+  const realPct = g.goalRealistic ? Math.min(99, Math.round(g.goalRealistic / g.goalAmount * 100)) : null;
+
   const startD = new Date(g.goalStart); startD.setHours(0,0,0,0);
   const endD   = new Date(g.goalEnd);   endD.setHours(0,0,0,0);
   const totalDays = Math.max(1, (endD - startD) / 86400000);
   const elapsed   = Math.max(0, Math.min(totalDays, (today - startD) / 86400000));
   const datePct   = Math.round(elapsed / totalDays * 100);
-  const tomorrowPct = datePct >= 100 ? 100 : Math.min(100, Math.round((elapsed + 1) / totalDays * 100));
+  const tomorrowPct   = datePct >= 100 ? 100 : Math.min(100, Math.round((elapsed + 1) / totalDays * 100));
   const tomorrowDelta = tomorrowPct - datePct;
   const daysLeft  = Math.max(0, Math.ceil((endD - today) / 86400000));
   const dateLabel = datePct >= 100 ? '期間終了' : `残${daysLeft}日`;
 
+  const hasTiers = g.goalMin || g.goalRealistic;
+
   container.innerHTML = `
     <div class="goal-nav">
       <button class="goal-nav-btn" id="btn-goal-prev" ${_goalIdx >= sorted.length - 1 ? 'disabled' : ''}>‹</button>
-      <span class="goal-nav-label">${escapeHtml(g.name)} <small>(${_goalIdx + 1}/${sorted.length})</small></span>
+      <span class="goal-nav-label">${escapeHtml(g.name)}</span>
       <button class="goal-nav-btn" id="btn-goal-next" ${_goalIdx <= 0 ? 'disabled' : ''}>›</button>
     </div>
     <div class="goal-card">
       <div class="goal-header">
         <span class="goal-name">${escapeHtml(g.name)}</span>
-        <button class="small-btn btn-goal-delete" data-id="${g.id}">削除</button>
+        <div class="goal-header-btns">
+          <button class="small-btn btn-goal-edit">編集</button>
+          <button class="small-btn btn-goal-delete" data-id="${g.id}">削除</button>
+        </div>
       </div>
       <div class="goal-meta">
         <span>${g.goalStart} 〜 ${g.goalEnd}</span>
         <span class="${pnl >= 0 ? 'win' : 'loss'}">${(pnl >= 0 ? '+' : '') + '¥' + Math.round(pnl).toLocaleString()} / ¥${Number(g.goalAmount).toLocaleString()}</span>
       </div>
+      ${hasTiers ? `
+      <div class="goal-tier-row">
+        ${g.goalMin       ? `<span class="goal-tier-tag tier-min">最低 ¥${Number(g.goalMin).toLocaleString()}</span>` : ''}
+        ${g.goalRealistic ? `<span class="goal-tier-tag tier-real">現実 ¥${Number(g.goalRealistic).toLocaleString()}</span>` : ''}
+        <span class="goal-tier-tag tier-ideal">理想 ¥${Number(g.goalAmount).toLocaleString()}</span>
+      </div>` : ''}
       <div class="goal-bar-row">
         <span class="goal-bar-label">損益</span>
-        <div class="goal-track"><div class="goal-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="goal-track">
+          <div class="goal-fill" style="width:${pct}%;background:${color}"></div>
+          ${minPct  !== null ? `<div class="goal-marker goal-marker-min"  style="left:${minPct}%"  title="最低目標 ¥${Number(g.goalMin).toLocaleString()}"></div>`       : ''}
+          ${realPct !== null ? `<div class="goal-marker goal-marker-real" style="left:${realPct}%" title="現実目標 ¥${Number(g.goalRealistic).toLocaleString()}"></div>` : ''}
+        </div>
         <span class="goal-bar-pct">${pct}%${done}</span>
       </div>
       <div class="goal-bar-row">
@@ -2360,6 +2466,10 @@ function renderGoalProgress() {
 
   document.getElementById('btn-goal-prev').addEventListener('click', () => { _goalIdx++; renderGoalProgress(); });
   document.getElementById('btn-goal-next').addEventListener('click', () => { _goalIdx--; renderGoalProgress(); });
+  container.querySelector('.btn-goal-edit').addEventListener('click', () => {
+    _goalEditing = true;
+    renderGoalProgress();
+  });
   container.querySelector('.btn-goal-delete').addEventListener('click', async () => {
     if (!await showConfirm('この目標を削除しますか？')) return;
     await deleteGoal(g.id);
@@ -4093,10 +4203,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
     const f = e.target;
     await addGoal({
-      name:       f.elements.goalName.value.trim(),
-      goalAmount: parseInt(f.elements.goalAmount.value),
-      goalStart:  f.elements.goalStart.value,
-      goalEnd:    f.elements.goalEnd.value,
+      name:          f.elements.goalName.value.trim(),
+      goalAmount:    parseInt(f.elements.goalAmount.value),
+      goalMin:       f.elements.goalMin.value       ? parseInt(f.elements.goalMin.value)       : null,
+      goalRealistic: f.elements.goalRealistic.value ? parseInt(f.elements.goalRealistic.value) : null,
+      goalStart:     f.elements.goalStart.value,
+      goalEnd:       f.elements.goalEnd.value,
     });
     f.reset();
     renderGoalProgress();
