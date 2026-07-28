@@ -639,6 +639,7 @@ details[open].settings-section > summary::before { content: '▼ '; }
 .goal-marker-real { border-color: #3B82F6; }
 .goal-marker-ideal { border-color: #27AE60; border-right-style: solid; }
 /* 理論値マーカー（今日ペース）: solid・半透明でゴール目標線と区別 */
+.goal-marker-crossed { border-color: rgba(255,255,255,0.7) !important; }
 .goal-marker-theory { border-right-style: solid; opacity: 0.35; z-index: 2; }
 .gtm-min   { border-color: #F39C12; }
 .gtm-real  { border-color: #3B82F6; }
