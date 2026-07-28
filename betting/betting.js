@@ -2477,9 +2477,9 @@ function renderGoalProgress() {
   const realPct = (g.goalRealistic && effectiveMax === g.goalAmount)
     ? Math.min(99, Math.round(g.goalRealistic / effectiveMax * 100)) : null;
 
-  // 超えたマーカーは白に
-  const minCrossed  = !!(g.goalMin       && pnl >= g.goalMin);
-  const realCrossed = !!(g.goalRealistic && pnl >= g.goalRealistic);
+  // 超えたマーカーは白点線に（目標ライン）
+  const minCrossed   = !!(g.goalMin       && pnl >= g.goalMin);
+  const realCrossed  = !!(g.goalRealistic && pnl >= g.goalRealistic);
   const idealCrossed = pnl >= g.goalAmount;
 
   const startD = new Date(g.goalStart); startD.setHours(0,0,0,0);
@@ -2507,6 +2507,10 @@ function renderGoalProgress() {
   const thMinPct   = thMin   !== null ? Math.min(99, Math.round(thMin   / effectiveMax * 100)) : null;
   const thRealPct  = thReal  !== null ? Math.min(99, Math.round(thReal  / effectiveMax * 100)) : null;
   const thIdealPct = Math.min(99, Math.round(thIdeal / effectiveMax * 100));
+  // 超えた理論値マーカーも白点線に
+  const thMinCrossed   = thMin   !== null && pnl >= thMin;
+  const thRealCrossed  = thReal  !== null && pnl >= thReal;
+  const thIdealCrossed = pnl >= thIdeal;
 
   // meta 行：各ティアの目標額のみ（理論値は線でバーに表示）
   const gtc = (cls, label, amount) =>
@@ -2546,9 +2550,9 @@ function renderGoalProgress() {
           ${minPct   !== null ? `<div class="goal-marker goal-marker-min   ${minCrossed   ? 'goal-marker-crossed' : ''}" style="left:${minPct}%"   title="最低目標 ¥${fmt(g.goalMin)}"></div>`       : ''}
           ${realPct  !== null ? `<div class="goal-marker goal-marker-real  ${realCrossed  ? 'goal-marker-crossed' : ''}" style="left:${realPct}%"  title="現実目標 ¥${fmt(g.goalRealistic)}"></div>` : ''}
           ${idealPct !== null ? `<div class="goal-marker goal-marker-ideal ${idealCrossed ? 'goal-marker-crossed' : ''}" style="left:${idealPct}%" title="理想目標 ¥${fmt(g.goalAmount)}"></div>`    : ''}
-          ${thMinPct   !== null ? `<div class="goal-marker goal-marker-theory gtm-min"   style="left:${thMinPct}%"   title="最低 今日ペース ¥${fmt(thMin)}"></div>`   : ''}
-          ${thRealPct  !== null ? `<div class="goal-marker goal-marker-theory gtm-real"  style="left:${thRealPct}%"  title="現実 今日ペース ¥${fmt(thReal)}"></div>`  : ''}
-          <div class="goal-marker goal-marker-theory gtm-ideal" style="left:${thIdealPct}%" title="理想 今日ペース ¥${fmt(thIdeal)}"></div>
+          ${thMinPct   !== null ? `<div class="goal-marker goal-marker-theory gtm-min   ${thMinCrossed   ? 'goal-marker-crossed' : ''}" style="left:${thMinPct}%"   title="最低 今日ペース ¥${fmt(thMin)}"></div>`   : ''}
+          ${thRealPct  !== null ? `<div class="goal-marker goal-marker-theory gtm-real  ${thRealCrossed  ? 'goal-marker-crossed' : ''}" style="left:${thRealPct}%"  title="現実 今日ペース ¥${fmt(thReal)}"></div>`  : ''}
+          <div class="goal-marker goal-marker-theory gtm-ideal ${thIdealCrossed ? 'goal-marker-crossed' : ''}" style="left:${thIdealPct}%" title="理想 今日ペース ¥${fmt(thIdeal)}"></div>
         </div>
         <span class="goal-bar-pct goal-date-label">${pct}%${done}</span>
       </div>
