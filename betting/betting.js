@@ -3751,8 +3751,11 @@ function renderPickerEvents(evs) {
 
 function applyMatchToSingleForm({ title, sportKey }) {
   const formSport = SPORT_KEY_TO_FORM[sportKey] || 'Other';
+  const prevSport = document.querySelector('[name="sport"]').value;
+  const keepLeague = prevSport === formSport
+    ? (document.getElementById('single-league-select')?.value || '') : '';
   document.querySelector('[name="sport"]').value = formSport;
-  updateLeagueSelect(formSport);
+  updateLeagueSelect(formSport, keepLeague);
   document.getElementById('single-match-input').value = title;
   const disp = document.getElementById('single-match-display');
   disp.textContent = title;
@@ -3763,11 +3766,12 @@ function applyMatchToSingleForm({ title, sportKey }) {
 function applyMatchToLeg(legItem, { title, sportKey, league }) {
   const formSport = SPORT_KEY_TO_FORM[sportKey] || 'Other';
   const sportSel  = legItem.querySelector('[data-field="sport"]');
-  sportSel.value  = formSport;
   const leagueSel  = legItem.querySelector('[data-field="league"]');
   const leagueWrap = legItem.querySelectorAll('.form-row > .form-group')[0];
+  const keepLeague = sportSel.value === formSport ? (leagueSel?.value || '') : '';
+  sportSel.value  = formSport;
   if (getLeagues()[formSport]) {
-    leagueSel.innerHTML = leagueOptions(formSport);
+    leagueSel.innerHTML = leagueOptions(formSport, keepLeague);
     leagueWrap.style.visibility = '';
   }
   legItem.querySelector('[data-field="match"]').value = title;
