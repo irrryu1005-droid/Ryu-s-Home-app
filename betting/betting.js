@@ -103,7 +103,6 @@ function normalizeBet(row) {
     stake:        row.stake,
     isFreebet:    row.is_freebet    || false,
     campaignId:   row.campaign_id,
-    campaignProvisioned: !!row.campaign_provisioned,
     result:       row.result        || 'pending',
     memo:         row.memo,
     sortOrder:    row.sort_order    ?? 0,
@@ -204,7 +203,6 @@ function betToRow(bet) {
     stake:         bet.stake,
     is_freebet:    !!bet.isFreebet,
     campaign_id:   bet.campaignId    || null,
-    campaign_provisioned: !!bet.campaignProvisioned,
     result:        bet.result,
     memo:          bet.memo          || null,
     sort_order:    bet.sortOrder     ?? 0,
@@ -463,18 +461,14 @@ function calcEffectiveOdds(bet) {
 }
 
 function calcPnl(bet) {
-  let isFbSuccess = false;
   if (bet.isFreebet && bet.campaignId) {
     const campaign = _campaigns.find(c => c.id === bet.campaignId);
     if (!campaign || campaign.status !== 'completed') return null;
     if (campaign.completionType === 'failed') return 0;
-    isFbSuccess = true;
   }
   const odds = bet.type === 'parlay' ? calcEffectiveOdds(bet) : bet.odds;
   if (bet.result === 'win') {
-    // 達成時まだ未確定だったFB（campaignProvisioned）が勝ち → 賭け金＋利益を全額計上（odds×stake）
-    // 達成前に既に勝ち確定していたFBは、FB報酬が達成時に別途計上済みのため利益のみ
-    if (isFbSuccess && bet.campaignProvisioned) return Math.round(bet.stake * odds);
+    // FBウォレット方式で最後まで計算すると「勝ちは常に利益のみ」に帰着するため、達成タイミングは問わず統一
     return Math.round(bet.stake * (odds - 1));
   }
   // フリーベットは自分の金ではないため、負けても損失は常に0（通常ベットのみ -stake）
@@ -1211,13 +1205,6 @@ function renderPnlStatement() {
       ? `${(bet.legs || []).length}連`
       : (bet.league || '未設定');
     const odds = bet.type === 'parlay' ? calcEffectiveOdds(bet) : (bet.odds || 1);
-
-    if (bet.result === 'win' && bet.isFreebet && bet.campaignProvisioned) {
-      // 達成時未確定だったFBが勝ち → 賭け金＋利益を全額収益に計上（費用なし）
-      if (!revenues[sport]) revenues[sport] = {};
-      revenues[sport][league] = (revenues[sport][league] || 0) + pnl;
-      continue;
-    }
 
     if (pnl > 0) {
       // 勝ち：通常=全回収額(stake×odds)、FB=純利益のみ(stake×(odds-1))
@@ -2044,14 +2031,10 @@ function renderCampaigns() {
         const campaignBets = _bets.filter(b => String(b.campaignId) === String(c.id));
         return campaignBets.reduce((sum, b) => {
           const odds = b.type === 'parlay' ? calcEffectiveOdds(b) : b.odds;
-          if (b.result === 'win') {
-            // 達成時未確定だった(provisioned)FB → 賭け金＋利益全額、それ以外(達成前に確定済み/通常ベット)は利益のみ
-            return sum + Math.round(b.stake * (b.campaignProvisioned ? odds : (odds - 1)));
-          }
-          // 負けは達成前/pending問わず一律 -stake
+          // FBウォレット方式で最後まで計算すると「勝ちは常に利益のみ」に帰着するため、達成タイミングは問わず統一
+          if (b.result === 'win')  return sum + Math.round(b.stake * (odds - 1));
           if (b.result === 'loss') return sum - b.stake;
-          if (b.result === 'pending' && b.campaignProvisioned) return sum - b.stake; // 達成時に立てた仮の-stake
-          return sum;
+          return sum; // pending → 結果確定まで反映しない
         }, 0);
       })();
       // 表示だけFB報酬を加算（実際の残高・損益タブへの反映は「条件達成」レコード行が別途担う）
@@ -2127,16 +2110,6 @@ async function completeCampaign(id) {
   if (!completedDate || !/^\d{4}-\d{2}-\d{2}$/.test(completedDate)) return;
   if (!await showConfirm(`「${c.name}」を ${completedDate} 達成（ベット成功）で完了しますか？`)) return;
 
-  // 達成した瞬間まだ未確定のFBベットには「達成時未確定」フラグを立てる
-  // → 結果確定時、勝ち=賭け金＋利益全額／負け=0（達成前に確定済みのベットは利益のみ／貢献度-stake）で区別するため
-  const provisionedIds = _bets
-    .filter(b => String(b.campaignId) === String(id) && b.isFreebet && b.result === 'pending')
-    .map(b => b.id);
-  if (provisionedIds.length > 0) {
-    const { error: provErr } = await db.from('bets').update({ campaign_provisioned: true }).in('id', provisionedIds);
-    if (provErr) { console.error('completeCampaign (provision) error:', provErr); return; }
-  }
-
   const { error } = await db.from('bet_campaigns')
     .update({ status: 'completed', completed_date: completedDate, completion_type: 'success' })
     .eq('id', id);
@@ -2178,10 +2151,6 @@ async function reopenCampaign(id) {
     const { error: delErr } = await db.from('bet_deposits').delete().in('id', rewardDeposits.map(d => d.id));
     if (delErr) { console.error('reopenCampaign (remove reward deposit) error:', delErr); return; }
   }
-
-  // 達成時未確定フラグもリセット（次回達成時に現在のpending状態で正しく再判定するため）
-  const { error: provErr } = await db.from('bets').update({ campaign_provisioned: false }).eq('campaign_id', id);
-  if (provErr) { console.error('reopenCampaign (reset provisioned) error:', provErr); return; }
 
   const { error } = await db.from('bet_campaigns')
     .update({ status: 'active', completed_date: null })
@@ -2702,7 +2671,7 @@ function renderBalanceChart() {
       balance += ev.deposit + ev.pnl;
       labels.push(ev.date);
       data.push(balance);
-      pointColors.push(ev.deposit !== 0 ? '#F59E0B' : '#3498DB');
+      pointColors.push(ev.deposit > 0 ? '#F59E0B' : ev.deposit < 0 ? '#27AE60' : '#3498DB');
       pointRadii.push(ev.deposit !== 0 ? 6 : 3);
       tooltipDeposits.push(ev.deposit);
     }
@@ -2731,7 +2700,7 @@ function renderBalanceChart() {
       balance += ev.deposit + ev.pnl;
       labels.push(k);
       data.push(balance);
-      pointColors.push(ev.deposit !== 0 ? '#F59E0B' : '#3498DB');
+      pointColors.push(ev.deposit > 0 ? '#F59E0B' : ev.deposit < 0 ? '#27AE60' : '#3498DB');
       pointRadii.push(ev.deposit !== 0 ? 6 : 3);
       tooltipDeposits.push(ev.deposit);
     }
