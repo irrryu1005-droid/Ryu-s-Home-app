@@ -461,18 +461,21 @@ function calcEffectiveOdds(bet) {
 }
 
 function calcPnl(bet) {
+  let isFbSuccess = false;
   if (bet.isFreebet && bet.campaignId) {
     const campaign = _campaigns.find(c => c.id === bet.campaignId);
     if (!campaign || campaign.status !== 'completed') return null;
     if (campaign.completionType === 'failed') return 0;
+    isFbSuccess = true;
   }
   const odds = bet.type === 'parlay' ? calcEffectiveOdds(bet) : bet.odds;
   if (bet.result === 'win') {
     // FBウォレット方式で最後まで計算すると「勝ちは常に利益のみ」に帰着するため、達成タイミングは問わず統一
     return Math.round(bet.stake * (odds - 1));
   }
-  // フリーベットは自分の金ではないため、負けても損失は常に0（通常ベットのみ -stake）
-  if (bet.result === 'loss') return bet.isFreebet ? 0 : -bet.stake;
+  // 達成済みプロモのFBは報酬が既に実際の金として計上済みのため、負けは通常ベットと同じく -stake
+  // それ以外（独立FB・未達成プロモ紐付き）は自分の金ではないため負けても損失0
+  if (bet.result === 'loss') return (bet.isFreebet && !isFbSuccess) ? 0 : -bet.stake;
   if (bet.result === 'void') return 0;
   return null;
 }
@@ -1218,7 +1221,7 @@ function renderPnlStatement() {
         expenses[sport][league] = (expenses[sport][league] || 0) + bet.stake;
       }
     } else if (pnl < 0) {
-      // 負け：費用 = -pnl（通常ベットのみ。FBの負けは常に0なのでここに来ない）
+      // 負け：費用 = -pnl（通常ベット、および達成済みプロモ紐付きFB）
       if (!expenses[sport]) expenses[sport] = {};
       expenses[sport][league] = (expenses[sport][league] || 0) + (-pnl);
     }
@@ -1392,10 +1395,12 @@ function buildDepositRow(dep) {
   const label  = isReward ? '🎉 条件達成' : (isIn ? '入金' : '出金');
   const cls    = isReward ? 'badge-deposit-reward' : (isIn ? 'badge-deposit-in' : 'badge-deposit-out');
   const nameSuffix = campaign ? ` <small>（${escapeHtml(campaign.name)}）</small>` : '';
+  // FB報酬は損益扱いなので損益列に金額を表示。入金・出金は「—」のまま
+  const pnlCell = isReward ? `<td class="col-pnl win">${formatPnl(dep.amount)}</td>` : `<td class="col-pnl">—</td>`;
   return `<tr class="bet-row records-deposit-row" draggable="true" data-id="dep-${dep.id}" data-date="${dep.deposit_date}" data-deposit-id="${dep.id}">
     <td class="drag-handle" title="ドラッグして並び替え">⠿</td>
     <td colspan="5"><span class="badge-deposit ${cls}">${label}</span> ¥${Math.abs(dep.amount).toLocaleString()}${nameSuffix}</td>
-    <td class="col-pnl">—</td>
+    ${pnlCell}
     <td></td>
   </tr>`;
 }
@@ -1445,6 +1450,17 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
   }
 
   const sumPnl  = bets => bets.reduce((s, b) => s + (calcPnl(b) ?? 0), 0);
+
+  // FB報酬（「条件達成」レコード行）の日/週/月ごとの合計。損益列・集計に組み込むため
+  const rewardsByDay = new Map();
+  for (const dep of _deposits) {
+    if (!dep.campaign_id) continue;
+    rewardsByDay.set(dep.deposit_date, (rewardsByDay.get(dep.deposit_date) || 0) + (dep.amount || 0));
+  }
+  const rewardForDay   = dKey => rewardsByDay.get(dKey) || 0;
+  const rewardForWeek  = dMap => [...dMap.keys()].reduce((s, dKey) => s + rewardForDay(dKey), 0);
+  const rewardForMonth = wMap => [...wMap.values()].reduce((s, dMap) => s + rewardForWeek(dMap), 0);
+
   const pnlSpan = (pnl) => {
     const cls = pnl > 0 ? 'win' : pnl < 0 ? 'loss' : '';
     return `<span class="group-pnl ${cls}">${formatPnl(pnl)}</span>`;
@@ -1458,7 +1474,7 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
     const [year, monStr] = mKey.split('-');
     const mon            = parseInt(monStr);
     const allMonthBets   = [...wMap.values()].flatMap(d => [...d.values()].flat());
-    const mPnl           = sumPnl(allMonthBets);
+    const mPnl           = sumPnl(allMonthBets) + rewardForMonth(wMap);
 
     html += `<details class="month-group" data-month="${mKey}" ${mOpen(mKey) ? 'open' : ''}>
       <summary class="group-summary month-summary">
@@ -1471,7 +1487,7 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
 
     for (const [wKey, dMap] of sortedWeeks) {
       const allWeekBets = [...dMap.values()].flat();
-      const wPnl = sumPnl(allWeekBets);
+      const wPnl = sumPnl(allWeekBets) + rewardForWeek(dMap);
       // wKey はその週の月曜日 (YYYY-MM-DD)。日曜日 = 月曜 + 6日
       const monDate = new Date(wKey + 'T12:00:00');
       const sunDate = new Date(wKey + 'T12:00:00');
@@ -1488,7 +1504,7 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
       for (const [dKey, bets] of [...dMap.entries()].sort((a, b) => b[0].localeCompare(a[0]))) {
         const d      = new Date(dKey + 'T12:00:00');
         const dLabel = `${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
-        const dPnl   = sumPnl(bets);
+        const dPnl   = sumPnl(bets) + rewardForDay(dKey);
 
         // ベットと入金を sort_order で並べて混合表示
         const dayItems = getDayItems(dKey);
@@ -2661,7 +2677,7 @@ function renderBalanceChart() {
     }
     for (const dep of _deposits) {
       const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
-      events.push({ date: dep.deposit_date, pnl: 0, deposit: signed, sort_order: dep.sort_order ?? -1 });
+      events.push({ date: dep.deposit_date, pnl: 0, deposit: signed, reward: !!dep.campaign_id, sort_order: dep.sort_order ?? -1 });
     }
     events.sort((a, b) => {
       if (a.date !== b.date) return a.date < b.date ? -1 : 1;
@@ -2671,7 +2687,7 @@ function renderBalanceChart() {
       balance += ev.deposit + ev.pnl;
       labels.push(ev.date);
       data.push(balance);
-      pointColors.push(ev.deposit > 0 ? '#F59E0B' : ev.deposit < 0 ? '#27AE60' : '#3498DB');
+      pointColors.push(ev.reward ? '#9B59B6' : ev.deposit > 0 ? '#F59E0B' : ev.deposit < 0 ? '#27AE60' : '#3498DB');
       pointRadii.push(ev.deposit !== 0 ? 6 : 3);
       tooltipDeposits.push(ev.deposit);
     }
@@ -2680,11 +2696,12 @@ function renderBalanceChart() {
                 : _balanceViewBy === 'month' ? d => d.slice(0, 7)
                 :                              d => d; // day
     const groupMap = {};
-    const addGroup = (date, pnl, deposit) => {
+    const addGroup = (date, pnl, deposit, reward = 0) => {
       const k = keyFn(date);
-      if (!groupMap[k]) groupMap[k] = { pnl: 0, deposit: 0 };
+      if (!groupMap[k]) groupMap[k] = { pnl: 0, deposit: 0, reward: 0 };
       groupMap[k].pnl     += pnl;
       groupMap[k].deposit += deposit;
+      groupMap[k].reward  += reward;
     };
     for (const bet of allBets) {
       const pnl = calcPnlForChart(bet);
@@ -2693,14 +2710,14 @@ function renderBalanceChart() {
     }
     for (const dep of _deposits) {
       const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
-      addGroup(dep.deposit_date, 0, signed);
+      addGroup(dep.deposit_date, 0, signed, dep.campaign_id ? signed : 0);
     }
     for (const k of Object.keys(groupMap).sort()) {
       const ev = groupMap[k];
       balance += ev.deposit + ev.pnl;
       labels.push(k);
       data.push(balance);
-      pointColors.push(ev.deposit > 0 ? '#F59E0B' : ev.deposit < 0 ? '#27AE60' : '#3498DB');
+      pointColors.push(ev.reward !== 0 ? '#9B59B6' : ev.deposit > 0 ? '#F59E0B' : ev.deposit < 0 ? '#27AE60' : '#3498DB');
       pointRadii.push(ev.deposit !== 0 ? 6 : 3);
       tooltipDeposits.push(ev.deposit);
     }
