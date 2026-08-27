@@ -817,6 +817,7 @@ tr:last-child td { border-bottom: none; }
 .badge-deposit     { border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
 .badge-deposit-in  { background: #FEF3C7; color: #D97706; }
 .badge-deposit-out { background: #FEE2E2; color: #DC2626; }
+.badge-deposit-reward { background: #EDE9FE; color: #7C3AED; }
 .records-deposit-row { background: #FFFBEB; }
 
 .stats-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }

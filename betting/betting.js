@@ -103,6 +103,7 @@ function normalizeBet(row) {
     stake:        row.stake,
     isFreebet:    row.is_freebet    || false,
     campaignId:   row.campaign_id,
+    campaignProvisioned: !!row.campaign_provisioned,
     result:       row.result        || 'pending',
     memo:         row.memo,
     sortOrder:    row.sort_order    ?? 0,
@@ -203,6 +204,7 @@ function betToRow(bet) {
     stake:         bet.stake,
     is_freebet:    !!bet.isFreebet,
     campaign_id:   bet.campaignId    || null,
+    campaign_provisioned: !!bet.campaignProvisioned,
     result:        bet.result,
     memo:          bet.memo          || null,
     sort_order:    bet.sortOrder     ?? 0,
@@ -463,9 +465,14 @@ function calcPnl(bet) {
     isFbSuccess = true;
   }
   const odds = bet.type === 'parlay' ? calcEffectiveOdds(bet) : bet.odds;
-  if (bet.result === 'win')  return Math.round(bet.stake * (odds - 1));
-  // FB成功キャンペーンの負けは -stake（通常ベットと同じ）、それ以外のFBは 0
-  if (bet.result === 'loss') return (bet.isFreebet && !isFbSuccess) ? 0 : -bet.stake;
+  if (bet.result === 'win') {
+    // 達成時まだ未確定だったFB（campaignProvisioned）が勝ち → 賭け金＋利益を全額計上（odds×stake）
+    // 達成前に既に勝ち確定していたFBは、FB報酬が達成時に別途計上済みのため利益のみ
+    if (isFbSuccess && bet.campaignProvisioned) return Math.round(bet.stake * odds);
+    return Math.round(bet.stake * (odds - 1));
+  }
+  // フリーベットは自分の金ではないため、負けても損失は常に0（通常ベットのみ -stake）
+  if (bet.result === 'loss') return bet.isFreebet ? 0 : -bet.stake;
   if (bet.result === 'void') return 0;
   return null;
 }
@@ -1199,6 +1206,13 @@ function renderPnlStatement() {
       : (bet.league || '未設定');
     const odds = bet.type === 'parlay' ? calcEffectiveOdds(bet) : (bet.odds || 1);
 
+    if (bet.result === 'win' && bet.isFreebet && bet.campaignProvisioned) {
+      // 達成時未確定だったFBが勝ち → 賭け金＋利益を全額収益に計上（費用なし）
+      if (!revenues[sport]) revenues[sport] = {};
+      revenues[sport][league] = (revenues[sport][league] || 0) + pnl;
+      continue;
+    }
+
     if (pnl > 0) {
       // 勝ち：通常=全回収額(stake×odds)、FB=純利益のみ(stake×(odds-1))
       const returnAmt = bet.isFreebet
@@ -1211,23 +1225,27 @@ function renderPnlStatement() {
         expenses[sport][league] = (expenses[sport][league] || 0) + bet.stake;
       }
     } else if (pnl < 0) {
-      // 負け：費用 = -pnl（通常=stake、FB成功キャンペーン=stake、その他FB=0でここに来ない）
+      // 負け：費用 = -pnl（通常ベットのみ。FBの負けは常に0なのでここに来ない）
       if (!expenses[sport]) expenses[sport] = {};
       expenses[sport][league] = (expenses[sport][league] || 0) + (-pnl);
     }
     // pnl === 0: void / 失敗キャンペーンFB → 費用・収益とも¥0
   }
 
-  // FB報酬（成功キャンペーン報酬）を収益に追加
-  const fbDs = isAll ? null : `${y}-${String(m).padStart(2,'0')}-01`;
-  const fbDe = isAll ? null : `${y}-${String(m).padStart(2,'0')}-31`;
-  _campaigns
-    .filter(c => c.status === 'completed' && c.completionType === 'success' && !c.fbRewardInBankroll && (c.fbReward || 0) > 0)
-    .filter(c => !fbDs || (c.completedDate && c.completedDate >= fbDs && c.completedDate <= fbDe))
-    .forEach(c => {
-      if (!revenues['FB報酬']) revenues['FB報酬'] = {};
-      revenues['FB報酬'][c.name] = (revenues['FB報酬'][c.name] || 0) + (c.fbReward || 0);
-    });
+  // 「条件達成」レコード行（FB報酬）を収益に追加
+  const rewardDeposits = isAll
+    ? _deposits.filter(d => d.campaign_id)
+    : (() => {
+        const start = `${y}-${String(m).padStart(2, '0')}-01`;
+        const end   = `${y}-${String(m).padStart(2, '0')}-31`;
+        return _deposits.filter(d => d.campaign_id && d.deposit_date >= start && d.deposit_date <= end);
+      })();
+  for (const dep of rewardDeposits) {
+    const campaign = _campaigns.find(c => String(c.id) === String(dep.campaign_id));
+    if (!revenues['FB報酬']) revenues['FB報酬'] = {};
+    const name = campaign ? campaign.name : '条件達成';
+    revenues['FB報酬'][name] = (revenues['FB報酬'][name] || 0) + dep.amount;
+  }
 
   const expTotal = Object.values(expenses).flatMap(Object.values).reduce((a, b) => a + b, 0);
   const revTotal = Object.values(revenues).flatMap(Object.values).reduce((a, b) => a + b, 0);
@@ -1376,11 +1394,14 @@ function buildBetRow(bet) {
 function buildDepositRow(dep) {
   const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
   const isIn   = signed >= 0;
-  const label  = isIn ? '入金' : '出金';
-  const cls    = isIn ? 'badge-deposit-in' : 'badge-deposit-out';
+  const isReward = !!dep.campaign_id;
+  const campaign = isReward ? _campaigns.find(c => String(c.id) === String(dep.campaign_id)) : null;
+  const label  = isReward ? '🎉 条件達成' : (isIn ? '入金' : '出金');
+  const cls    = isReward ? 'badge-deposit-reward' : (isIn ? 'badge-deposit-in' : 'badge-deposit-out');
+  const nameSuffix = campaign ? ` <small>（${escapeHtml(campaign.name)}）</small>` : '';
   return `<tr class="bet-row records-deposit-row" draggable="true" data-id="dep-${dep.id}" data-date="${dep.deposit_date}" data-deposit-id="${dep.id}">
     <td class="drag-handle" title="ドラッグして並び替え">⠿</td>
-    <td colspan="5"><span class="badge-deposit ${cls}">${label}</span> ¥${Math.abs(dep.amount).toLocaleString()}</td>
+    <td colspan="5"><span class="badge-deposit ${cls}">${label}</span> ¥${Math.abs(dep.amount).toLocaleString()}${nameSuffix}</td>
     <td class="col-pnl">—</td>
     <td></td>
   </tr>`;
@@ -1431,12 +1452,6 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
   }
 
   const sumPnl  = bets => bets.reduce((s, b) => s + (calcPnl(b) ?? 0), 0);
-  const fbBonusForPeriod = (start, end) =>
-    _campaigns
-      .filter(c => c.status === 'completed' && c.completionType === 'success'
-                && !c.fbRewardInBankroll && (c.fbReward || 0) > 0
-                && c.completedDate >= start && c.completedDate <= end)
-      .reduce((s, c) => s + (c.fbReward || 0), 0);
   const pnlSpan = (pnl) => {
     const cls = pnl > 0 ? 'win' : pnl < 0 ? 'loss' : '';
     return `<span class="group-pnl ${cls}">${formatPnl(pnl)}</span>`;
@@ -1450,7 +1465,7 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
     const [year, monStr] = mKey.split('-');
     const mon            = parseInt(monStr);
     const allMonthBets   = [...wMap.values()].flatMap(d => [...d.values()].flat());
-    const mPnl           = sumPnl(allMonthBets) + fbBonusForPeriod(`${mKey}-01`, `${mKey}-31`);
+    const mPnl           = sumPnl(allMonthBets);
 
     html += `<details class="month-group" data-month="${mKey}" ${mOpen(mKey) ? 'open' : ''}>
       <summary class="group-summary month-summary">
@@ -1463,9 +1478,7 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
 
     for (const [wKey, dMap] of sortedWeeks) {
       const allWeekBets = [...dMap.values()].flat();
-      const wSun = new Date(wKey + 'T12:00:00'); wSun.setDate(wSun.getDate() + 6);
-      const wSunStr = wSun.toISOString().slice(0, 10);
-      const wPnl = sumPnl(allWeekBets) + fbBonusForPeriod(wKey, wSunStr);
+      const wPnl = sumPnl(allWeekBets);
       // wKey はその週の月曜日 (YYYY-MM-DD)。日曜日 = 月曜 + 6日
       const monDate = new Date(wKey + 'T12:00:00');
       const sunDate = new Date(wKey + 'T12:00:00');
@@ -1482,7 +1495,7 @@ function renderRecords(preOpenMonths = null, preOpenWeeks = null, preOpenDays = 
       for (const [dKey, bets] of [...dMap.entries()].sort((a, b) => b[0].localeCompare(a[0]))) {
         const d      = new Date(dKey + 'T12:00:00');
         const dLabel = `${d.getMonth()+1}月${d.getDate()}日（${DAY_NAMES[d.getDay()]}）`;
-        const dPnl   = sumPnl(bets) + fbBonusForPeriod(dKey, dKey);
+        const dPnl   = sumPnl(bets);
 
         // ベットと入金を sort_order で並べて混合表示
         const dayItems = getDayItems(dKey);
@@ -2018,27 +2031,33 @@ function renderCampaigns() {
   if (completed.length > 0) {
     const rows = completed.map(c => {
       const isFailed     = c.completionType === 'failed';
-      // FBウォレット方式：fbRewardを初期残高として、勝ち=純利益加算、負け/未確認=賭け金減算
+      // 表示用の合計（ベット損益＋FB報酬）。残高・損益タブ側は二重計上を避けるため
+      // 「条件達成」レコード行(bet_deposits)経由のみで反映し、このbetPnl自体には含めない。
       const betPnl = (() => {
         if (isFailed) return 0;
         const campaignBets = _bets.filter(b => String(b.campaignId) === String(c.id));
-        const wallet = campaignBets.reduce((sum, b) => {
+        return campaignBets.reduce((sum, b) => {
           const odds = b.type === 'parlay' ? calcEffectiveOdds(b) : b.odds;
-          if (b.result === 'win')  return sum + Math.round(b.stake * (odds - 1));
+          if (b.result === 'win') {
+            // 達成時未確定だった(provisioned)FB → 賭け金＋利益全額、それ以外(達成前に確定済み/通常ベット)は利益のみ
+            return sum + Math.round(b.stake * (b.campaignProvisioned ? odds : (odds - 1)));
+          }
+          // 負けは達成前/pending問わず一律 -stake
           if (b.result === 'loss') return sum - b.stake;
-          if (b.isFreebet && b.result === 'pending') return sum - b.stake;
+          if (b.result === 'pending' && b.campaignProvisioned) return sum - b.stake; // 達成時に立てた仮の-stake
           return sum;
-        }, c.fbReward || 0);
-        return wallet;
+        }, 0);
       })();
-      const pnlClass = betPnl > 0 ? 'win' : betPnl < 0 ? 'loss' : '';
+      // 表示だけFB報酬を加算（実際の残高・損益タブへの反映は「条件達成」レコード行が別途担う）
+      const displayPnl = isFailed ? betPnl : betPnl + (c.fbReward || 0);
+      const pnlClass = displayPnl > 0 ? 'win' : displayPnl < 0 ? 'loss' : '';
       const statusBadge = isFailed
         ? '<span class="badge-failed">条件未達</span>'
         : '<span class="badge-success">ベット成功</span>';
       return `<tr>
         <td>${escapeHtml(c.name)} ${statusBadge}</td>
         <td>¥${Number(c.fbReward).toLocaleString()}</td>
-        <td class="${pnlClass}">${formatPnl(betPnl)}</td>
+        <td class="${pnlClass}">${formatPnl(displayPnl)}</td>
         <td><button class="small-btn btn-campaign-reopen" data-id="${c.id}">再開</button></td>
       </tr>`;
     }).join('');
@@ -2096,13 +2115,38 @@ function renderCampaigns() {
 
 async function completeCampaign(id) {
   const c = _campaigns.find(c => String(c.id) === String(id));
-  if (!c || !await showConfirm(`「${c.name}」をベット成功で完了しますか？`)) return;
+  if (!c) return;
+  const completedDate = await showPrompt(`「${c.name}」の達成日を入力してください (YYYY-MM-DD)`, todayJST());
+  if (!completedDate || !/^\d{4}-\d{2}-\d{2}$/.test(completedDate)) return;
+  if (!await showConfirm(`「${c.name}」を ${completedDate} 達成（ベット成功）で完了しますか？`)) return;
+
+  // 達成した瞬間まだ未確定のFBベットには「達成時未確定」フラグを立てる
+  // → 結果確定時、勝ち=賭け金＋利益全額／負け=0（達成前に確定済みのベットは利益のみ／貢献度-stake）で区別するため
+  const provisionedIds = _bets
+    .filter(b => String(b.campaignId) === String(id) && b.isFreebet && b.result === 'pending')
+    .map(b => b.id);
+  if (provisionedIds.length > 0) {
+    const { error: provErr } = await db.from('bets').update({ campaign_provisioned: true }).in('id', provisionedIds);
+    if (provErr) { console.error('completeCampaign (provision) error:', provErr); return; }
+  }
+
   const { error } = await db.from('bet_campaigns')
-    .update({ status: 'completed', completed_date: todayJST(), completion_type: 'success' })
+    .update({ status: 'completed', completed_date: completedDate, completion_type: 'success' })
     .eq('id', id);
   if (error) { console.error('completeCampaign error:', error); return; }
-  const { data } = await db.from('bet_campaigns').select('*').eq('hidden', false).order('created_at');
-  if (data) _campaigns = data.map(normalizeCampaign);
+
+  // FB報酬を「条件達成」レコード行として追加し、bankrollに反映
+  // ※「FB報酬は元手設定に含む」済みの場合は二重計上になるためスキップ
+  if (!c.fbRewardInBankroll) {
+    const newBankroll = (_settings.bankroll || 0) + (c.fbReward || 0);
+    await saveBankroll(newBankroll);
+    const { error: depErr } = await db.from('bet_deposits').insert([{
+      amount: c.fbReward, deposit_date: completedDate, type: 'deposit', campaign_id: id, sort_order: -1,
+    }]);
+    if (depErr) { console.error('completeCampaign (reward deposit) error:', depErr); return; }
+  }
+
+  await loadAll();
   refreshAll();
 }
 
@@ -2121,12 +2165,27 @@ async function endCampaign(id) {
 async function reopenCampaign(id) {
   const c = _campaigns.find(c => String(c.id) === String(id));
   if (!c || !await showConfirm(`「${c.name}」を進行中に戻しますか？`)) return;
+
+  // 過去に付与した「条件達成」レコード行があれば取り消す（bankrollからも差し引く）
+  // → 再度「達成」した時に二重計上しないようにするため
+  const rewardDeposits = _deposits.filter(d => String(d.campaign_id) === String(id));
+  if (rewardDeposits.length > 0) {
+    const totalReward = rewardDeposits.reduce((sum, d) => sum + (d.type === 'withdrawal' ? -d.amount : d.amount), 0);
+    await saveBankroll((_settings.bankroll || 0) - totalReward);
+    const { error: delErr } = await db.from('bet_deposits').delete().in('id', rewardDeposits.map(d => d.id));
+    if (delErr) { console.error('reopenCampaign (remove reward deposit) error:', delErr); return; }
+  }
+
+  // 達成時未確定フラグもリセット（次回達成時に現在のpending状態で正しく再判定するため）
+  const { error: provErr } = await db.from('bets').update({ campaign_provisioned: false }).eq('campaign_id', id);
+  if (provErr) { console.error('reopenCampaign (reset provisioned) error:', provErr); return; }
+
   const { error } = await db.from('bet_campaigns')
     .update({ status: 'active', completed_date: null })
     .eq('id', id);
   if (error) { console.error('reopenCampaign error:', error); return; }
-  const { data } = await db.from('bet_campaigns').select('*').eq('hidden', false).order('created_at');
-  if (data) _campaigns = data.map(normalizeCampaign);
+
+  await loadAll();
   refreshAll();
 }
 
@@ -2177,11 +2236,7 @@ function calcStreak() {
 function updateSummary() {
   const settled   = _bets.filter(b => b.result === 'win' || b.result === 'loss');
   const wins      = settled.filter(b => b.result === 'win');
-  // 元手設定に含まれていないFBリワードは残高に加算（元手設定に含む場合はスキップ）
-  const fbRewardBonus = _campaigns
-    .filter(c => c.status === 'completed' && c.completionType === 'success' && !c.fbRewardInBankroll)
-    .reduce((sum, c) => sum + (c.fbReward || 0), 0);
-  const totalPnl  = _bets.reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0) + fbRewardBonus;
+  const totalPnl  = _bets.reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
   const winRate   = settled.length > 0 ? (wins.length / settled.length * 100).toFixed(1) + '%' : '-%';
 
   document.getElementById('total-bets').textContent = _bets.length;
@@ -2257,14 +2312,8 @@ function renderPeriodStats() {
   const monthLabel = _periodMonthOfs === 0 ? '今月' : `${mBase.getFullYear()}/${mBase.getMonth()+1}月`;
 
   const calcPeriod = (start, end) => {
-    const betPnl = _bets.filter(b => b.date >= start && b.date <= end)
-                        .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
-    const fbBonus = _campaigns
-      .filter(c => c.status === 'completed' && c.completionType === 'success'
-                && !c.fbRewardInBankroll && (c.fbReward || 0) > 0
-                && c.completedDate >= start && c.completedDate <= end)
-      .reduce((sum, c) => sum + (c.fbReward || 0), 0);
-    return betPnl + fbBonus;
+    return _bets.filter(b => b.date >= start && b.date <= end)
+                .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
   };
 
   const fmt = pnl => (pnl >= 0 ? '+' : '') + '¥' + Math.round(pnl).toLocaleString();
@@ -2449,15 +2498,9 @@ function renderGoalProgress() {
   // ---- 通常表示モード ----
   const today = new Date(); today.setHours(0,0,0,0);
 
-  const betPnl = _bets
+  const pnl = _bets
     .filter(b => b.date >= g.goalStart && b.date <= g.goalEnd)
     .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
-  const fbBonus = _campaigns
-    .filter(c => c.status === 'completed' && c.completionType === 'success'
-              && !c.fbRewardInBankroll && (c.fbReward || 0) > 0
-              && c.completedDate >= g.goalStart && c.completedDate <= g.goalEnd)
-    .reduce((sum, c) => sum + (c.fbReward || 0), 0);
-  const pnl = betPnl + fbBonus;
 
   // 現実目標未達成中は現実を100%基準、達成後は理想を100%基準
   const effectiveMax = (g.goalRealistic && pnl < g.goalRealistic) ? g.goalRealistic : g.goalAmount;
@@ -2628,11 +2671,6 @@ function renderBalanceChart() {
   // 全ベット（pending含む）を時系列順に並べる（settled と pending を統合）
   const allBets = _bets.slice().reverse(); // renderCharts で reverse 済みのものを再利用
 
-  // 元手未含のFBリワードをグラフ用仮想イベントとして収集
-  const fbBonusEvents = _campaigns
-    .filter(c => c.status === 'completed' && c.completionType === 'success' && !c.fbRewardInBankroll && c.completedDate)
-    .map(c => ({ date: c.completedDate, amount: c.fbReward || 0 }));
-
   if (_balanceViewBy === 'bet') {
     const events = [];
     for (const bet of allBets) {
@@ -2643,9 +2681,6 @@ function renderBalanceChart() {
     for (const dep of _deposits) {
       const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
       events.push({ date: dep.deposit_date, pnl: 0, deposit: signed, sort_order: dep.sort_order ?? -1 });
-    }
-    for (const ev of fbBonusEvents) {
-      events.push({ date: ev.date, pnl: 0, deposit: ev.amount, sort_order: -1 });
     }
     events.sort((a, b) => {
       if (a.date !== b.date) return a.date < b.date ? -1 : 1;
@@ -2678,9 +2713,6 @@ function renderBalanceChart() {
     for (const dep of _deposits) {
       const signed = dep.type === 'withdrawal' ? -dep.amount : dep.amount;
       addGroup(dep.deposit_date, 0, signed);
-    }
-    for (const ev of fbBonusEvents) {
-      addGroup(ev.date, 0, ev.amount);
     }
     for (const k of Object.keys(groupMap).sort()) {
       const ev = groupMap[k];
