@@ -359,10 +359,12 @@ function initSettings() {
 function renderDepositHistory() {
   const el = document.getElementById('deposit-history');
   if (!el) return;
-  if (_deposits.length === 0) { el.innerHTML = ''; return; }
+  // 「条件達成」レコード行（FB報酬）は入金・出金ではないためこの履歴には含めない（Recordsタブに表示）
+  const realDeposits = _deposits.filter(d => !d.campaign_id);
+  if (realDeposits.length === 0) { el.innerHTML = ''; return; }
 
   // 日付降順（新しい順）
-  const sorted = [..._deposits].sort((a, b) => b.deposit_date.localeCompare(a.deposit_date));
+  const sorted = [...realDeposits].sort((a, b) => b.deposit_date.localeCompare(a.deposit_date));
 
   const rows = sorted.map(d => {
     const isWithdrawal = d.type === 'withdrawal';
@@ -402,17 +404,18 @@ function renderDepositHistory() {
         const newType   = row.querySelector('.dep-edit-type').value;
         if (!newDate || !newAmount || newAmount <= 0) return;
 
-        // bankroll への影響差分を計算
-        const oldEffect = dep.type === 'withdrawal' ? -dep.amount :  dep.amount;
-        const newEffect = newType  === 'withdrawal' ? -newAmount  :  newAmount;
-        const newBankroll = (_settings.bankroll || 0) + (newEffect - oldEffect);
-
-        await saveBankroll(newBankroll);
+        // bankroll への影響差分を計算（「条件達成」レコード行はbankroll非連動なのでスキップ）
+        if (!dep.campaign_id) {
+          const oldEffect = dep.type === 'withdrawal' ? -dep.amount :  dep.amount;
+          const newEffect = newType  === 'withdrawal' ? -newAmount  :  newAmount;
+          const newBankroll = (_settings.bankroll || 0) + (newEffect - oldEffect);
+          await saveBankroll(newBankroll);
+          document.getElementById('settings-bankroll').value = newBankroll;
+        }
         await db.from('bet_deposits').update({ amount: newAmount, deposit_date: newDate, type: newType }).eq('id', id);
 
         const idx = _deposits.findIndex(d => d.id === id);
         if (idx !== -1) _deposits[idx] = { ..._deposits[idx], amount: newAmount, deposit_date: newDate, type: newType };
-        document.getElementById('settings-bankroll').value = newBankroll;
         renderDepositHistory();
         refreshAll();
       });
@@ -425,12 +428,15 @@ function renderDepositHistory() {
       const dep = _deposits.find(d => d.id === id);
       if (!dep) return;
       if (!await showConfirm(`この入出金履歴を削除しますか？`)) return;
-      const isWithdrawal = dep.type === 'withdrawal';
-      const newBankroll  = (_settings.bankroll || 0) + (isWithdrawal ? dep.amount : -dep.amount);
-      await saveBankroll(newBankroll);
+      // 「条件達成」レコード行はbankroll非連動なのでスキップ
+      if (!dep.campaign_id) {
+        const isWithdrawal = dep.type === 'withdrawal';
+        const newBankroll  = (_settings.bankroll || 0) + (isWithdrawal ? dep.amount : -dep.amount);
+        await saveBankroll(newBankroll);
+        document.getElementById('settings-bankroll').value = newBankroll;
+      }
       await db.from('bet_deposits').delete().eq('id', id);
       _deposits = _deposits.filter(d => d.id !== id);
-      document.getElementById('settings-bankroll').value = newBankroll;
       renderDepositHistory();
       refreshAll();
     });
@@ -2056,6 +2062,7 @@ function renderCampaigns() {
         : '<span class="badge-success">ベット成功</span>';
       return `<tr>
         <td>${escapeHtml(c.name)} ${statusBadge}</td>
+        <td>${c.completedDate || '—'}</td>
         <td>¥${Number(c.fbReward).toLocaleString()}</td>
         <td class="${pnlClass}">${formatPnl(displayPnl)}</td>
         <td><button class="small-btn btn-campaign-reopen" data-id="${c.id}">再開</button></td>
@@ -2066,7 +2073,7 @@ function renderCampaigns() {
       <div class="campaign-history-label">過去の結果（${completed.length}件）</div>
       <div class="table-scroll">
         <table class="campaign-history-table">
-          <thead><tr><th>キャンペーン</th><th>FB報酬</th><th>ベット損益</th><th></th></tr></thead>
+          <thead><tr><th>キャンペーン</th><th>達成日</th><th>FB報酬</th><th>ベット損益</th><th></th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -2135,11 +2142,9 @@ async function completeCampaign(id) {
     .eq('id', id);
   if (error) { console.error('completeCampaign error:', error); return; }
 
-  // FB報酬を「条件達成」レコード行として追加し、bankrollに反映
+  // FB報酬を「条件達成」レコード行として追加（bankroll＝元手は入金・出金のみで構成するため、ここでは変更しない）
   // ※「FB報酬は元手設定に含む」済みの場合は二重計上になるためスキップ
   if (!c.fbRewardInBankroll) {
-    const newBankroll = (_settings.bankroll || 0) + (c.fbReward || 0);
-    await saveBankroll(newBankroll);
     const { error: depErr } = await db.from('bet_deposits').insert([{
       amount: c.fbReward, deposit_date: completedDate, type: 'deposit', campaign_id: id, sort_order: -1,
     }]);
@@ -2166,12 +2171,10 @@ async function reopenCampaign(id) {
   const c = _campaigns.find(c => String(c.id) === String(id));
   if (!c || !await showConfirm(`「${c.name}」を進行中に戻しますか？`)) return;
 
-  // 過去に付与した「条件達成」レコード行があれば取り消す（bankrollからも差し引く）
+  // 過去に付与した「条件達成」レコード行があれば取り消す（bankrollは元々変更していないので削除のみでよい）
   // → 再度「達成」した時に二重計上しないようにするため
   const rewardDeposits = _deposits.filter(d => String(d.campaign_id) === String(id));
   if (rewardDeposits.length > 0) {
-    const totalReward = rewardDeposits.reduce((sum, d) => sum + (d.type === 'withdrawal' ? -d.amount : d.amount), 0);
-    await saveBankroll((_settings.bankroll || 0) - totalReward);
     const { error: delErr } = await db.from('bet_deposits').delete().in('id', rewardDeposits.map(d => d.id));
     if (delErr) { console.error('reopenCampaign (remove reward deposit) error:', delErr); return; }
   }
@@ -2248,14 +2251,19 @@ function updateSummary() {
     .filter(b => b.result === 'pending' && !b.isFreebet)
     .reduce((sum, b) => sum + (b.stake || 0), 0);
 
-  // 残高（元手が設定されていれば元手+損益、なければ損益だけ表示）
+  // 「条件達成」レコード行（FB報酬）：bankroll（元手＝入金/出金のみ）には含めず、別枠として残高に加算
+  const rewardTotal = _deposits
+    .filter(d => d.campaign_id)
+    .reduce((sum, d) => sum + (d.type === 'withdrawal' ? -d.amount : d.amount), 0);
+
+  // 残高（元手が設定されていれば元手+損益+FB報酬、なければ損益だけ表示）
   const balanceEl = document.getElementById('balance');
   if (_settings.bankroll) {
-    const balance = _settings.bankroll + totalPnl - pendingStake;
+    const balance = _settings.bankroll + totalPnl - pendingStake + rewardTotal;
     balanceEl.textContent = '¥' + Math.round(balance).toLocaleString();
     balanceEl.className   = 's-val ' + (balance < _settings.bankroll ? 'loss' : balance > _settings.bankroll ? 'win' : '');
   } else {
-    const effectivePnl = totalPnl - pendingStake;
+    const effectivePnl = totalPnl - pendingStake + rewardTotal;
     balanceEl.textContent = (effectivePnl >= 0 ? '+' : '') + '¥' + Math.round(effectivePnl).toLocaleString();
     balanceEl.className   = 's-val ' + (effectivePnl > 0 ? 'win' : effectivePnl < 0 ? 'loss' : '');
   }
@@ -2660,7 +2668,11 @@ function renderCharts() {
 
 function renderBalanceChart() {
   // 出金は負数として計算（入金:+amount、出金:-amount）
-  const netDeposited = _deposits.reduce((s, d) => s + (d.type === 'withdrawal' ? -d.amount : d.amount), 0);
+  // ※「条件達成」レコード行(campaign_id付き)はbankrollに含まれていないため、起点計算では除外する
+  //   （下のイベントループでは全ての入出金＋条件達成行を処理するので、そちらで正しく反映される）
+  const netDeposited = _deposits
+    .filter(d => !d.campaign_id)
+    .reduce((s, d) => s + (d.type === 'withdrawal' ? -d.amount : d.amount), 0);
   const initialBankroll = (_settings.bankroll || 0) - netDeposited;
 
   // pending非FB: -stake（ベット時点で即控除）
