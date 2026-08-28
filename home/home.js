@@ -8,6 +8,25 @@ const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============================================================
+// 日付ユーティリティ（JST）
+// toISOString() はUTC変換でJSTとズレるため、日付文字列化には使わない
+// ============================================================
+function ymdStr(y, m, d) {
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+function localDateStr(date) {
+  return ymdStr(date.getFullYear(), date.getMonth(), date.getDate());
+}
+function todayJST() {
+  return localDateStr(new Date());
+}
+function daysAgoStr(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return localDateStr(d);
+}
+
+// ============================================================
 // Google Calendar 連携
 // ============================================================
 const GC_CLIENT_ID            = '1053779234925-qc97npjce6q3avsssjkfl3jvldjv4sj1.apps.googleusercontent.com';
@@ -77,7 +96,7 @@ async function gcalCreate(summary, date, colorId) {
     body: JSON.stringify({
       summary,
       start:   { date },
-      end:     { date: nextDay.toISOString().split('T')[0] },
+      end:     { date: localDateStr(nextDay) },
       colorId: String(colorId),
     }),
   });
@@ -279,7 +298,7 @@ function initMobileScheduleForm() {
     submitBtn.disabled = true;
     submitBtn.textContent = '追加中...';
 
-    const date       = document.getElementById('m-sch-date').value || new Date().toISOString().split('T')[0];
+    const date       = document.getElementById('m-sch-date').value || todayJST();
     const startISO   = `${date}T${sTime}:00`;
     const endISO     = `${date}T${eTime}:00`;
     const calendarId = document.getElementById('m-sch-calendar')?.value || 'primary';
@@ -352,7 +371,7 @@ function initScheduleAddForm() {
     submitBtn.disabled = true;
     submitBtn.textContent = '追加中...';
 
-    const date       = document.getElementById('sch-date').value || new Date().toISOString().split('T')[0];
+    const date       = document.getElementById('sch-date').value || todayJST();
     const startISO   = `${date}T${sTime}:00`;
     const endISO     = `${date}T${eTime}:00`;
     const calendarId = document.getElementById('sch-calendar')?.value || 'primary';
@@ -388,15 +407,15 @@ function yen(n) {
 }
 
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  return todayJST();
 }
 
 function monthRange() {
   const now = new Date();
   const y = now.getFullYear(), m = now.getMonth();
   return {
-    start: new Date(y, m, 1).toISOString().split('T')[0],
-    end:   new Date(y, m + 1, 0).toISOString().split('T')[0],
+    start: ymdStr(y, m, 1),
+    end:   ymdStr(y, m, new Date(y, m + 1, 0).getDate()),
   };
 }
 
@@ -703,8 +722,8 @@ function buildGanttTimeline(todos) {
   const first    = new Date(year, month, 1);
   const last     = new Date(year, month + 1, 0);
   const days     = last.getDate();
-  const firstStr = first.toISOString().split('T')[0];
-  const lastStr  = last.toISOString().split('T')[0];
+  const firstStr = localDateStr(first);
+  const lastStr  = localDateStr(last);
   const today    = todayStr();
   const WEEK     = ['日', '月', '火', '水', '木', '金', '土'];
   const totalW   = days * HOME_CELL_W;
@@ -745,7 +764,7 @@ function buildGanttTimeline(todos) {
 
     Array.from({ length: days }, (_, i) => {
       const d    = new Date(year, month, i + 1);
-      const dStr = d.toISOString().split('T')[0];
+      const dStr = localDateStr(d);
       const dow  = d.getDay();
       const cell = document.createElement('div');
       cell.className = `home-tl-cell ${dow === 0 || dow === 6 ? 'we' : ''} ${dStr === today ? 'today' : ''}`;
@@ -955,7 +974,7 @@ let habitChart = null;
 
 async function loadHabitChart() {
   const end   = todayStr();
-  const start = new Date(Date.now() - 29 * 86400000).toISOString().split('T')[0];
+  const start = daysAgoStr(29);
 
   const { data: logs } = await db.from('routine_logs').select('*').gte('date', start).lte('date', end);
   const logMap = {};
@@ -964,7 +983,7 @@ async function loadHabitChart() {
   const labels = [], counts = [], colors = [];
 
   for (let i = 29; i >= 0; i--) {
-    const d   = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
+    const d   = daysAgoStr(i);
     const log = logMap[d];
     const cnt = log ? (log.ielts ? 1 : 0) + (log.reading ? 1 : 0) + (log.training ? 1 : 0) : 0;
 

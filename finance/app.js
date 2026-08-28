@@ -84,11 +84,22 @@ function yen(n) {
   return '¥' + Math.abs(n).toLocaleString('ja-JP');
 }
 
+// ローカル日付から YYYY-MM-DD 文字列を組み立てる（toISOString はUTC変換でJSTとズレるため使わない）
+function dateStr(y, m, d) {
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function todayJST() {
+  const d = new Date();
+  return dateStr(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 function monthRange(date) {
   const y = date.getFullYear();
   const m = date.getMonth();
-  const start = new Date(y, m, 1).toISOString().split('T')[0];
-  const end   = new Date(y, m + 1, 0).toISOString().split('T')[0];
+  const start = dateStr(y, m, 1);
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  const end = dateStr(y, m, lastDay);
   return { start, end };
 }
 
@@ -182,7 +193,7 @@ document.getElementById('input-location').addEventListener('change', function ()
 });
 
 // 今日の日付をデフォルトに
-document.getElementById('input-date').value = new Date().toISOString().split('T')[0];
+document.getElementById('input-date').value = todayJST();
 
 // カテゴリ初期化（Supabase から追加分を読み込んでから表示）
 loadCategories().then(() => updateCategoryOptions());
@@ -314,7 +325,7 @@ async function renderDashboard() {
   document.getElementById('dash-month-label').textContent = monthLabel(dashMonth);
 
   const { start, end } = monthRange(dashMonth);
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayJST();
   const effectiveEnd = end > today ? today : end;
 
   const { data: txns } = await db
@@ -358,9 +369,9 @@ async function renderDashboard() {
 async function renderChart() {
   // 6ヶ月分まとめて取得
   const sixAgo = new Date(dashMonth.getFullYear(), dashMonth.getMonth() - 5, 1);
-  const { start } = { start: sixAgo.toISOString().split('T')[0] };
+  const start = dateStr(sixAgo.getFullYear(), sixAgo.getMonth(), sixAgo.getDate());
   const { end }   = monthRange(dashMonth);
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayJST();
   const effectiveEnd = end > today ? today : end;
 
   const { data: all } = await db
@@ -594,7 +605,7 @@ async function openNewTxnModal(defaultType = 'expense') {
     b.classList.toggle('active', b.dataset.type === defaultType);
   });
 
-  const today = new Date().toLocaleDateString('sv-SE');
+  const today = todayJST();
   f.elements.id.value     = '';
   f.elements.date.value   = today;
   f.elements.amount.value = '';
@@ -839,7 +850,7 @@ async function renderFinancePnl() {
 // 口座残高
 // ============================================================
 async function renderAccounts() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayJST();
 
   const [{ data: accounts }, { data: futureTxns }] = await Promise.all([
     db.from('accounts').select('*').order('sort_order'),
@@ -1103,7 +1114,7 @@ async function renderPlannedTab() {
       const { name, amount, category, day, payment } = btn.dataset;
       const billingDate = day
         ? `${yearMonthStr}-${String(day).padStart(2, '0')}`
-        : new Date().toLocaleDateString('sv-SE');
+        : todayJST();
       openPlannedRegisterModal({ name, amount: parseInt(amount), category, date: billingDate, paymentMethod: payment });
     });
   });

@@ -2631,7 +2631,8 @@ function weekKey(dateStr) {
   const d = new Date(dateStr + 'T00:00:00');
   const dow = d.getDay();
   d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
-  return d.toISOString().split('T')[0];
+  // toISOString()はUTC変換でJSTとズレるため使わない
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function getStatKey(sport, league) {
@@ -3979,10 +3980,12 @@ async function addMatchToGcal(btn) {
   } else {
     const next = new Date(dateStr + 'T00:00:00');
     next.setDate(next.getDate() + 1);
+    // toISOString()はUTC変換でJSTとズレるため使わない
+    const nextStr = `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
     body = {
       summary: title,
       start:   { date: dateStr },
-      end:     { date: next.toISOString().split('T')[0] },
+      end:     { date: nextStr },
     };
   }
 

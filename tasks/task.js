@@ -8,6 +8,22 @@ const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============================================================
+// 日付ユーティリティ（JST）
+// toISOString() はUTC変換でJSTとズレるため、日付文字列化には使わない
+// ============================================================
+function ymdStr(y, m, d) {
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+function localDateStr(date) {
+  return ymdStr(date.getFullYear(), date.getMonth(), date.getDate());
+}
+function daysAgoStr(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return localDateStr(d);
+}
+
+// ============================================================
 // 定数
 // ============================================================
 const ROUTINE_KEYS = ['ielts', 'reading', 'training'];
@@ -81,7 +97,7 @@ async function gcalCreate(summary, date, colorId) {
     body: JSON.stringify({
       summary,
       start:   { date },
-      end:     { date: nextDay.toISOString().split('T')[0] },
+      end:     { date: localDateStr(nextDay) },
       colorId: String(colorId),
     }),
   });
@@ -104,7 +120,7 @@ async function gcalDelete(eventId) {
 // ユーティリティ
 // ============================================================
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  return localDateStr(new Date());
 }
 
 function formatDate(dateStr) {
@@ -118,9 +134,9 @@ function getRoutineDate() {
   if (now.getHours() < 3) {
     const y = new Date(now);
     y.setDate(y.getDate() - 1);
-    return y.toISOString().split('T')[0];
+    return localDateStr(y);
   }
-  return now.toISOString().split('T')[0];
+  return localDateStr(now);
 }
 
 // ============================================================
@@ -662,7 +678,7 @@ document.addEventListener('mousemove', (e) => {
     const x      = e.clientX - rect.left + scrollEl.scrollLeft;
     const dayIdx = Math.max(0, Math.min(tlDays - 1, Math.floor(x / CELL_W)));
     const d      = new Date(tlMonth.getFullYear(), tlMonth.getMonth(), dayIdx + 1);
-    const newDate = d.toISOString().split('T')[0];
+    const newDate = localDateStr(d);
     createDrag.currentDate = newDate;
     // プレビューバーの位置・幅を更新
     const { startDate, previewEl } = createDrag;
@@ -759,7 +775,7 @@ document.addEventListener('mouseup', async (e) => {
   if (deltaDays !== 0) {
     const base = new Date(dragState.origDate + 'T00:00:00');
     base.setDate(base.getDate() + deltaDays);
-    const newDateStr = base.toISOString().split('T')[0];
+    const newDateStr = localDateStr(base);
     if (dragState.handle === 'right') {
       const startStr = dragState.task.start_date || dragState.task.due_date;
       if (newDateStr >= startStr) {
@@ -1053,14 +1069,14 @@ async function saveRoutine(recordDate) {
 
 async function loadHabitChart() {
   const end   = todayStr();
-  const start = new Date(Date.now() - 29 * 86400000).toISOString().split('T')[0];
+  const start = daysAgoStr(29);
   const { data: logs } = await db.from('routine_logs').select('*').gte('date', start).lte('date', end);
   const logMap = {};
   (logs || []).forEach(l => { logMap[l.date] = l; });
 
   const labels = [], counts = [], colors = [];
   for (let i = 29; i >= 0; i--) {
-    const d   = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
+    const d   = daysAgoStr(i);
     const log = logMap[d];
     const cnt = log ? ROUTINE_KEYS.reduce((s, k) => s + (log[k] ? 1 : 0), 0) : 0;
     labels.push(d.slice(5));

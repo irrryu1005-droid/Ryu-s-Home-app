@@ -7,6 +7,15 @@ const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============================================================
+// 日付ユーティリティ（JST）
+// toISOString() はUTC変換でJSTとズレるため、日付文字列化には使わない
+// ============================================================
+function todayJST() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ============================================================
 // 状態
 // ============================================================
 let _books       = [];
@@ -704,7 +713,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-add-score').addEventListener('click', () => {
     document.getElementById('score-form').reset();
-    document.getElementById('score-form').elements.date.value = new Date().toISOString().slice(0, 10);
+    document.getElementById('score-form').elements.date.value = todayJST();
     document.getElementById('score-modal-overlay').hidden = false;
   });
   document.querySelectorAll('.modal-close-score').forEach(btn =>
@@ -728,7 +737,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btn-add-log').addEventListener('click', () => {
     document.getElementById('log-form').reset();
-    document.getElementById('log-form').elements.date.value = new Date().toISOString().slice(0, 10);
+    document.getElementById('log-form').elements.date.value = todayJST();
     document.getElementById('log-modal-overlay').hidden = false;
   });
   document.querySelectorAll('.modal-close-log').forEach(btn =>
