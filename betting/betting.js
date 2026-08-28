@@ -2770,12 +2770,26 @@ function renderPnlChart(allBets) {
   const labels = [], data = [];
   let cum = 0;
 
+  // FB報酬（「条件達成」レコード行）も損益として合算する（P/Lタブ・Recordsと一致させるため）
+  const rewards = _deposits.filter(d => d.campaign_id);
+
   if (_pnlViewBy === 'bet') {
+    const events = [];
     for (const bet of allBets) {
       const pnl = calcPnlForChart(bet);
       if (pnl === null) continue;
-      cum += pnl;
-      labels.push(bet.date);
+      events.push({ date: bet.date, pnl, sort_order: bet.sortOrder ?? 0 });
+    }
+    for (const dep of rewards) {
+      events.push({ date: dep.deposit_date, pnl: dep.amount, sort_order: dep.sort_order ?? -1 });
+    }
+    events.sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return (b.sort_order ?? 9999) - (a.sort_order ?? 9999); // 同日内は降順（recordsの下＝古い順）
+    });
+    for (const ev of events) {
+      cum += ev.pnl;
+      labels.push(ev.date);
       data.push(cum);
     }
   } else {
@@ -2788,6 +2802,10 @@ function renderPnlChart(allBets) {
       if (pnl === null) continue;
       const k = keyFn(bet.date);
       groupMap[k] = (groupMap[k] || 0) + pnl;
+    }
+    for (const dep of rewards) {
+      const k = keyFn(dep.deposit_date);
+      groupMap[k] = (groupMap[k] || 0) + dep.amount;
     }
     for (const k of Object.keys(groupMap).sort()) {
       cum += groupMap[k];
