@@ -3639,7 +3639,9 @@ async function fetchEventsForDate(dateStr) {
     seen.add(key);
     return true;
   });
-  scheduleCache[dateStr] = evs;
+  // 0件の結果はキャッシュしない（API側の一時的な失敗で0件になっただけの可能性があり、
+  // それを永久キャッシュしてしまうと本当は試合があるのに「なし」のまま固定されてしまうため）
+  if (evs.length > 0) scheduleCache[dateStr] = evs;
   return evs;
 }
 
