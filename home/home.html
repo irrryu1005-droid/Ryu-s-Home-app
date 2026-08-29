@@ -235,45 +235,17 @@
       <a href="../betting/betting.html" class="m-app-tab"><span class="m-app-tab-icon">🎯</span>Betting</a>
     </nav>
 
-    <!-- 今日の予定 -->
-    <section class="m-section">
-      <div class="m-sch-nav-row">
-        <button class="sch-nav-btn" id="m-sch-prev">‹</button>
-        <h2 id="m-sch-date-label">📅 今日の予定</h2>
-        <button class="sch-nav-btn" id="m-sch-next">›</button>
-      </div>
-      <div id="m-schedule-list" class="m-schedule-list">
-        <div class="schedule-loading">読み込み中...</div>
-      </div>
-      <div class="m-schedule-add-wrap">
-        <button class="m-schedule-add-toggle" id="m-schedule-add-toggle">＋ 予定を追加</button>
-        <form class="m-schedule-add-form hidden" id="m-schedule-add-form">
-          <input type="text" id="m-sch-title" placeholder="タイトル" required>
-          <input type="date" id="m-sch-date" class="m-sch-date-input">
-          <div class="m-sch-time-row">
-            <input type="time" id="m-sch-start">
-            <span class="m-sch-sep">〜</span>
-            <input type="time" id="m-sch-end">
-          </div>
-          <select id="m-sch-calendar" class="m-sch-calendar-select">
-            <option value="primary">読み込み中...</option>
-          </select>
-          <div class="m-sch-btns">
-            <button type="button" id="m-sch-cancel">キャンセル</button>
-            <button type="submit" id="m-sch-submit">追加</button>
-          </div>
-        </form>
-      </div>
-    </section>
-
     <!-- ルーティン -->
-    <section class="m-section">
-      <h2>🔄 今日のルーティン</h2>
+    <section class="m-section m-routine-section">
+      <div class="m-section-head">
+        <h2>🔄 今日のルーティン</h2>
+        <span class="m-routine-badge" id="m-routine-count">0 / 3</span>
+      </div>
       <div class="routine-items">
         <label class="routine-item">
           <input type="checkbox" data-key="ielts">
           <span class="routine-icon">📖</span>
-          <span>IELTS単語</span>
+          <span>IELTS</span>
         </label>
         <label class="routine-item">
           <input type="checkbox" data-key="reading">
@@ -283,18 +255,96 @@
         <label class="routine-item">
           <input type="checkbox" data-key="training">
           <span class="routine-icon">💪</span>
-          <span>トレーニング</span>
+          <span>トレ</span>
         </label>
-      </div>
-      <div class="routine-progress-wrap">
-        <div class="routine-progress-track">
-          <div class="routine-progress-fill" id="m-routine-fill"></div>
-        </div>
-        <div class="routine-count" id="m-routine-count">0 / 3</div>
       </div>
     </section>
 
+    <!-- 収支を記録 -->
+    <section class="m-section">
+      <h2>💰 収支を記録</h2>
+      <div class="type-toggle">
+        <button type="button" class="type-btn expense active" data-type="expense">支出</button>
+        <button type="button" class="type-btn income" data-type="income">収入</button>
+      </div>
+      <form id="m-fin-form">
+        <div class="form-group">
+          <label>金額</label>
+          <input type="number" id="m-fin-amount" inputmode="numeric" placeholder="0" required>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>カテゴリ</label>
+            <select id="m-fin-category" required></select>
+          </div>
+          <div class="form-group">
+            <label>支払い方法</label>
+            <select id="m-fin-payment" required></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>日付</label>
+          <input type="date" id="m-fin-date">
+        </div>
+        <button type="submit" class="submit-btn" id="m-fin-submit">登録する</button>
+        <div id="m-fin-message"></div>
+      </form>
+    </section>
+
+    <!-- ToDo追加 -->
+    <section class="m-section">
+      <button type="button" class="m-todo-open-btn" id="m-todo-open-btn">✅ ToDoを追加</button>
+    </section>
+
   </div><!-- /mobile-home -->
+
+  <!-- ToDo追加モーダル -->
+  <div class="m-todo-modal-overlay hidden" id="m-todo-modal-overlay">
+    <div class="m-todo-modal">
+      <div class="m-todo-modal-title">✅ ToDoを追加</div>
+      <form id="m-todo-form" novalidate>
+        <div class="form-group">
+          <label>タスク名</label>
+          <input type="text" id="m-todo-text" placeholder="タスクを入力" required>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>カテゴリ</label>
+            <select id="m-todo-category">
+              <option value="">カテゴリなし</option>
+              <option value="神大">神大</option>
+              <option value="バイト">バイト</option>
+              <option value="Betting">Betting</option>
+              <option value="資格">資格</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ステータス</label>
+            <select id="m-todo-status">
+              <option value="will">Will</option>
+              <option value="doing">Doing</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label>開始日</label>
+            <input type="date" id="m-todo-start">
+          </div>
+          <div class="form-group">
+            <label>期限</label>
+            <input type="date" id="m-todo-due">
+          </div>
+        </div>
+        <div class="m-todo-modal-btns">
+          <button type="button" id="m-todo-cancel">キャンセル</button>
+          <button type="submit" id="m-todo-submit">追加</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script src="home.js"></script>
 </body>

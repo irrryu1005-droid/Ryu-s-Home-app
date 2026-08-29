@@ -1020,7 +1020,7 @@ body {
 .submit-btn {
   width: 100%;
   padding: 14px;
-  background: var(--expense);
+  background: linear-gradient(135deg, var(--expense), #4F46E5);
   color: var(--white);
   border: none;
   border-radius: 12px;
@@ -1028,8 +1028,11 @@ body {
   font-weight: 700;
   cursor: pointer;
   margin-top: 6px;
+  box-shadow: 0 4px 14px rgba(99,102,241,0.28);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.submit-btn:disabled { opacity: 0.5; }
+.submit-btn:active { transform: scale(0.98); box-shadow: 0 2px 8px rgba(99,102,241,0.22); }
+.submit-btn:disabled { opacity: 0.5; box-shadow: none; }
 
 #m-message {
   text-align: center;
@@ -1039,85 +1042,138 @@ body {
   min-height: 18px;
 }
 
-/* モバイル今日の予定 */
-.m-schedule-list {
-  min-height: 24px;
-}
-.m-schedule-add-wrap {
-  margin-top: 8px;
-}
-.m-schedule-add-toggle {
-  width: 100%;
-  padding: 7px;
-  background: var(--bg);
-  border: 1.5px dashed var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-}
-.m-schedule-add-toggle:hover {
-  border-color: var(--expense);
-  color: var(--expense);
-}
-.m-schedule-add-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
-}
-.m-schedule-add-form.hidden { display: none; }
-.m-schedule-add-form input[type="text"],
-.m-schedule-add-form input[type="date"],
-.m-schedule-add-form select {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-  background: var(--bg);
-  color: var(--text);
-}
-.m-schedule-add-form input:focus,
-.m-schedule-add-form select:focus {
-  outline: none;
-  border-color: var(--expense);
-}
-.m-sch-time-row {
+/* ============================================================
+   モバイル: セクション共通ヘッダー（タイトル＋右側バッジ）
+============================================================ */
+.m-section-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.m-section-head h2 { margin-bottom: 0; }
+
+/* ============================================================
+   モバイル: ルーティン（横並びコンパクトチップ）
+============================================================ */
+.m-routine-badge {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--profit-pos);
+  background: #ECFDF5;
+  padding: 4px 10px;
+  border-radius: 99px;
+  letter-spacing: 0.02em;
+}
+#mobile-home .m-routine-section .routine-items {
+  flex-direction: row;
   gap: 8px;
+  margin-bottom: 0;
 }
-.m-sch-time-row input[type="time"] {
+#mobile-home .m-routine-section .routine-item {
   flex: 1;
-  padding: 8px 10px;
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-  background: var(--bg);
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 4px;
+  border-radius: 14px;
+  text-align: center;
+  position: relative;
 }
-.m-sch-sep { color: var(--text-muted); font-weight: 600; }
-.m-sch-btns {
+#mobile-home .m-routine-section .routine-item:active { transform: scale(0.96); }
+#mobile-home .m-routine-section .routine-item input[type="checkbox"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+#mobile-home .m-routine-section .routine-icon { font-size: 21px; }
+#mobile-home .m-routine-section .routine-item span:last-child {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+#mobile-home .m-routine-section .routine-item:has(input:checked) span:last-child { color: var(--profit-pos); }
+
+/* ============================================================
+   モバイル: 収支クイック入力 / ToDo追加モーダル
+============================================================ */
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+#m-fin-message {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 16px;
+}
+
+.m-todo-open-btn {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, #4F46E5, var(--expense));
+  color: var(--white);
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(99,102,241,0.28);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.m-todo-open-btn:active { transform: scale(0.98); box-shadow: 0 2px 8px rgba(99,102,241,0.22); }
+
+.m-todo-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17,24,39,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 200;
+}
+.m-todo-modal-overlay.hidden { display: none; }
+.m-todo-modal {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 18px;
+  width: 100%;
+  max-width: 360px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.m-todo-modal-title {
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 14px;
+}
+.m-todo-modal-btns {
   display: flex;
   gap: 8px;
+  margin-top: 6px;
 }
-.m-sch-btns button {
+.m-todo-modal-btns button {
   flex: 1;
-  padding: 9px;
+  padding: 11px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   border: none;
 }
-#m-sch-cancel {
+#m-todo-cancel {
   background: var(--bg);
-  color: var(--text-muted);
+  color: var(--muted);
   border: 1.5px solid var(--border) !important;
 }
-#m-sch-submit {
+#m-todo-submit {
   background: var(--expense);
   color: var(--white);
 }

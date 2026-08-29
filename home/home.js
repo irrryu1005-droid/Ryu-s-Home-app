@@ -563,6 +563,140 @@ async function loadFinanceSummary() {
 }
 
 // ============================================================
+// 収支クイック入力（モバイル版）
+// ============================================================
+const HOME_PAYMENT_METHODS = [
+  'deposit（銀行）', 'cash（現金）', 'PayPay',
+  'Rakuten Pay', 'non-trade payables', 'credit trade payable',
+];
+const HOME_DEFAULT_INCOME  = ['仕送り', 'バイト', 'Sports Betting'];
+const HOME_DEFAULT_EXPENSE = ['食費', '交通費', '衣類・アクセサリー', '娯楽費', '旅費', 'サブスクリプション', '美容', 'ガジェット', '必需品'];
+
+let _homeFinType = 'expense';
+let _homeIncomeCategories  = [...HOME_DEFAULT_INCOME];
+let _homeExpenseCategories = [...HOME_DEFAULT_EXPENSE];
+
+async function loadHomeFinanceCategories() {
+  const { data } = await db.from('finance_categories').select('type,name').order('id');
+  if (data && data.length > 0) {
+    _homeIncomeCategories  = data.filter(r => r.type === 'income').map(r => r.name);
+    _homeExpenseCategories = data.filter(r => r.type !== 'income').map(r => r.name).filter(n => n !== '科目変換');
+  }
+  populateHomeFinCategories();
+}
+
+function populateHomeFinCategories() {
+  const sel  = document.getElementById('m-fin-category');
+  if (!sel) return;
+  const cats = _homeFinType === 'income' ? _homeIncomeCategories : _homeExpenseCategories;
+  sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+async function updateHomeAccountBalance(accountName, type, amount) {
+  const { data: account } = await db.from('accounts').select('balance').eq('account_name', accountName).single();
+  if (!account) return;
+  const delta = type === 'income' ? amount : -amount;
+  await db.from('accounts').update({ balance: account.balance + delta }).eq('account_name', accountName);
+}
+
+function initHomeFinanceForm() {
+  const form = document.getElementById('m-fin-form');
+  if (!form) return;
+
+  const paymentSel = document.getElementById('m-fin-payment');
+  paymentSel.innerHTML = HOME_PAYMENT_METHODS.map(p => `<option value="${p}">${p}</option>`).join('');
+  document.getElementById('m-fin-date').value = todayJST();
+  populateHomeFinCategories();
+
+  document.querySelectorAll('.type-toggle .type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _homeFinType = btn.dataset.type;
+      document.querySelectorAll('.type-toggle .type-btn').forEach(b => b.classList.toggle('active', b === btn));
+      populateHomeFinCategories();
+    });
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msgEl    = document.getElementById('m-fin-message');
+    const submitBtn = document.getElementById('m-fin-submit');
+    const amount   = parseInt(document.getElementById('m-fin-amount').value, 10);
+    const category = document.getElementById('m-fin-category').value;
+    const payment  = document.getElementById('m-fin-payment').value;
+    const date     = document.getElementById('m-fin-date').value || todayJST();
+    if (!amount || !category || !payment) return;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '登録中...';
+
+    const payload = { date, type: _homeFinType, amount, category, payment_method: payment, memo: '' };
+    const { error } = await db.from('transactions').insert([payload]);
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = '登録する';
+
+    if (error) {
+      msgEl.style.color = 'var(--profit-neg)';
+      msgEl.textContent = 'エラー: ' + error.message;
+    } else {
+      await updateHomeAccountBalance(payment, _homeFinType, amount);
+      msgEl.style.color = 'var(--profit-pos)';
+      msgEl.textContent = '✓ 登録しました';
+      document.getElementById('m-fin-amount').value = '';
+      setTimeout(() => { msgEl.textContent = ''; }, 2000);
+      loadFinanceSummary();
+    }
+  });
+}
+
+// ============================================================
+// ToDo追加モーダル（モバイル版）
+// ============================================================
+function initHomeTodoModal() {
+  const openBtn   = document.getElementById('m-todo-open-btn');
+  const overlay   = document.getElementById('m-todo-modal-overlay');
+  const cancelBtn = document.getElementById('m-todo-cancel');
+  const form      = document.getElementById('m-todo-form');
+  if (!openBtn || !overlay || !form) return;
+
+  const close = () => { overlay.classList.add('hidden'); form.reset(); };
+
+  openBtn.addEventListener('click', () => overlay.classList.remove('hidden'));
+  cancelBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text     = document.getElementById('m-todo-text').value.trim();
+    const category = document.getElementById('m-todo-category').value || null;
+    const status   = document.getElementById('m-todo-status').value;
+    const startDate = document.getElementById('m-todo-start').value || null;
+    const dueDate   = document.getElementById('m-todo-due').value   || null;
+    if (!text) return;
+
+    const submitBtn = document.getElementById('m-todo-submit');
+    submitBtn.disabled = true;
+
+    const payload = {
+      text, category, status,
+      start_date: startDate,
+      due_date:   dueDate,
+      done_at:    status === 'done' ? todayStr() : null,
+    };
+    const { data: newTodo } = await db.from('todos').insert([payload]).select().single();
+
+    if (newTodo && dueDate) {
+      const eventId = await gcalCreate(`【締切】${text}`, dueDate, 11);
+      if (eventId) await db.from('todos').update({ gcal_due_event_id: eventId }).eq('id', newTodo.id);
+    }
+
+    submitBtn.disabled = false;
+    close();
+    loadPcTodos();
+  });
+}
+
+// ============================================================
 // ToDo（PC版）
 // ============================================================
 const HOME_CAT_COLORS = {
@@ -1111,15 +1245,13 @@ loadMobileTodos();
 loadRoutine();
 loadHabitChart();
 initScheduleAddForm();
-initMobileScheduleForm();
+loadHomeFinanceCategories();
+initHomeFinanceForm();
+initHomeTodoModal();
 
-// 予定ナビゲーション
-['sch-prev', 'm-sch-prev'].forEach(id => {
-  document.getElementById(id)?.addEventListener('click', () => { _schedDayOffset--; loadTodaySchedule(); });
-});
-['sch-next', 'm-sch-next'].forEach(id => {
-  document.getElementById(id)?.addEventListener('click', () => { _schedDayOffset++; loadTodaySchedule(); });
-});
+// 予定ナビゲーション（PC版のみ。モバイルの今日の予定は廃止済み）
+document.getElementById('sch-prev')?.addEventListener('click', () => { _schedDayOffset--; loadTodaySchedule(); });
+document.getElementById('sch-next')?.addEventListener('click', () => { _schedDayOffset++; loadTodaySchedule(); });
 
 // データ更新ボタン
 document.getElementById('btn-refresh')?.addEventListener('click', async () => {
