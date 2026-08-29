@@ -2305,8 +2305,13 @@ function renderPeriodStats() {
   const monthLabel = _periodMonthOfs === 0 ? '今月' : `${mBase.getFullYear()}/${mBase.getMonth()+1}月`;
 
   const calcPeriod = (start, end) => {
-    return _bets.filter(b => b.date >= start && b.date <= end)
-                .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
+    const betPnl = _bets.filter(b => b.date >= start && b.date <= end)
+                        .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
+    // FB報酬（条件達成レコード行）もこの期間の分だけ加算
+    const rewardPnl = _deposits
+      .filter(d => d.campaign_id && d.deposit_date >= start && d.deposit_date <= end)
+      .reduce((sum, d) => sum + (d.amount || 0), 0);
+    return betPnl + rewardPnl;
   };
 
   const fmt = pnl => (pnl >= 0 ? '+' : '') + '¥' + Math.round(pnl).toLocaleString();
@@ -2491,9 +2496,14 @@ function renderGoalProgress() {
   // ---- 通常表示モード ----
   const today = new Date(); today.setHours(0,0,0,0);
 
-  const pnl = _bets
+  const betPnl = _bets
     .filter(b => b.date >= g.goalStart && b.date <= g.goalEnd)
     .reduce((sum, b) => sum + (calcPnl(b) ?? 0), 0);
+  // FB報酬（条件達成レコード行）も期間内の分を加算
+  const rewardPnl = _deposits
+    .filter(d => d.campaign_id && d.deposit_date >= g.goalStart && d.deposit_date <= g.goalEnd)
+    .reduce((sum, d) => sum + (d.amount || 0), 0);
+  const pnl = betPnl + rewardPnl;
 
   // 現実目標未達成中は現実を100%基準、達成後は理想を100%基準
   const effectiveMax = (g.goalRealistic && pnl < g.goalRealistic) ? g.goalRealistic : g.goalAmount;

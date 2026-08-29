@@ -305,7 +305,8 @@ body {
   padding: 10px 12px;
   border: 1.5px solid var(--border);
   border-radius: 10px;
-  font-size: 13px;
+  /* iOSはinputのfont-sizeが16px未満だとフォーカス時に画面を自動拡大するため16px以上を維持 */
+  font-size: 16px;
   background: var(--bg);
   color: var(--text);
   font-family: inherit;
@@ -1265,7 +1266,7 @@ tr:last-child td { border-bottom: none; }
   .form-group label { font-size: 11px; margin-bottom: 3px; }
   .form-group input,
   .form-group select,
-  .form-group textarea { padding: 8px 10px; font-size: 12px; }
+  .form-group textarea { padding: 8px 10px; font-size: 16px; }
   .form-row       { gap: 8px; }
   .form-btns      { gap: 8px; margin-top: 10px; }
   .form-btns button { padding: 10px; font-size: 13px; }
@@ -1633,7 +1634,8 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   border: 1px solid #D0D7E0;
   background: #F8F9FA;
   color: #2C3E50;
-  font-size: 14px;
+  /* iOSはinputのfont-sizeが16px未満だとフォーカス時に画面を自動拡大するため16px以上を維持 */
+  font-size: 16px;
   box-sizing: border-box;
 }
 
@@ -1951,7 +1953,8 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   padding: 8px 10px;
   border: 1.5px solid var(--border);
   border-radius: 8px;
-  font-size: 14px;
+  /* iOSはinputのfont-sizeが16px未満だとフォーカス時に画面を自動拡大するため16px以上を維持 */
+  font-size: 16px;
   background: var(--white);
   color: var(--text);
 }
@@ -1989,7 +1992,8 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   padding: 6px 8px;
   border: 1.5px solid var(--border);
   border-radius: 7px;
-  font-size: 13px;
+  /* iOSはinputのfont-sizeが16px未満だとフォーカス時に画面を自動拡大するため16px以上を維持 */
+  font-size: 16px;
   color: var(--text);
   background: var(--white);
 }
