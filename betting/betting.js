@@ -3216,17 +3216,9 @@ async function fetchESPNOnce(sport, leagueId, dateStr) {
   return parseESPNEvents(await res2.json(), dateStr);
 }
 
-// ESPNは一時的な403/タイムアウトが起きやすく、その場合は例外を投げずに単に0件を返すこともあるため、
-// 「例外」だけでなく「0件」も失敗とみなして少し待って1回だけ再試行する
 async function fetchESPN(sport, leagueId, dateStr) {
-  const attempt = async () => {
-    try { return await fetchESPNOnce(sport, leagueId, dateStr); }
-    catch { return []; }
-  };
-  const first = await attempt();
-  if (first.length > 0) return first;
-  await new Promise(r => setTimeout(r, 600));
-  return attempt();
+  try { return await fetchESPNOnce(sport, leagueId, dateStr); }
+  catch { return []; }
 }
 
 // ---- TheSportsDB汎用フェッチ ----
