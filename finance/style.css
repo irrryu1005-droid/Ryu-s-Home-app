@@ -48,17 +48,6 @@ body {
   z-index: 11;
   box-shadow: 0 1px 6px rgba(0,0,0,0.06);
 }
-.home-link {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-decoration: none;
-  padding: 5px 10px;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  transition: color 0.15s;
-}
-.home-link:hover { color: var(--text); }
 .header h1 { font-size: 20px; font-weight: 800; margin: 0; }
 
 /* ============================================================

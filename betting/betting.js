@@ -3205,17 +3205,28 @@ function parseESPNEvents(data, dateStr) {
   });
 }
 
+async function fetchESPNOnce(sport, leagueId, dateStr) {
+  const d    = dateStr.replace(/-/g, '');
+  const base = `https://site.api.espn.com/apis/site/v2/sports/${sport}/${leagueId}`;
+  // scoreboard を試し、4xx なら events にフォールバック（決勝など）
+  const res = await fetch(`${base}/scoreboard?dates=${d}`);
+  if (res.ok) return parseESPNEvents(await res.json(), dateStr);
+  const res2 = await fetch(`${base}/events?dates=${d}`);
+  if (!res2.ok) return [];
+  return parseESPNEvents(await res2.json(), dateStr);
+}
+
+// ESPNは一時的な403/タイムアウトが起きやすく、その場合は例外を投げずに単に0件を返すこともあるため、
+// 「例外」だけでなく「0件」も失敗とみなして少し待って1回だけ再試行する
 async function fetchESPN(sport, leagueId, dateStr) {
-  try {
-    const d    = dateStr.replace(/-/g, '');
-    const base = `https://site.api.espn.com/apis/site/v2/sports/${sport}/${leagueId}`;
-    // scoreboard を試し、4xx なら events にフォールバック（決勝など）
-    const res = await fetch(`${base}/scoreboard?dates=${d}`);
-    if (res.ok) return parseESPNEvents(await res.json(), dateStr);
-    const res2 = await fetch(`${base}/events?dates=${d}`);
-    if (!res2.ok) return [];
-    return parseESPNEvents(await res2.json(), dateStr);
-  } catch { return []; }
+  const attempt = async () => {
+    try { return await fetchESPNOnce(sport, leagueId, dateStr); }
+    catch { return []; }
+  };
+  const first = await attempt();
+  if (first.length > 0) return first;
+  await new Promise(r => setTimeout(r, 600));
+  return attempt();
 }
 
 // ---- TheSportsDB汎用フェッチ ----

@@ -68,3 +68,33 @@
   animation: spin 0.6s linear infinite;
   pointer-events: none;
 }
+
+/* ============================================================
+   PC用アプリ切り替えナビ（全ページ共通）768px以上のみ表示
+============================================================ */
+.pc-app-nav {
+  display: none;
+}
+@media (min-width: 768px) {
+  .pc-app-nav {
+    display: flex;
+    gap: 4px;
+    padding: 8px 20px;
+    background: #fff;
+    border-bottom: 1px solid #E4E9F0;
+  }
+}
+.pc-app-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8A9BB0;
+  transition: background 0.15s, color 0.15s;
+}
+.pc-app-nav-link:hover { background: #F3F5F8; color: #4A90D9; }
+.pc-app-nav-link.active { background: #EEF4FC; color: #4A90D9; }
