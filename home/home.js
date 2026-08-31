@@ -123,19 +123,19 @@ function schedDateStr() {
 }
 
 function updateScheduleTitle() {
-  let label;
-  if (_schedDayOffset === 0) label = '今日';
-  else if (_schedDayOffset === 1) label = '明日';
-  else if (_schedDayOffset === -1) label = '昨日';
+  let prefix = '';
+  if (_schedDayOffset === 0) prefix = '';
+  else if (_schedDayOffset === 1) prefix = 'Tomorrow ';
+  else if (_schedDayOffset === -1) prefix = 'Yesterday ';
   else {
     const d = new Date();
     d.setDate(d.getDate() + _schedDayOffset);
-    const days = ['日', '月', '火', '水', '木', '金', '土'];
-    label = `${d.getMonth() + 1}月${d.getDate()}日（${days[d.getDay()]}）`;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    prefix = `${months[d.getMonth()]} ${d.getDate()} `;
   }
   ['sch-date-label', 'm-sch-date-label'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.textContent = `📅 ${label}の予定`;
+    if (el) el.textContent = `📅 ${prefix}Schedule`;
   });
 }
 
@@ -525,11 +525,6 @@ function updateDigitalTime() {
     subEl.textContent = `${days[now.getDay()]}. ${now.getFullYear()} / ${now.getMonth() + 1} / ${now.getDate()}`;
   }
 
-  const dateEl = document.getElementById('pc-date');
-  if (dateEl) {
-    const days = ['日', '月', '火', '水', '木', '金', '土'];
-    dateEl.textContent = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（${days[now.getDay()]}）`;
-  }
 }
 
 function startClock() {

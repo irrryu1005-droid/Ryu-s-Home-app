@@ -58,7 +58,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
@@ -67,12 +67,6 @@ body {
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--text);
-}
-.pc-header-date {
-  font-size: 13px;
-  color: var(--muted);
-  font-weight: 400;
-  letter-spacing: 0.02em;
 }
 
 /* 2カラムグリッド */
@@ -880,38 +874,6 @@ body {
   transition: opacity 0.15s;
 }
 .gcal-login-btn:hover { opacity: 0.85; }
-
-/* ナビカード */
-.nav-cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-.nav-card {
-  background: var(--white);
-  border-radius: var(--radius);
-  padding: 18px 10px;
-  text-align: center;
-  text-decoration: none;
-  color: var(--sub);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  transition: all 0.2s ease;
-}
-.nav-card:hover {
-  border-color: var(--expense);
-  box-shadow: 0 4px 16px rgba(99,102,241,0.1);
-  transform: translateY(-2px);
-  color: var(--expense);
-}
-.nav-icon  { font-size: 24px; margin-bottom: 8px; }
-.nav-label { font-size: 12px; font-weight: 600; letter-spacing: 0.03em; }
-
-.nav-study   {}
-.nav-life    {}
-.nav-tasks   {}
-.nav-finance {}
-.nav-betting {}
 
 /* ============================================================
    モバイル版

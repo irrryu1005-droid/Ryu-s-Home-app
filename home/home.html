@@ -22,11 +22,10 @@
 
     <header class="pc-header">
       <div class="pc-header-title">🏠 HOME</div>
-      <div class="pc-header-date" id="pc-date"></div>
       <button id="btn-refresh" class="refresh-btn" title="データを更新">↻</button>
     </header>
 
-    <nav class="pc-app-nav">
+    <nav class="pc-app-nav pc-app-nav-card">
       <a href="home.html"               class="pc-app-nav-link active"><span>🏠</span>Home</a>
       <a href="../study/study.html"     class="pc-app-nav-link"><span>📚</span>Study</a>
       <a href="../tasks/task.html"      class="pc-app-nav-link"><span>✅</span>Tasks</a>
@@ -47,7 +46,7 @@
       <div class="pc-card schedule-card">
         <div class="card-title-nav">
           <button class="sch-nav-btn" id="sch-prev">‹</button>
-          <span class="card-title" id="sch-date-label">📅 今日の予定</span>
+          <span class="card-title" id="sch-date-label">📅 Schedule</span>
           <button class="sch-nav-btn" id="sch-next">›</button>
         </div>
         <div id="schedule-list" class="schedule-list">
@@ -150,7 +149,7 @@
 
       <!-- ルーティン -->
       <div class="pc-card routine-card">
-        <div class="card-title">🔄 今日のルーティン</div>
+        <div class="card-title">🔄 Routine</div>
         <div class="routine-today" id="routine-today-label"></div>
         <div class="routine-items">
           <label class="routine-item">
@@ -207,26 +206,6 @@
       <a href="../finance/finance.html" class="to-finance-link">収支アプリを開く →</a>
     </div>
 
-    <!-- ナビゲーションカード -->
-    <div class="nav-cards">
-      <a href="../study/study.html" class="nav-card nav-study">
-        <div class="nav-icon">📚</div>
-        <div class="nav-label">Study</div>
-      </a>
-      <a href="../tasks/task.html" class="nav-card nav-tasks">
-        <div class="nav-icon">📋</div>
-        <div class="nav-label">Tasks</div>
-      </a>
-      <a href="../finance/finance.html" class="nav-card nav-finance">
-        <div class="nav-icon">💰</div>
-        <div class="nav-label">Finance</div>
-      </a>
-      <a href="../betting/betting.html" class="nav-card nav-betting">
-        <div class="nav-icon">🎯</div>
-        <div class="nav-label">Betting</div>
-      </a>
-    </div>
-
   </div><!-- /pc-home -->
 
 
@@ -246,7 +225,7 @@
     <!-- ルーティン -->
     <section class="m-section m-routine-section">
       <div class="m-section-head">
-        <h2>🔄 今日のルーティン</h2>
+        <h2>🔄 Routine</h2>
         <span class="m-routine-badge" id="m-routine-count">0 / 3</span>
       </div>
       <div class="routine-items">
