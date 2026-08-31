@@ -1035,14 +1035,36 @@ document.getElementById('mobile-todo-form')?.addEventListener('submit', async (e
 // ============================================================
 const ROUTINE_KEYS = ['ielts', 'reading', 'training'];
 
-async function loadRoutine() {
-  const today = todayStr();
-  const days  = ['日', '月', '火', '水', '木', '金', '土'];
-  const now   = new Date();
-  const labelEl = document.getElementById('routine-today-label');
-  if (labelEl) labelEl.textContent = `${now.getMonth() + 1}月${now.getDate()}日（${days[now.getDay()]}）`;
+// 深夜3時より前にチェックした分は前日として記録する（Tasksアプリのルーティンタブと同じルール）
+function getRoutineDate() {
+  const now = new Date();
+  if (now.getHours() < 3) {
+    const y = new Date(now);
+    y.setDate(y.getDate() - 1);
+    return localDateStr(y);
+  }
+  return localDateStr(now);
+}
 
-  const { data } = await db.from('routine_logs').select('*').eq('date', today).single();
+async function loadRoutine() {
+  const recordDate  = getRoutineDate();
+  const days        = ['日', '月', '火', '水', '木', '金', '土'];
+  const d           = new Date(recordDate + 'T00:00:00');
+  const now         = new Date();
+  const isLateNight = now.getHours() < 3;
+
+  const labelEl = document.getElementById('routine-today-label');
+  if (labelEl) labelEl.textContent = `${d.getMonth() + 1}月${d.getDate()}日（${days[d.getDay()]}）`;
+
+  const hintText = isLateNight ? `⚠️ 現在${now.getHours()}時台のため、前日として記録されます` : '';
+  ['routine-hint', 'm-routine-hint'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent   = hintText;
+    el.style.display = isLateNight ? 'block' : 'none';
+  });
+
+  const { data } = await db.from('routine_logs').select('*').eq('date', recordDate).single();
 
   document.querySelectorAll('.routine-item input[type="checkbox"]').forEach(cb => {
     const key = cb.dataset.key;
@@ -1052,7 +1074,7 @@ async function loadRoutine() {
       document.querySelectorAll(`.routine-item input[data-key="${key}"]`).forEach(c => {
         c.checked = cb.checked;
       });
-      saveRoutine();
+      saveRoutine(recordDate, key, cb.checked);
     });
   });
 
@@ -1081,10 +1103,12 @@ function updateRoutineProgress() {
   });
 }
 
-async function saveRoutine() {
+async function saveRoutine(recordDate, changedKey, changedValue) {
   updateRoutineProgress();
-  const today   = todayStr();
-  const payload = { date: today };
+  const date = recordDate || getRoutineDate();
+  // 既存行を読み込み、他項目のタイムスタンプ(_at)を保持したまま上書きする
+  const { data: existing } = await db.from('routine_logs').select('*').eq('date', date).single();
+  const payload = { date, ...existing };
   // data-key ごとに重複除去して保存
   const seen = new Set();
   document.querySelectorAll('.routine-item input[type="checkbox"]').forEach(cb => {
@@ -1093,6 +1117,9 @@ async function saveRoutine() {
       payload[cb.dataset.key] = cb.checked;
     }
   });
+  if (changedKey) {
+    payload[`${changedKey}_at`] = changedValue ? new Date().toISOString() : null;
+  }
   await db.from('routine_logs').upsert([payload], { onConflict: 'date' });
 }
 

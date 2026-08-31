@@ -1041,7 +1041,7 @@ async function initRoutine() {
 
   document.querySelectorAll('.routine-item input[type="checkbox"]').forEach(cb => {
     cb.checked = data ? !!data[cb.dataset.key] : false;
-    cb.addEventListener('change', () => saveRoutine(recordDate));
+    cb.addEventListener('change', () => saveRoutine(recordDate, cb.dataset.key, cb.checked));
   });
 
   updateRoutineProgress();
@@ -1057,13 +1057,16 @@ function updateRoutineProgress() {
   if (count) count.textContent = `${done} / ${ROUTINE_KEYS.length}`;
 }
 
-async function saveRoutine(recordDate) {
+async function saveRoutine(recordDate, changedKey, changedValue) {
   updateRoutineProgress();
   const { data: existing } = await db.from('routine_logs').select('*').eq('date', recordDate).single();
   const payload = { date: recordDate, ...existing };
   document.querySelectorAll('.routine-item input[type="checkbox"]').forEach(cb => {
     payload[cb.dataset.key] = cb.checked;
   });
+  if (changedKey) {
+    payload[`${changedKey}_at`] = changedValue ? new Date().toISOString() : null;
+  }
   await db.from('routine_logs').upsert([payload], { onConflict: 'date' });
 }
 
