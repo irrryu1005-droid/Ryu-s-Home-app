@@ -3260,25 +3260,37 @@ async function fetchTSDB(sport, dateStr) {
 // UEFA cup competitions: ノックアウト段階は seasontype=3 を追加で試す
 const UEFA_CUPS = new Set(['uefa.champions', 'uefa.europa', 'uefa.ecl']);
 
+// 同時実行数を制限してリクエストの一斉バーストを避ける（ESPNが大量同時アクセスをブロックしやすいため）
+async function mapLimited(items, limit, fn) {
+  const results = new Array(items.length);
+  let idx = 0;
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 // ---- ⚽ サッカー（ESPN + Netlify function 常時併用）----
 async function fetchSoccer(dateStr) {
   const [espnResults, netlifyEvs] = await Promise.all([
-    // ESPN: 各リーグを並列取得
-    Promise.all(
-      ESPN_SOCCER_LEAGUES.map(async ({ id, label }) => {
-        let evs = await fetchESPN('soccer', id, dateStr);
-        if (evs.length === 0 && UEFA_CUPS.has(id)) {
-          try {
-            const d = dateStr.replace(/-/g, '');
-            const r = await fetch(
-              `https://site.api.espn.com/apis/site/v2/sports/soccer/${id}/scoreboard?dates=${d}&seasontype=3`
-            );
-            if (r.ok) evs = parseESPNEvents(await r.json(), dateStr);
-          } catch {}
-        }
-        return evs.map(ev => ({ ...ev, league: label, sportKey: 'Soccer' }));
-      })
-    ).then(r => r.flat()),
+    // ESPN: 各リーグを最大4件ずつ同時取得（15リーグを一斉に投げるとESPNにブロックされやすいため）
+    mapLimited(ESPN_SOCCER_LEAGUES, 4, async ({ id, label }) => {
+      let evs = await fetchESPN('soccer', id, dateStr);
+      if (evs.length === 0 && UEFA_CUPS.has(id)) {
+        try {
+          const d = dateStr.replace(/-/g, '');
+          const r = await fetch(
+            `https://site.api.espn.com/apis/site/v2/sports/soccer/${id}/scoreboard?dates=${d}&seasontype=3`
+          );
+          if (r.ok) evs = parseESPNEvents(await r.json(), dateStr);
+        } catch {}
+      }
+      return evs.map(ev => ({ ...ev, league: label, sportKey: 'Soccer' }));
+    }).then(r => r.flat()),
     // Netlify function: FotMob XML → UEFA → TSDB を常時取得
     fetch(`/.netlify/functions/soccer-schedule?date=${dateStr}`)
       .then(r => r.ok ? r.json() : { events: [] })
