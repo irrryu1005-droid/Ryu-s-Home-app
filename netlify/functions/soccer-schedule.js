@@ -1,9 +1,100 @@
-// FotMob XML API → UEFA API → TheSportsDB の順でサッカー試合を取得
+// ESPN（国内リーグ・カップ・国際大会）をメインに、FotMob XML API → UEFA API → TheSportsDB で補完してサッカー試合を取得
+// サーバーサイド(Netlify Function)経由にすることで、ブラウザから直接ESPNへアクセスしてブロックされる問題を回避する
 const OK_HEADERS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 
 const MAJOR = /conference league|champions league|europa league|world cup|friendl|nations league|asian cup|copa america|euro\b|concacaf|asian champions|wc qual|world cup qual/i;
 
-// 1) FotMob XML API（apigw.fotmob.com）
+// ---- ESPN: 国内リーグ・カップ・国際大会 ----
+const ESPN_SOCCER_LEAGUES = [
+  // リーグ戦
+  { id: 'eng.1',            label: 'Premier League'     },
+  { id: 'esp.1',            label: 'La Liga'            },
+  { id: 'ger.1',            label: 'Bundesliga'         },
+  { id: 'ita.1',            label: 'Serie A'            },
+  { id: 'fra.1',            label: 'Ligue 1'            },
+  { id: 'ned.1',            label: 'Eredivisie'         },
+  { id: 'por.1',            label: 'Primeira Liga'      },
+  { id: 'jpn.1',            label: 'J1 League'          },
+  { id: 'usa.1',            label: 'MLS'                },
+  { id: 'sau.1',            label: 'Saudi Pro League'   },
+  // 欧州カップ戦
+  { id: 'uefa.champions',   label: 'Champions League'   },
+  { id: 'uefa.europa',      label: 'Europa League'      },
+  { id: 'uefa.ecl',         label: 'Conference League'  },
+  // 五大リーグ国内カップ
+  { id: 'eng.fa',           label: 'FA Cup'             },
+  { id: 'eng.league_cup',   label: 'EFL Cup'            },
+  { id: 'esp.copa_del_rey', label: 'Copa del Rey'       },
+  { id: 'ger.dfb_pokal',    label: 'DFB Pokal'          },
+  { id: 'ita.coppa_italia', label: 'Coppa Italia'       },
+  { id: 'fra.coupe_de_france', label: 'Coupe de France' },
+  // 国際大会
+  { id: 'fifa.world',            label: 'World Cup'          },
+  { id: 'fifa.worldq.afc',       label: 'WC Qual (AFC)'      },
+  { id: 'fifa.worldq.uefa',      label: 'WC Qual (UEFA)'     },
+  { id: 'fifa.worldq.conmebol',  label: 'WC Qual (CONMEBOL)' },
+  { id: 'fifa.worldq.concacaf',  label: 'WC Qual (CONCACAF)' },
+  { id: 'fifa.friendly.m',       label: "Int'l Friendly"     },
+  { id: 'uefa.nations',          label: 'Nations League'     },
+  { id: 'concacaf.nations.l',    label: 'CONCACAF Nations'   },
+];
+const UEFA_CUPS = new Set(['uefa.champions', 'uefa.europa', 'uefa.ecl']);
+
+// 同時実行数を制限（サーバー間通信とはいえ一斉アクセスは避ける）
+async function mapLimited(items, limit, fn) {
+  const results = new Array(items.length);
+  let idx = 0;
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+function parseESPNEvents(data, league) {
+  return (data.events || []).map(ev => {
+    const comp  = ev.competitions?.[0];
+    const home  = comp?.competitors?.find(c => c.homeAway === 'home');
+    const away  = comp?.competitors?.find(c => c.homeAway === 'away');
+    const title = (home && away)
+      ? `${away.team.displayName} vs ${home.team.displayName}`
+      : (ev.name || ev.shortName || '');
+    return { title, league, startUtc: ev.date || null };
+  });
+}
+
+async function fetchESPNLeague(id, label, date) {
+  try {
+    const d    = date.replace(/-/g, '');
+    const base = `https://site.api.espn.com/apis/site/v2/sports/soccer/${id}`;
+    const res  = await fetch(`${base}/scoreboard?dates=${d}`);
+    let evs = [];
+    if (res.ok) {
+      evs = parseESPNEvents(await res.json(), label);
+    } else {
+      const res2 = await fetch(`${base}/events?dates=${d}`);
+      if (res2.ok) evs = parseESPNEvents(await res2.json(), label);
+    }
+    // UEFAカップ戦はノックアウト段階を追加で試す
+    if (evs.length === 0 && UEFA_CUPS.has(id)) {
+      try {
+        const r = await fetch(`${base}/scoreboard?dates=${d}&seasontype=3`);
+        if (r.ok) evs = parseESPNEvents(await r.json(), label);
+      } catch {}
+    }
+    return evs;
+  } catch { return []; }
+}
+
+async function tryESPNAll(date) {
+  const results = await mapLimited(ESPN_SOCCER_LEAGUES, 5, ({ id, label }) => fetchESPNLeague(id, label, date));
+  return results.flat();
+}
+
+// ---- FotMob XML API（apigw.fotmob.com）: ESPNで拾えない国際大会の補完用 ----
 async function tryFotMob(date) {
   const d = date.replace(/-/g, '');
   try {
@@ -47,7 +138,7 @@ async function tryFotMob(date) {
   } catch { return []; }
 }
 
-// 2) UEFA公式Match API（UCL/UEL/UECL）
+// ---- UEFA公式Match API（UCL/UEL/UECL）: 補完用 ----
 async function tryUEFA(date) {
   const ids = ['UECL', 'UCL', 'UEL'];
   const events = [];
@@ -73,7 +164,7 @@ async function tryUEFA(date) {
   return events;
 }
 
-// 3) TheSportsDB
+// ---- TheSportsDB: 補完用 ----
 async function tryTSDB(date) {
   for (const sport of ['Soccer', 'Football']) {
     try {
@@ -101,14 +192,19 @@ exports.handler = async (event) => {
   const { date } = event.queryStringParameters || {};
   if (!date) return { statusCode: 400, body: 'date required' };
 
-  // FotMob → UEFA → TSDB の順で試す
-  let events = await tryFotMob(date);
-  if (events.length === 0) events = await tryUEFA(date);
-  if (events.length === 0) events = await tryTSDB(date);
+  // ESPN（国内リーグ・カップ・国際大会）をメインで取得
+  const espnEvents = await tryESPNAll(date);
+
+  // ESPNで拾えなかった国際大会をFotMob → UEFA → TSDBの順で補完
+  const espnTitles = new Set(espnEvents.map(e => e.title?.toLowerCase()));
+  let supplement = await tryFotMob(date);
+  if (supplement.length === 0) supplement = await tryUEFA(date);
+  if (supplement.length === 0) supplement = await tryTSDB(date);
+  const uniqueSupplement = supplement.filter(e => !espnTitles.has(e.title?.toLowerCase()));
 
   return {
     statusCode: 200,
     headers: OK_HEADERS,
-    body: JSON.stringify({ events }),
+    body: JSON.stringify({ events: [...espnEvents, ...uniqueSupplement] }),
   };
 };

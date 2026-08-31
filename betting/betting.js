@@ -3119,40 +3119,7 @@ const SCHEDULE_SPORTS = [
   { key: 'Volleyball',  icon: '🏐', label: 'Volleyball' },
 ];
 
-// ---- サッカーリーグ定義（ESPN）----
-const ESPN_SOCCER_LEAGUES = [
-  // リーグ戦
-  { id: 'eng.1',            label: 'Premier League'     },
-  { id: 'esp.1',            label: 'La Liga'            },
-  { id: 'ger.1',            label: 'Bundesliga'         },
-  { id: 'ita.1',            label: 'Serie A'            },
-  { id: 'fra.1',            label: 'Ligue 1'            },
-  { id: 'ned.1',            label: 'Eredivisie'         },
-  { id: 'por.1',            label: 'Primeira Liga'      },
-  { id: 'jpn.1',            label: 'J1 League'          },
-  { id: 'usa.1',            label: 'MLS'                },
-  { id: 'sau.1',            label: 'Saudi Pro League'   },
-  // 欧州カップ戦
-  { id: 'uefa.champions',   label: 'Champions League'   },
-  { id: 'uefa.europa',      label: 'Europa League'      },
-  { id: 'uefa.ecl',         label: 'Conference League'  },
-  // 五大リーグ国内カップ
-  { id: 'eng.fa',           label: 'FA Cup'             },
-  { id: 'eng.league_cup',   label: 'EFL Cup'            },
-  { id: 'esp.copa_del_rey', label: 'Copa del Rey'       },
-  { id: 'ger.dfb_pokal',    label: 'DFB Pokal'          },
-  { id: 'ita.coppa_italia', label: 'Coppa Italia'       },
-  { id: 'fra.coupe_de_france', label: 'Coupe de France' },
-  // 国際大会
-  { id: 'fifa.world',            label: 'World Cup'          },
-  { id: 'fifa.worldq.afc',       label: 'WC Qual (AFC)'      },
-  { id: 'fifa.worldq.uefa',      label: 'WC Qual (UEFA)'     },
-  { id: 'fifa.worldq.conmebol',  label: 'WC Qual (CONMEBOL)' },
-  { id: 'fifa.worldq.concacaf',  label: 'WC Qual (CONCACAF)' },
-  { id: 'fifa.friendly.m',       label: "Int'l Friendly"     },
-  { id: 'uefa.nations',          label: 'Nations League'     },
-  { id: 'concacaf.nations.l',    label: 'CONCACAF Nations'   },
-];
+// サッカーのリーグ一覧はNetlify Function（netlify/functions/soccer-schedule.js）側に移動済み
 
 let scheduleDate   = new Date();
 let scheduleFilter = 'all';
@@ -3257,51 +3224,17 @@ async function fetchTSDB(sport, dateStr) {
   } catch { return []; }
 }
 
-// UEFA cup competitions: ノックアウト段階は seasontype=3 を追加で試す
-const UEFA_CUPS = new Set(['uefa.champions', 'uefa.europa', 'uefa.ecl']);
-
-// 同時実行数を制限してリクエストの一斉バーストを避ける（ESPNが大量同時アクセスをブロックしやすいため）
-async function mapLimited(items, limit, fn) {
-  const results = new Array(items.length);
-  let idx = 0;
-  async function worker() {
-    while (idx < items.length) {
-      const i = idx++;
-      results[i] = await fn(items[i], i);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-}
-
-// ---- ⚽ サッカー（ESPN + Netlify function 常時併用）----
+// ---- ⚽ サッカー ----
+// 国内リーグ・カップ・国際大会すべてNetlify Function経由（サーバーサイド）で取得する。
+// 以前はブラウザから直接ESPNへ15リーグ分アクセスしていたが、ブラウザのアクセスがESPNにブロックされる
+// 事象が繰り返し発生したため、サーバー側（Netlify Functions）に取得を移した。
 async function fetchSoccer(dateStr) {
-  const [espnResults, netlifyEvs] = await Promise.all([
-    // ESPN: 各リーグを最大4件ずつ同時取得（15リーグを一斉に投げるとESPNにブロックされやすいため）
-    mapLimited(ESPN_SOCCER_LEAGUES, 4, async ({ id, label }) => {
-      let evs = await fetchESPN('soccer', id, dateStr);
-      if (evs.length === 0 && UEFA_CUPS.has(id)) {
-        try {
-          const d = dateStr.replace(/-/g, '');
-          const r = await fetch(
-            `https://site.api.espn.com/apis/site/v2/sports/soccer/${id}/scoreboard?dates=${d}&seasontype=3`
-          );
-          if (r.ok) evs = parseESPNEvents(await r.json(), dateStr);
-        } catch {}
-      }
-      return evs.map(ev => ({ ...ev, league: label, sportKey: 'Soccer' }));
-    }).then(r => r.flat()),
-    // Netlify function: FotMob XML → UEFA → TSDB を常時取得
-    fetch(`/.netlify/functions/soccer-schedule?date=${dateStr}`)
-      .then(r => r.ok ? r.json() : { events: [] })
-      .then(d => (d.events || []).map(ev => ({ ...ev, sportKey: 'Soccer' })))
-      .catch(() => []),
-  ]);
-
-  // 重複除去: タイトルが同じものはESPNを優先
-  const espnTitles = new Set(espnResults.map(e => e.title?.toLowerCase()));
-  const uniqueNetlify = netlifyEvs.filter(e => !espnTitles.has(e.title?.toLowerCase()));
-  return [...espnResults, ...uniqueNetlify];
+  try {
+    const res = await fetch(`/.netlify/functions/soccer-schedule?date=${dateStr}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.events || []).map(ev => ({ ...ev, sportKey: 'Soccer' }));
+  } catch { return []; }
 }
 
 // ---- ⚾ MLB（公式API）----
