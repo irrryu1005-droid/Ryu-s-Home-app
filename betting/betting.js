@@ -4257,6 +4257,7 @@ function initTabs() {
       document.querySelectorAll('.tab-content').forEach(t => { t.hidden = true; });
       btn.classList.add('active');
       document.getElementById(`tab-${btn.dataset.tab}`).hidden = false;
+      localStorage.setItem('bettingActiveTab', btn.dataset.tab);
       if (btn.dataset.tab === 'stats') {
         renderCharts();
         renderPeriodStats();
@@ -4455,8 +4456,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   populateSettings();
   refreshAll();
 
-  // 最初のタブを表示
-  document.getElementById('tab-records').hidden = false;
+  // 最初のタブを表示（前回リロード時に見ていたタブを復元。なければRecords）
+  const savedTab = localStorage.getItem('bettingActiveTab');
+  const savedTabBtn = savedTab ? document.querySelector(`.nav-btn[data-tab="${savedTab}"]`) : null;
+  if (savedTabBtn) {
+    savedTabBtn.click();
+  } else {
+    document.getElementById('tab-records').hidden = false;
+  }
 
   // データ更新ボタン
   document.getElementById('btn-refresh').addEventListener('click', async () => {
