@@ -2351,6 +2351,7 @@ function renderPeriodStats() {
 // 目標進捗（ナビゲーション付き）
 // ============================================================
 let _goalIdx     = 0;
+let _goalIdxAutoSelected = false; // 初回のみ「今日を含む目標」を自動選択するためのフラグ
 let _goalEditing = false;
 
 function attachGoalTrackTooltip(container) {
@@ -2422,6 +2423,15 @@ function renderGoalProgress() {
 
   // goalEnd 降順（新しい順）
   const sorted = [..._goals].sort((a, b) => b.goalEnd.localeCompare(a.goalEnd));
+
+  // 初回表示時のみ、期間内に今日を含む目標があればそれをデフォルト選択する
+  if (!_goalIdxAutoSelected) {
+    _goalIdxAutoSelected = true;
+    const today = todayJST();
+    const todayIdx = sorted.findIndex(gl => gl.goalStart <= today && today <= gl.goalEnd);
+    if (todayIdx !== -1) _goalIdx = todayIdx;
+  }
+
   _goalIdx = Math.max(0, Math.min(_goalIdx, sorted.length - 1));
   const g = sorted[_goalIdx];
 
