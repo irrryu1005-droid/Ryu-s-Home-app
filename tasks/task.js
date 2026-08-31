@@ -1023,19 +1023,9 @@ document.getElementById('tl-add-form').addEventListener('submit', async (e) => {
 let habitChart = null;
 
 async function initRoutine() {
-  const recordDate  = getRoutineDate();
-  const now         = new Date();
-  const isLateNight = now.getHours() < 3;
+  const recordDate = getRoutineDate();
 
   document.getElementById('routine-record-date').textContent = formatDate(recordDate);
-
-  const hintEl = document.getElementById('routine-hint');
-  if (isLateNight) {
-    hintEl.textContent = `⚠️ 現在${now.getHours()}時台のため、前日（${formatDate(recordDate)}）として記録されます`;
-    hintEl.style.display = 'block';
-  } else {
-    hintEl.style.display = 'none';
-  }
 
   const { data } = await db.from('routine_logs').select('*').eq('date', recordDate).single();
 

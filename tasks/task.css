@@ -376,17 +376,6 @@ body {
   margin-left: auto;
 }
 
-.routine-hint {
-  display: none;
-  font-size: 12px;
-  color: var(--income);
-  background: #FEF9E7;
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  font-weight: 600;
-}
-
 .routine-items { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .routine-item {
   display: flex;

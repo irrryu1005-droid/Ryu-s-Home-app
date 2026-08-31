@@ -643,20 +643,11 @@ body {
 /* ルーティンカード */
 .routine-card { grid-row: 3; grid-column: 1; }
 
-.routine-today {
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 14px;
-  letter-spacing: 0.02em;
-}
-.routine-hint {
-  font-size: 12px;
-  color: var(--income);
-  background: #FEF9E7;
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  font-weight: 600;
+.routine-date-inline {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0.7;
 }
 .routine-items { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
 .routine-item {
@@ -1035,15 +1026,6 @@ body {
   padding: 4px 10px;
   border-radius: 99px;
   letter-spacing: 0.02em;
-}
-.m-routine-hint {
-  font-size: 11px;
-  color: var(--income);
-  background: #FEF9E7;
-  border-radius: 8px;
-  padding: 6px 10px;
-  margin-bottom: 10px;
-  font-weight: 600;
 }
 #mobile-home .m-routine-section .routine-items {
   flex-direction: row;

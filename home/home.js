@@ -1047,21 +1047,13 @@ function getRoutineDate() {
 }
 
 async function loadRoutine() {
-  const recordDate  = getRoutineDate();
-  const days        = ['日', '月', '火', '水', '木', '金', '土'];
+  const recordDate = getRoutineDate();
   const d           = new Date(recordDate + 'T00:00:00');
-  const now         = new Date();
-  const isLateNight = now.getHours() < 3;
+  const dateLabel   = `(${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')})`;
 
-  const labelEl = document.getElementById('routine-today-label');
-  if (labelEl) labelEl.textContent = `${d.getMonth() + 1}月${d.getDate()}日（${days[d.getDay()]}）`;
-
-  const hintText = isLateNight ? `⚠️ 現在${now.getHours()}時台のため、前日として記録されます` : '';
-  ['routine-hint', 'm-routine-hint'].forEach(id => {
+  ['routine-today-label', 'm-routine-date'].forEach(id => {
     const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent   = hintText;
-    el.style.display = isLateNight ? 'block' : 'none';
+    if (el) el.textContent = dateLabel;
   });
 
   const { data } = await db.from('routine_logs').select('*').eq('date', recordDate).single();
