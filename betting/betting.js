@@ -1168,7 +1168,16 @@ function initCalendarTab() {
   document.getElementById('cal-modal-delete').addEventListener('click', _deleteCalEvent);
   document.getElementById('cal-event-form').addEventListener('submit', _saveCalEvent);
   document.getElementById('cal-add-period').addEventListener('click', () => {
-    _addPeriodRow(document.getElementById('cal-periods-list'), calDateStr(new Date()), calDateStr(new Date()));
+    // 既存行があれば一番新しい（終了日が最新の）行をそのままコピーして初期値にする（年の打ち直しを省くため）
+    const existing = _getPeriodsFromForm();
+    let start = calDateStr(new Date());
+    let end   = start;
+    if (existing.length > 0) {
+      const latest = existing.reduce((a, b) => (b.end > a.end ? b : a));
+      start = latest.start;
+      end   = latest.end;
+    }
+    _addPeriodRow(document.getElementById('cal-periods-list'), start, end);
   });
 }
 
