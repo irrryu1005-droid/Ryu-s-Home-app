@@ -385,7 +385,7 @@ function renderDepositHistory() {
       if (!dep) return;
       const row = el.querySelector(`.deposit-row[data-id="${id}"]`);
       row.innerHTML = `
-        <input type="date" class="dep-edit-date" value="${dep.deposit_date}" style="width:130px">
+        <input type="date" class="dep-edit-date" value="${dep.deposit_date}" min="0001-01-01" max="9999-12-31" style="width:130px">
         <input type="number" class="dep-edit-amount" value="${dep.amount}" min="1" style="width:100px">
         <select class="dep-edit-type">
           <option value="deposit"   ${dep.type === 'deposit'    ? 'selected' : ''}>入金</option>
@@ -1093,9 +1093,9 @@ function _addPeriodRow(container, start = '', end = '') {
   const row = document.createElement('div');
   row.className = 'cal-period-row';
   row.innerHTML = `
-    <input type="date" class="cal-period-start" value="${start}" required>
+    <input type="date" class="cal-period-start" value="${start}" min="0001-01-01" max="9999-12-31" required>
     <span class="cal-period-sep">〜</span>
-    <input type="date" class="cal-period-end"   value="${end}"   required>
+    <input type="date" class="cal-period-end"   value="${end}"   min="0001-01-01" max="9999-12-31" required>
     <button type="button" class="cal-period-del">✕</button>`;
   row.querySelector('.cal-period-del').addEventListener('click', () => {
     if (container.querySelectorAll('.cal-period-row').length > 1) row.remove();
@@ -2017,7 +2017,7 @@ function renderCampaigns() {
             </div>
             <div class="form-group">
               <label>開始日</label>
-              <input type="date" name="campaignStart" value="${c.startDate || ''}">
+              <input type="date" name="campaignStart" value="${c.startDate || ''}" min="0001-01-01" max="9999-12-31">
             </div>
           </div>
           <div class="form-row">
@@ -2477,11 +2477,11 @@ function renderGoalProgress() {
           <div class="form-row">
             <div class="form-group">
               <label>開始日</label>
-              <input type="date" name="goalStart" value="${g.goalStart}" required>
+              <input type="date" name="goalStart" value="${g.goalStart}" min="0001-01-01" max="9999-12-31" required>
             </div>
             <div class="form-group">
               <label>終了日</label>
-              <input type="date" name="goalEnd" value="${g.goalEnd}" required>
+              <input type="date" name="goalEnd" value="${g.goalEnd}" min="0001-01-01" max="9999-12-31" required>
             </div>
           </div>
           <div class="goal-edit-btns">

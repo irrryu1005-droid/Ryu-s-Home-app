@@ -89,7 +89,7 @@
 
           <div class="form-group">
             <label>日付</label>
-            <input type="date" name="date" required>
+            <input type="date" name="date" min="0001-01-01" max="9999-12-31" required>
           </div>
 
           <!-- シングル専用 -->
@@ -194,7 +194,7 @@
             </div>
             <div class="form-group">
               <label>日付</label>
-              <input type="date" id="settings-deposit-date">
+              <input type="date" id="settings-deposit-date" min="0001-01-01" max="9999-12-31">
             </div>
           </div>
           <div class="deposit-btns">
@@ -220,7 +220,7 @@
               </div>
               <div class="form-group">
                 <label>開始日</label>
-                <input type="date" name="campaignStart" required>
+                <input type="date" name="campaignStart" min="0001-01-01" max="9999-12-31" required>
               </div>
             </div>
             <div class="form-row">
@@ -293,11 +293,11 @@
             <div class="form-row">
               <div class="form-group">
                 <label>開始日</label>
-                <input type="date" name="goalStart" required>
+                <input type="date" name="goalStart" min="0001-01-01" max="9999-12-31" required>
               </div>
               <div class="form-group">
                 <label>終了日</label>
-                <input type="date" name="goalEnd" required>
+                <input type="date" name="goalEnd" min="0001-01-01" max="9999-12-31" required>
               </div>
             </div>
             <button type="submit" class="btn-secondary" style="width:100%;margin-top:4px">追加</button>
