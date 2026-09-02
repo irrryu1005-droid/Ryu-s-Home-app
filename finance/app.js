@@ -978,7 +978,7 @@ async function renderPlannedTab() {
   const overrideMap = {};
   for (const ov of (overrideRes.data || [])) overrideMap[ov.subscription_id] = ov;
 
-  const usdRate = 150; // 簡易レート（Life と共有不可なため固定）
+  const usdRate = _usdRateF; // サブスクタブと同じ実勢レート（fetchUsdRateFで取得）を使う
 
   // 編集モーダルが使えるよう _subsF / _loans を補完
   if (_subsF.length === 0 && subRes.data?.length) _subsF = subRes.data.map(normalizeSubF);
