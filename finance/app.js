@@ -753,8 +753,9 @@ async function renderFinancePnl() {
   const y = _finPnlYear, m = _finPnlMonth;
   document.getElementById('fin-pnl-month-label').textContent = `${y}年${m}月`;
 
+  const lastDay = new Date(y, m, 0).getDate(); // その月の最終日（30日までの月に31日を指定するとSupabase側で無効な日付エラーになりデータ0件扱いになるため）
   const start = `${y}-${String(m).padStart(2, '0')}-01`;
-  const end   = `${y}-${String(m).padStart(2, '0')}-31`;
+  const end   = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
   const { data: txns } = await db
     .from('transactions')
