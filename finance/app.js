@@ -1342,6 +1342,7 @@ function subFToRow(sub) {
     billing_day:    sub.billingDay    ? parseInt(sub.billingDay)  : null,
     purpose:        sub.purpose       || null,
     payment_method: sub.paymentMethod || null,
+    payer:          sub.payer         || '自分',
     note:           sub.note          || null,
     currency:       sub.currency      || 'JPY',
   };
@@ -1460,6 +1461,7 @@ function openAddSubF() {
   const form = document.getElementById('sub-form-f');
   form.reset();
   form.elements.id.value = '';
+  form.elements.payer.value = '自分';
   document.getElementById('sub-form-title-f').textContent = 'サブスクを追加';
   updateSubCostFieldsF('month');
   document.getElementById('sub-modal-f').hidden = false;
@@ -1480,6 +1482,7 @@ function openEditSubF(id) {
   form.elements.billingDay.value    = s.billingDay ?? '';
   form.elements.paymentMethod.value = s.paymentMethod;
   form.elements.status.value        = s.status;
+  form.elements.payer.value         = s.payer;
   form.elements.note.value          = s.note;
   document.getElementById('sub-form-title-f').textContent = '編集';
   updateSubCostFieldsF(s.contractForm);
@@ -1522,6 +1525,7 @@ function initSubsF() {
       billingDay:    f.elements.billingDay.value   || null,
       paymentMethod: f.elements.paymentMethod.value || null,
       status:        f.elements.status.value,
+      payer:         f.elements.payer.value,
       note:          f.elements.note.value.trim()  || null,
     };
     if (id) {
