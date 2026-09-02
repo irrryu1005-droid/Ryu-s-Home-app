@@ -2558,8 +2558,10 @@ function renderGoalProgress() {
   const dateLabel = datePct >= 100 ? '期間終了' : `残${daysLeft}日`;
 
   // 各ティアの今日時点の理論値（期間比例）
-  // 今日を「1日分」としてカウントする（初日から1/totalDaysの目安を示す。elapsedは経過済み日数=0始まりのため+1する）
-  const pace    = Math.min(1, (elapsed + 1) / totalDays);
+  // 今日を「1日分」としてカウントする（初日から1/期間日数の目安を示す）。
+  // totalDaysは開始日と終了日の差分(exclusive)のため、期間の暦日数(inclusive)にするには分子分母どちらも+1する
+  // 例: 9/1〜9/30(30日間)の3日目 → 3/30 = 10%（totalDaysの29のままだと3/29≈10.3%になり金額がズレる）
+  const pace    = Math.min(1, (elapsed + 1) / (totalDays + 1));
   const thMin   = g.goalMin       ? Math.round(g.goalMin       * pace) : null;
   const thReal  = g.goalRealistic ? Math.round(g.goalRealistic * pace) : null;
   const thIdeal = Math.round(g.goalAmount * pace);
