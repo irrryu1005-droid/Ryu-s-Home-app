@@ -3784,13 +3784,19 @@ function renderPickerEvents(evs) {
   });
 }
 
-function applyMatchToSingleForm({ title, sportKey }) {
+async function applyMatchToSingleForm({ title, sportKey, league }) {
   const formSport = SPORT_KEY_TO_FORM[sportKey] || 'Other';
   const prevSport = document.querySelector('[name="sport"]').value;
   const keepLeague = prevSport === formSport
     ? (document.getElementById('single-league-select')?.value || '') : '';
   document.querySelector('[name="sport"]').value = formSport;
-  updateLeagueSelect(formSport, keepLeague);
+  // 試合に紐づくリーグ名がわかっていれば自動入力する（未登録リーグなら追加してから選択）
+  if (league && getLeagues()[formSport] !== undefined) {
+    await addLeague(formSport, league);
+    updateLeagueSelect(formSport, league);
+  } else {
+    updateLeagueSelect(formSport, keepLeague);
+  }
   document.getElementById('single-match-input').value = title;
   const disp = document.getElementById('single-match-display');
   disp.textContent = title;
@@ -3798,7 +3804,7 @@ function applyMatchToSingleForm({ title, sportKey }) {
   document.getElementById('btn-clear-match-single').removeAttribute('hidden');
 }
 
-function applyMatchToLeg(legItem, { title, sportKey, league }) {
+async function applyMatchToLeg(legItem, { title, sportKey, league }) {
   const formSport = SPORT_KEY_TO_FORM[sportKey] || 'Other';
   const sportSel  = legItem.querySelector('[data-field="sport"]');
   const leagueSel  = legItem.querySelector('[data-field="league"]');
@@ -3806,7 +3812,9 @@ function applyMatchToLeg(legItem, { title, sportKey, league }) {
   const keepLeague = sportSel.value === formSport ? (leagueSel?.value || '') : '';
   sportSel.value  = formSport;
   if (getLeagues()[formSport]) {
-    leagueSel.innerHTML = leagueOptions(formSport, keepLeague);
+    // 試合に紐づくリーグ名がわかっていれば自動入力する（未登録リーグなら追加してから選択）
+    if (league) await addLeague(formSport, league);
+    leagueSel.innerHTML = leagueOptions(formSport, league || keepLeague);
     leagueWrap.style.visibility = '';
   }
   legItem.querySelector('[data-field="match"]').value = title;
