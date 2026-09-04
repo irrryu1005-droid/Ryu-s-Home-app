@@ -15,7 +15,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let INCOME_CATEGORIES  = [];
 let EXPENSE_CATEGORIES = [];
 
-const DEFAULT_INCOME   = ['仕送り', 'バイト', 'Sports Betting'];
+const DEFAULT_INCOME   = ['仕送り', '給与', 'Sports Betting'];
 const DEFAULT_EXPENSE  = ['食費', '交通費', '衣類・アクセサリー', '娯楽費', '旅費', 'サブスクリプション', '美容', 'ガジェット', '必需品', '科目変換'];
 
 async function loadCategories() {

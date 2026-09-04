@@ -395,7 +395,7 @@ function initScheduleAddForm() {
 // ============================================================
 // 定数
 // ============================================================
-const INCOME_CATEGORIES  = ['仕送り', 'バイト', 'Sports Betting'];
+const INCOME_CATEGORIES  = ['仕送り', '給与', 'Sports Betting'];
 const EXPENSE_CATEGORIES = ['食費', '交通費', '衣類・アクセサリー', '娯楽費', '旅費', 'サブスクリプション', '美容', 'ガジェット', '必需品', '科目変換'];
 const PAYMENT_METHODS    = ['deposit（銀行）', 'cash（現金）', 'PayPay', 'Rakuten Pay', 'non-trade payables', 'credit trade payable'];
 
@@ -564,7 +564,7 @@ const HOME_PAYMENT_METHODS = [
   'deposit（銀行）', 'cash（現金）', 'PayPay',
   'Rakuten Pay', 'non-trade payables', 'credit trade payable',
 ];
-const HOME_DEFAULT_INCOME  = ['仕送り', 'バイト', 'Sports Betting'];
+const HOME_DEFAULT_INCOME  = ['仕送り', '給与', 'Sports Betting'];
 const HOME_DEFAULT_EXPENSE = ['食費', '交通費', '衣類・アクセサリー', '娯楽費', '旅費', 'サブスクリプション', '美容', 'ガジェット', '必需品'];
 
 let _homeFinType = 'expense';
