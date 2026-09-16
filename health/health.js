@@ -41,6 +41,9 @@ function escapeHtml(str) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+function roundG(n) {
+  return Math.round((n || 0) * 10) / 10;
+}
 
 // ============================================================
 // データ取得
@@ -88,9 +91,9 @@ function renderTodaySummary() {
     totals.carb    += log.carb_g   || 0;
     totals.kcal    += log.kcal     || 0;
   }
-  document.getElementById('today-protein').textContent = `${totals.protein}g`;
-  document.getElementById('today-fat').textContent     = `${totals.fat}g`;
-  document.getElementById('today-carbs').textContent   = `${totals.carb}g`;
+  document.getElementById('today-protein').textContent = `${roundG(totals.protein)}g`;
+  document.getElementById('today-fat').textContent     = `${roundG(totals.fat)}g`;
+  document.getElementById('today-carbs').textContent   = `${roundG(totals.carb)}g`;
   document.getElementById('today-kcal').textContent    = `${totals.kcal}kcal`;
 
   renderRemain('remain-protein', _goals.protein_target, totals.protein);
@@ -100,7 +103,7 @@ function renderTodaySummary() {
 
 function renderRemain(elId, target, consumed) {
   const el = document.getElementById(elId);
-  const diff = target - consumed;
+  const diff = roundG(target - consumed);
   if (diff >= 0) {
     el.textContent = `残り${diff}g`;
     el.classList.remove('over');
@@ -135,7 +138,7 @@ function renderChart() {
     { key: 'carb',    label: '炭水化物',   color: '#16A085' },
   ].map(({ key, label, color }) => ({
     label,
-    data: days.map(d => dayMap[d][key]),
+    data: days.map(d => roundG(dayMap[d][key])),
     borderColor: color,
     backgroundColor: color,
     tension: 0.3,
@@ -173,12 +176,17 @@ function renderPfcChart() {
     carb    += log.carb_g   || 0;
   }
   const kcalP = protein * 4, kcalF = fat * 9, kcalC = carb * 4;
-  const total = kcalP + kcalF + kcalC;
+  const actualTotal = kcalP + kcalF + kcalC;
+
+  const idealKcalP = (_goals.protein_target || 0) * 4;
+  const idealKcalF = (_goals.fat_target     || 0) * 9;
+  const idealKcalC = (_goals.carb_target    || 0) * 4;
+  const idealTotal = idealKcalP + idealKcalF + idealKcalC;
 
   const canvas = document.getElementById('chart-pfc');
   const emptyEl = document.getElementById('pfc-empty');
 
-  if (total === 0) {
+  if (actualTotal === 0 && idealTotal === 0) {
     if (_pfcChart) { _pfcChart.destroy(); _pfcChart = null; }
     canvas.hidden = true;
     emptyEl.hidden = false;
@@ -193,11 +201,20 @@ function renderPfcChart() {
     type: 'doughnut',
     data: {
       labels: ['タンパク質', '脂質', '炭水化物'],
-      datasets: [{
-        data: [kcalP, kcalF, kcalC],
-        backgroundColor: ['#2563EB', '#E67E22', '#16A085'],
-        borderWidth: 0,
-      }],
+      datasets: [
+        {
+          label: '実際',
+          data: [kcalP, kcalF, kcalC],
+          backgroundColor: ['#2563EB', '#E67E22', '#16A085'],
+          borderWidth: 0,
+        },
+        {
+          label: '目標',
+          data: [idealKcalP, idealKcalF, idealKcalC],
+          backgroundColor: ['rgba(37,99,235,0.3)', 'rgba(230,126,34,0.3)', 'rgba(22,160,133,0.3)'],
+          borderWidth: 0,
+        },
+      ],
     },
     options: {
       responsive: true,
@@ -207,8 +224,10 @@ function renderPfcChart() {
         tooltip: {
           callbacks: {
             label: (item) => {
-              const pct = Math.round(item.parsed / total * 100);
-              return `${item.label}: ${pct}%`;
+              const isIdeal = item.datasetIndex === 1;
+              const total = isIdeal ? idealTotal : actualTotal;
+              const pct = total > 0 ? Math.round(item.parsed / total * 100) : 0;
+              return `${isIdeal ? '目標' : '実際'} ${item.label}: ${pct}%`;
             },
           },
         },
@@ -242,9 +261,9 @@ function renderLogList() {
             ${log.note ? `<span class="log-note">${escapeHtml(log.note)}</span>` : ''}
           </div>
           <div class="log-macros">
-            <span class="macro-tag protein">P ${log.amount_g || 0}g</span>
-            <span class="macro-tag fat">F ${log.fat_g || 0}g</span>
-            <span class="macro-tag carb">C ${log.carb_g || 0}g</span>
+            <span class="macro-tag protein">P ${roundG(log.amount_g)}g</span>
+            <span class="macro-tag fat">F ${roundG(log.fat_g)}g</span>
+            <span class="macro-tag carb">C ${roundG(log.carb_g)}g</span>
             ${log.kcal ? `<span class="macro-tag kcal">${log.kcal}kcal</span>` : ''}
           </div>
         </div>
@@ -289,13 +308,14 @@ document.getElementById('btn-refresh').addEventListener('click', async (e) => {
 document.getElementById('btn-quick-protein').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   btn.disabled = true;
+  const p = 20, f = 1.8, c = 3.3;
   await addLog({
     date: todayJST(),
     source: 'プロテイン',
-    amount_g: 20,
-    fat_g: 0,
-    carb_g: 0,
-    kcal: 80,
+    amount_g: p,
+    fat_g: f,
+    carb_g: c,
+    kcal: Math.round(p * 4 + f * 9 + c * 4),
     note: null,
   });
   btn.disabled = false;
@@ -323,11 +343,11 @@ logModal.addEventListener('click', (e) => { if (e.target === logModal) closeLogM
 logForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(logForm);
-  const protein = parseInt(fd.get('amount_g')) || 0;
-  const fat     = parseInt(fd.get('fat_g'))    || 0;
-  const carb    = parseInt(fd.get('carb_g'))   || 0;
+  const protein = parseFloat(fd.get('amount_g')) || 0;
+  const fat     = parseFloat(fd.get('fat_g'))    || 0;
+  const carb    = parseFloat(fd.get('carb_g'))   || 0;
   const kcalRaw = fd.get('kcal');
-  const kcal    = kcalRaw ? parseInt(kcalRaw) : (protein * 4 + fat * 9 + carb * 4);
+  const kcal    = kcalRaw ? parseInt(kcalRaw) : Math.round(protein * 4 + fat * 9 + carb * 4);
 
   await addLog({
     date:     fd.get('date') || todayJST(),

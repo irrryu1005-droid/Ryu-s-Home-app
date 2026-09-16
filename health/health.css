@@ -171,6 +171,7 @@ body {
 .chart-wrap { position: relative; height: 220px; }
 .chart-wrap-pfc { display: flex; align-items: center; justify-content: center; }
 .chart-wrap-pfc .empty-state { position: absolute; padding: 0; }
+.chart-pfc-caption { text-align: center; font-size: 10px; color: var(--muted); margin-top: 8px; }
 
 /* ============================================================
    モーダル・フォーム

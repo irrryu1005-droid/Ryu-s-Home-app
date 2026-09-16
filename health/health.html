@@ -107,6 +107,7 @@
             <canvas id="chart-pfc"></canvas>
             <div id="pfc-empty" class="empty-state" hidden>今日の記録がありません</div>
           </div>
+          <div class="chart-pfc-caption">外側=実際の摂取量 / 内側(薄色)=目標配分</div>
         </div>
 
         <!-- 日別推移グラフ -->
@@ -149,17 +150,17 @@
             <div class="form-row">
               <div class="form-group">
                 <label>タンパク質(g)</label>
-                <input type="number" name="amount_g" min="0" placeholder="0" required>
+                <input type="number" name="amount_g" min="0" step="any" placeholder="0" required>
               </div>
               <div class="form-group">
                 <label>脂質(g)</label>
-                <input type="number" name="fat_g" min="0" placeholder="0">
+                <input type="number" name="fat_g" min="0" step="any" placeholder="0">
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
                 <label>炭水化物(g)</label>
-                <input type="number" name="carb_g" min="0" placeholder="0">
+                <input type="number" name="carb_g" min="0" step="any" placeholder="0">
               </div>
               <div class="form-group">
                 <label>カロリー(kcal)</label>
