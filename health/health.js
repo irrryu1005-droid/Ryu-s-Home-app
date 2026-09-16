@@ -9,15 +9,23 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ============================================================
 // 日付ユーティリティ（JST）
 // toISOString() はUTC変換でJSTとズレるため、日付文字列化には使わない
+// 「今日」はルーティン（routine_logsのgetRoutineDate）と同じく深夜3時前は前日扱い
 // ============================================================
-function todayJST() {
-  const d = new Date();
+function ymdStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-function dateJSTMinusDays(n) {
+function healthTodayDate() {
   const d = new Date();
+  if (d.getHours() < 3) d.setDate(d.getDate() - 1);
+  return d;
+}
+function todayJST() {
+  return ymdStr(healthTodayDate());
+}
+function dateJSTMinusDays(n) {
+  const d = healthTodayDate();
   d.setDate(d.getDate() - n);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return ymdStr(d);
 }
 function fmtDateLabel(dateStr) {
   const [, m, d] = dateStr.split('-');
