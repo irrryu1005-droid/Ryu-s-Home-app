@@ -179,6 +179,54 @@
         </div>
       </div>
 
+      <!-- カロリー収支 -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <span class="chart-card-title">⚖️ カロリー収支</span>
+        </div>
+        <div class="balance-row">
+          <div class="s-item">
+            <div class="s-label">摂取</div>
+            <div class="s-val" id="balance-intake">0kcal</div>
+          </div>
+          <div class="s-item">
+            <div class="s-label">消費</div>
+            <div class="s-val" id="balance-burn">0kcal</div>
+          </div>
+          <div class="s-item">
+            <div class="s-label">収支</div>
+            <div class="s-val" id="balance-net">0kcal</div>
+          </div>
+        </div>
+        <div id="balance-empty" class="empty-state" hidden>消費カロリーの記録がありません(iOSショートカット連携が必要です)</div>
+      </div>
+
+      <!-- 体組成(TANITA) -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <span class="chart-card-title">🏋 体組成(TANITA)</span>
+        </div>
+
+        <div class="balance-row" id="hp-stats-row" hidden>
+          <div class="s-item">
+            <div class="s-label">体重</div>
+            <div class="s-val" id="hp-weight">-</div>
+          </div>
+          <div class="s-item">
+            <div class="s-label">体脂肪率</div>
+            <div class="s-val" id="hp-fat">-</div>
+          </div>
+          <div class="s-item">
+            <div class="s-label">筋肉量</div>
+            <div class="s-val" id="hp-muscle">-</div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart-body"></canvas>
+        </div>
+        <div id="hp-empty" class="empty-state" hidden>まだ記録がありません。ジムで測定したら結果をチャットで教えてください</div>
+      </div>
+
     </main>
 
   </div>

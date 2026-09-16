@@ -173,6 +173,21 @@ body {
 .chart-wrap-pfc .empty-state { position: absolute; padding: 0; }
 .chart-pfc-caption { text-align: center; font-size: 10px; color: var(--muted); margin-top: 8px; }
 
+/* charts-rowの外に単独で置くchart-cardには下マージンを付ける */
+.tab-content > .chart-card { margin-bottom: 16px; }
+
+/* ============================================================
+   カロリー収支・体組成(TANITA)
+============================================================ */
+.balance-row {
+  display: flex;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.balance-row .s-item { padding: 8px 0; }
+#balance-net.positive { color: var(--orange); }
+#balance-net.negative { color: var(--accent); }
+
 /* ============================================================
    モーダル・フォーム
 ============================================================ */

@@ -39,7 +39,10 @@ let _logs  = [];
 let _range = 14;
 let _chart = null;
 let _pfcChart = null;
+let _bodyChart = null;
 let _goals = { protein_target: 100, fat_target: 60, carb_target: 250 };
+let _todayEnergy = null;
+let _bodyLogs = [];
 
 // ============================================================
 // ユーティリティ
@@ -84,6 +87,18 @@ async function saveGoals(g) {
   if (error) { console.error(error); alert('保存に失敗しました'); return; }
   _goals = data;
   renderAll();
+}
+
+async function loadEnergyLogs() {
+  const { data, error } = await db.from('health_energy_logs').select('*').eq('date', todayJST()).maybeSingle();
+  if (error) { console.error(error); _todayEnergy = null; return; }
+  _todayEnergy = data || null;
+}
+
+async function loadBodyLogs() {
+  const { data, error } = await db.from('health_body_logs').select('*').order('date', { ascending: true }).limit(90);
+  if (error) { console.error(error); return; }
+  _bodyLogs = data || [];
 }
 
 // ============================================================
@@ -245,6 +260,87 @@ function renderPfcChart() {
 }
 
 // ============================================================
+// カロリー収支（摂取 vs 消費）
+// ============================================================
+function renderCalorieBalance() {
+  const today = todayJST();
+  let intake = 0;
+  for (const log of _logs) {
+    if (log.date === today) intake += log.kcal || 0;
+  }
+
+  document.getElementById('balance-intake').textContent = `${intake}kcal`;
+
+  const balanceEmpty = document.getElementById('balance-empty');
+  if (!_todayEnergy) {
+    document.getElementById('balance-burn').textContent = '-';
+    document.getElementById('balance-net').textContent  = '-';
+    balanceEmpty.hidden = false;
+    return;
+  }
+  balanceEmpty.hidden = true;
+
+  const burn = (_todayEnergy.active_kcal || 0) + (_todayEnergy.resting_kcal || 0);
+  document.getElementById('balance-burn').textContent = `${burn}kcal`;
+
+  const net = intake - burn;
+  const netEl = document.getElementById('balance-net');
+  netEl.textContent = `${net > 0 ? '+' : ''}${net}kcal`;
+  netEl.classList.toggle('positive', net > 0);
+  netEl.classList.toggle('negative', net < 0);
+}
+
+// ============================================================
+// 体組成（TANITA、ジムのTANITA FITは個人API非対応のためチャット経由で手入力）
+// ============================================================
+function renderBodyComp() {
+  const canvas   = document.getElementById('chart-body');
+  const emptyEl  = document.getElementById('hp-empty');
+  const statsRow = document.getElementById('hp-stats-row');
+
+  if (_bodyLogs.length === 0) {
+    canvas.hidden = true;
+    statsRow.hidden = true;
+    emptyEl.hidden = false;
+    if (_bodyChart) { _bodyChart.destroy(); _bodyChart = null; }
+    return;
+  }
+  canvas.hidden = false;
+  statsRow.hidden = false;
+  emptyEl.hidden = true;
+
+  const latest = _bodyLogs[_bodyLogs.length - 1];
+  document.getElementById('hp-weight').textContent = latest.weight_kg      != null ? `${latest.weight_kg}kg` : '-';
+  document.getElementById('hp-fat').textContent    = latest.body_fat_pct  != null ? `${latest.body_fat_pct}%` : '-';
+  document.getElementById('hp-muscle').textContent = latest.muscle_mass_kg != null ? `${latest.muscle_mass_kg}kg` : '-';
+
+  const labels = _bodyLogs.map(r => fmtDateLabel(r.date));
+  const ctx = canvas.getContext('2d');
+  if (_bodyChart) _bodyChart.destroy();
+  _bodyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '体重(kg)',
+        data: _bodyLogs.map(r => r.weight_kg),
+        borderColor: '#2563EB',
+        backgroundColor: '#2563EB',
+        tension: 0.3,
+        pointRadius: 2,
+        spanGaps: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: false } },
+    },
+  });
+}
+
+// ============================================================
 // 記録一覧
 // ============================================================
 function renderLogList() {
@@ -288,6 +384,8 @@ function renderAll() {
   renderChart();
   renderPfcChart();
   renderLogList();
+  renderCalorieBalance();
+  renderBodyComp();
 }
 
 // ============================================================
@@ -305,7 +403,7 @@ document.querySelectorAll('.range-btn').forEach(btn => {
 document.getElementById('btn-refresh').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   btn.classList.add('spinning');
-  await Promise.all([loadLogs(), loadGoals()]);
+  await Promise.all([loadLogs(), loadGoals(), loadEnergyLogs(), loadBodyLogs()]);
   renderAll();
   setTimeout(() => btn.classList.remove('spinning'), 400);
 });
@@ -401,6 +499,6 @@ goalForm.addEventListener('submit', async (e) => {
 });
 
 (async function init() {
-  await Promise.all([loadLogs(), loadGoals()]);
+  await Promise.all([loadLogs(), loadGoals(), loadEnergyLogs(), loadBodyLogs()]);
   renderAll();
 })();
