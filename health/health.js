@@ -27,7 +27,6 @@ function fmtDateLabel(dateStr) {
 // ============================================================
 // 状態
 // ============================================================
-const NUTRIENTS = ['タンパク質', '脂質', '炭水化物'];
 let _logs  = [];
 let _range = 14;
 let _chart = null;
@@ -59,14 +58,18 @@ async function loadLogs() {
 // ============================================================
 function renderTodaySummary() {
   const today = todayJST();
-  const totals = { 'タンパク質': 0, '脂質': 0, '炭水化物': 0 };
+  const totals = { protein: 0, fat: 0, carb: 0, kcal: 0 };
   for (const log of _logs) {
     if (log.date !== today) continue;
-    if (totals[log.source] !== undefined) totals[log.source] += log.amount_g;
+    totals.protein += log.amount_g || 0;
+    totals.fat     += log.fat_g    || 0;
+    totals.carb    += log.carb_g   || 0;
+    totals.kcal    += log.kcal     || 0;
   }
-  document.getElementById('today-protein').textContent = `${totals['タンパク質']}g`;
-  document.getElementById('today-fat').textContent     = `${totals['脂質']}g`;
-  document.getElementById('today-carbs').textContent   = `${totals['炭水化物']}g`;
+  document.getElementById('today-protein').textContent = `${totals.protein}g`;
+  document.getElementById('today-fat').textContent     = `${totals.fat}g`;
+  document.getElementById('today-carbs').textContent   = `${totals.carb}g`;
+  document.getElementById('today-kcal').textContent    = `${totals.kcal}kcal`;
 }
 
 // ============================================================
@@ -76,22 +79,24 @@ function renderChart() {
   const startDate = dateJSTMinusDays(_range - 1);
   const dayMap = {};
   for (let i = _range - 1; i >= 0; i--) {
-    dayMap[dateJSTMinusDays(i)] = { 'タンパク質': 0, '脂質': 0, '炭水化物': 0 };
+    dayMap[dateJSTMinusDays(i)] = { protein: 0, fat: 0, carb: 0 };
   }
   for (const log of _logs) {
     if (log.date < startDate) continue;
     if (!dayMap[log.date]) continue;
-    if (dayMap[log.date][log.source] !== undefined) dayMap[log.date][log.source] += log.amount_g;
+    dayMap[log.date].protein += log.amount_g || 0;
+    dayMap[log.date].fat     += log.fat_g    || 0;
+    dayMap[log.date].carb    += log.carb_g   || 0;
   }
   const days = Object.keys(dayMap).sort();
   const labels = days.map(fmtDateLabel);
 
   const datasets = [
-    { key: 'タンパク質', color: '#2563EB' },
-    { key: '脂質',       color: '#E67E22' },
-    { key: '炭水化物',   color: '#16A085' },
-  ].map(({ key, color }) => ({
-    label: key,
+    { key: 'protein', label: 'タンパク質', color: '#2563EB' },
+    { key: 'fat',     label: '脂質',       color: '#E67E22' },
+    { key: 'carb',    label: '炭水化物',   color: '#16A085' },
+  ].map(({ key, label, color }) => ({
+    label,
     data: days.map(d => dayMap[d][key]),
     borderColor: color,
     backgroundColor: color,
@@ -137,9 +142,16 @@ function renderLogList() {
       <div class="day-group-header">${date}</div>
       ${groups[date].map(log => `
         <div class="log-row">
-          <span class="log-tag ${NUTRIENTS.includes(log.source) ? log.source : 'default'}">${escapeHtml(log.source || '記録')}</span>
-          <span class="log-amount">${log.amount_g}g</span>
-          <span class="log-note">${escapeHtml(log.note || '')}</span>
+          <div class="log-desc">
+            <span class="log-source">${escapeHtml(log.source || '記録')}</span>
+            ${log.note ? `<span class="log-note">${escapeHtml(log.note)}</span>` : ''}
+          </div>
+          <div class="log-macros">
+            <span class="macro-tag protein">P ${log.amount_g || 0}g</span>
+            <span class="macro-tag fat">F ${log.fat_g || 0}g</span>
+            <span class="macro-tag carb">C ${log.carb_g || 0}g</span>
+            ${log.kcal ? `<span class="macro-tag kcal">${log.kcal}kcal</span>` : ''}
+          </div>
         </div>
       `).join('')}
     </div>
@@ -168,10 +180,11 @@ document.querySelectorAll('.range-btn').forEach(btn => {
 });
 
 document.getElementById('btn-refresh').addEventListener('click', async (e) => {
-  e.currentTarget.classList.add('spinning');
+  const btn = e.currentTarget;
+  btn.classList.add('spinning');
   await loadLogs();
   renderAll();
-  setTimeout(() => e.currentTarget.classList.remove('spinning'), 400);
+  setTimeout(() => btn.classList.remove('spinning'), 400);
 });
 
 (async function init() {
