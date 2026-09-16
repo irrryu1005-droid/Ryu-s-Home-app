@@ -16,9 +16,9 @@
       <a href="../home/home.html"       class="m-app-tab"><span class="m-app-tab-icon">🏠</span>Home</a>
       <a href="../study/study.html"     class="m-app-tab"><span class="m-app-tab-icon">📚</span>Study</a>
       <a href="../tasks/task.html"      class="m-app-tab"><span class="m-app-tab-icon">✅</span>Tasks</a>
+      <a href="health.html"             class="m-app-tab active"><span class="m-app-tab-icon">💪</span>Health</a>
       <a href="../finance/finance.html" class="m-app-tab"><span class="m-app-tab-icon">💰</span>Finance</a>
       <a href="../betting/betting.html" class="m-app-tab"><span class="m-app-tab-icon">🎯</span>Betting</a>
-      <a href="health.html"             class="m-app-tab active"><span class="m-app-tab-icon">💪</span>Health</a>
     </nav>
 
     <header class="header">
@@ -30,9 +30,9 @@
       <a href="../home/home.html"       class="pc-app-nav-link"><span>🏠</span>Home</a>
       <a href="../study/study.html"     class="pc-app-nav-link"><span>📚</span>Study</a>
       <a href="../tasks/task.html"      class="pc-app-nav-link"><span>✅</span>Tasks</a>
+      <a href="health.html"             class="pc-app-nav-link active"><span>💪</span>Health</a>
       <a href="../finance/finance.html" class="pc-app-nav-link"><span>💰</span>Finance</a>
       <a href="../betting/betting.html" class="pc-app-nav-link"><span>🎯</span>Betting</a>
-      <a href="health.html"             class="pc-app-nav-link active"><span>💪</span>Health</a>
     </nav>
 
     <main class="tab-content">
@@ -57,18 +57,37 @@
         </div>
       </div>
 
-      <!-- 日別推移グラフ -->
-      <div class="chart-card">
-        <div class="chart-card-header">
-          <span class="chart-card-title">📊 日別推移</span>
-          <div class="range-toggle">
-            <button class="range-btn active" data-range="14">2週間</button>
-            <button class="range-btn" data-range="30">1ヶ月</button>
-            <button class="range-btn" data-range="90">3ヶ月</button>
+      <!-- クイックアクション -->
+      <div class="action-row">
+        <button id="btn-quick-protein" class="btn-quick">⚡ プロテイン20g</button>
+        <button id="btn-add-log" class="btn-primary">＋ 記録を追加</button>
+      </div>
+
+      <div class="charts-row">
+        <!-- 今日のPFCバランス -->
+        <div class="chart-card chart-card-pfc">
+          <div class="chart-card-header">
+            <span class="chart-card-title">🍽 今日のPFCバランス</span>
+          </div>
+          <div class="chart-wrap chart-wrap-pfc">
+            <canvas id="chart-pfc"></canvas>
+            <div id="pfc-empty" class="empty-state" hidden>今日の記録がありません</div>
           </div>
         </div>
-        <div class="chart-wrap">
-          <canvas id="chart-nutrition"></canvas>
+
+        <!-- 日別推移グラフ -->
+        <div class="chart-card chart-card-trend">
+          <div class="chart-card-header">
+            <span class="chart-card-title">📊 日別推移</span>
+            <div class="range-toggle">
+              <button class="range-btn active" data-range="14">2週間</button>
+              <button class="range-btn" data-range="30">1ヶ月</button>
+              <button class="range-btn" data-range="90">3ヶ月</button>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chart-nutrition"></canvas>
+          </div>
         </div>
       </div>
 
@@ -77,6 +96,53 @@
         <h2>📋 記録一覧</h2>
       </div>
       <div id="log-list"></div>
+
+      <!-- 記録追加モーダル -->
+      <div id="log-modal-overlay" class="modal-overlay" hidden>
+        <div class="form-card modal-card">
+          <h3>記録を追加</h3>
+          <form id="log-form" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label>日付</label>
+                <input type="date" name="date" required>
+              </div>
+              <div class="form-group">
+                <label>内容</label>
+                <input type="text" name="source" placeholder="例: 朝食・プロテイン">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>タンパク質(g)</label>
+                <input type="number" name="amount_g" min="0" placeholder="0" required>
+              </div>
+              <div class="form-group">
+                <label>脂質(g)</label>
+                <input type="number" name="fat_g" min="0" placeholder="0">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>炭水化物(g)</label>
+                <input type="number" name="carb_g" min="0" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label>カロリー(kcal)</label>
+                <input type="number" name="kcal" min="0" placeholder="未入力ならP/F/Cから自動計算">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>メモ</label>
+              <input type="text" name="note" placeholder="任意">
+            </div>
+            <div class="form-btns">
+              <button type="button" id="btn-cancel-log" class="btn-cancel">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
     </main>
 

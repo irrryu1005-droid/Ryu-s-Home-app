@@ -85,14 +85,45 @@ body {
 #today-kcal    { color: var(--text); }
 
 /* ============================================================
+   クイックアクション
+============================================================ */
+.action-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.action-row .btn-primary { flex: 1; }
+.btn-quick {
+  flex-shrink: 0;
+  padding: 9px 16px;
+  background: var(--white);
+  border: 1.5px solid var(--protein);
+  color: var(--protein);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.btn-quick:hover { background: var(--protein); color: var(--white); }
+.btn-quick:disabled { opacity: 0.6; cursor: default; }
+
+/* ============================================================
    グラフカード
 ============================================================ */
+.charts-row { display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
+@media (min-width: 768px) {
+  .charts-row { flex-direction: row; }
+  .chart-card-pfc   { flex: 0 0 260px; }
+  .chart-card-trend { flex: 1; min-width: 0; }
+}
 .chart-card {
   background: var(--white);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 .chart-card-header {
   display: flex;
@@ -117,6 +148,86 @@ body {
 }
 .range-btn.active { background: var(--accent); border-color: var(--accent); color: var(--white); }
 .chart-wrap { position: relative; height: 220px; }
+.chart-wrap-pfc { display: flex; align-items: center; justify-content: center; }
+.chart-wrap-pfc .empty-state { position: absolute; padding: 0; }
+
+/* ============================================================
+   モーダル・フォーム
+============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 200;
+  padding: 0 0 env(safe-area-inset-bottom);
+}
+.modal-overlay[hidden] { display: none; }
+.modal-card {
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: var(--radius) var(--radius) 0 0;
+  margin: 0;
+}
+.form-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.form-card h3 { font-size: 14px; font-weight: 800; margin-bottom: 14px; }
+.form-group { margin-bottom: 10px; }
+.form-group > label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.form-group input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.form-group input:focus { outline: none; border-color: var(--accent); }
+.form-row { display: flex; gap: 10px; align-items: flex-start; }
+.form-row .form-group { flex: 1; }
+.form-btns { display: flex; gap: 10px; margin-top: 14px; }
+.form-btns button { flex: 1; }
+.btn-primary {
+  padding: 9px 18px;
+  background: var(--accent);
+  color: var(--white);
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-cancel {
+  padding: 9px 18px;
+  background: var(--bg);
+  color: var(--muted);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
 
 /* ============================================================
    記録一覧
