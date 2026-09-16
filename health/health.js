@@ -41,7 +41,9 @@ let _chart = null;
 let _pfcChart = null;
 let _bodyChart = null;
 let _goals = { protein_target: 100, fat_target: 60, carb_target: 250 };
-let _todayEnergy = null;
+let _energyLogs = [];
+let _balanceRange = 14;
+let _balanceChart = null;
 let _bodyLogs = [];
 
 // ============================================================
@@ -90,9 +92,9 @@ async function saveGoals(g) {
 }
 
 async function loadEnergyLogs() {
-  const { data, error } = await db.from('health_energy_logs').select('*').eq('date', todayJST()).maybeSingle();
-  if (error) { console.error(error); _todayEnergy = null; return; }
-  _todayEnergy = data || null;
+  const { data, error } = await db.from('health_energy_logs').select('*').order('date', { ascending: true }).limit(90);
+  if (error) { console.error(error); return; }
+  _energyLogs = data || [];
 }
 
 async function loadBodyLogs() {
@@ -260,60 +262,125 @@ function renderPfcChart() {
 }
 
 // ============================================================
-// カロリー収支（摂取 vs 消費）
+// カロリー収支推移（摂取 vs 消費）
 // ============================================================
-function renderCalorieBalance() {
-  const today = todayJST();
-  let intake = 0;
+function renderBalanceChart() {
+  const startDate = dateJSTMinusDays(_balanceRange - 1);
+  const dayMap = {};
+  for (let i = _balanceRange - 1; i >= 0; i--) {
+    dayMap[dateJSTMinusDays(i)] = { intake: 0, burn: null };
+  }
   for (const log of _logs) {
-    if (log.date === today) intake += log.kcal || 0;
+    if (log.date < startDate) continue;
+    if (!dayMap[log.date]) continue;
+    dayMap[log.date].intake += log.kcal || 0;
+  }
+  for (const e of _energyLogs) {
+    if (e.date < startDate) continue;
+    if (!dayMap[e.date]) continue;
+    const resting = e.resting_kcal != null ? e.resting_kcal : latestBmrKcal();
+    dayMap[e.date].burn = (e.active_kcal || 0) + (resting || 0);
+  }
+  const days = Object.keys(dayMap).sort();
+  const labels = days.map(fmtDateLabel);
+  const hasAnyBurn = days.some(d => dayMap[d].burn !== null);
+
+  const canvas  = document.getElementById('chart-balance');
+  const emptyEl = document.getElementById('balance-empty');
+  canvas.hidden  = !hasAnyBurn;
+  emptyEl.hidden = hasAnyBurn;
+
+  if (hasAnyBurn) {
+    const ctx = canvas.getContext('2d');
+    if (_balanceChart) _balanceChart.destroy();
+    _balanceChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { type: 'bar',  label: '摂取', data: days.map(d => dayMap[d].intake), backgroundColor: '#2563EB' },
+          { type: 'bar',  label: '消費', data: days.map(d => dayMap[d].burn),   backgroundColor: '#E67E22' },
+          {
+            type: 'line', label: '収支',
+            data: days.map(d => dayMap[d].burn !== null ? dayMap[d].intake - dayMap[d].burn : null),
+            borderColor: '#16A085', backgroundColor: '#16A085',
+            tension: 0.3, pointRadius: 2, spanGaps: true,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+        },
+        scales: { y: { title: { display: true, text: 'kcal' } } },
+      },
+    });
+  } else if (_balanceChart) {
+    _balanceChart.destroy();
+    _balanceChart = null;
   }
 
-  document.getElementById('balance-intake').textContent = `${intake}kcal`;
-
-  const balanceEmpty = document.getElementById('balance-empty');
-  if (!_todayEnergy) {
-    document.getElementById('balance-burn').textContent = '-';
-    document.getElementById('balance-net').textContent  = '-';
-    balanceEmpty.hidden = false;
-    return;
+  const today = todayJST();
+  const t = dayMap[today] || { intake: 0, burn: null };
+  const capEl = document.getElementById('balance-today-caption');
+  if (t.burn === null) {
+    capEl.textContent = `今日: 摂取${t.intake}kcal / 消費データなし`;
+  } else {
+    const net = t.intake - t.burn;
+    capEl.textContent = `今日: 摂取${t.intake}kcal / 消費${t.burn}kcal / 収支${net > 0 ? '+' : ''}${net}kcal`;
   }
-  balanceEmpty.hidden = true;
-
-  const burn = (_todayEnergy.active_kcal || 0) + (_todayEnergy.resting_kcal || 0);
-  document.getElementById('balance-burn').textContent = `${burn}kcal`;
-
-  const net = intake - burn;
-  const netEl = document.getElementById('balance-net');
-  netEl.textContent = `${net > 0 ? '+' : ''}${net}kcal`;
-  netEl.classList.toggle('positive', net > 0);
-  netEl.classList.toggle('negative', net < 0);
 }
 
 // ============================================================
 // 体組成（TANITA、ジムのTANITA FITは個人API非対応のためチャット経由で手入力）
 // ============================================================
+const BODY_METRICS = {
+  weight_kg:              { label: '体重',       unit: 'kg',   color: '#2563EB' },
+  bmi:                    { label: 'BMI',        unit: '',     color: '#8B5CF6' },
+  body_fat_pct:           { label: '体脂肪率',   unit: '%',    color: '#E67E22' },
+  visceral_fat_level:     { label: '内臓脂肪Lv', unit: '',     color: '#DC2626' },
+  muscle_mass_kg:         { label: '筋肉量',     unit: 'kg',   color: '#16A085' },
+  estimated_bone_mass_kg: { label: '推定骨量',   unit: 'kg',   color: '#64748B' },
+  bmr_kcal:               { label: '基礎代謝',   unit: 'kcal', color: '#F59E0B' },
+  body_age:               { label: '体内年齢',   unit: '歳',   color: '#0EA5E9' },
+  muscle_quality_score:   { label: '筋質点数',   unit: '点',   color: '#10B981' },
+};
+let _bodyMetric = 'weight_kg';
+
+function latestBmrKcal() {
+  for (let i = _bodyLogs.length - 1; i >= 0; i--) {
+    if (_bodyLogs[i].bmr_kcal != null) return _bodyLogs[i].bmr_kcal;
+  }
+  return null;
+}
+
 function renderBodyComp() {
-  const canvas   = document.getElementById('chart-body');
-  const emptyEl  = document.getElementById('hp-empty');
-  const statsRow = document.getElementById('hp-stats-row');
+  const canvas    = document.getElementById('chart-body');
+  const emptyEl   = document.getElementById('hp-empty');
+  const statsGrid = document.getElementById('body-stats-grid');
 
   if (_bodyLogs.length === 0) {
     canvas.hidden = true;
-    statsRow.hidden = true;
+    statsGrid.hidden = true;
     emptyEl.hidden = false;
     if (_bodyChart) { _bodyChart.destroy(); _bodyChart = null; }
     return;
   }
   canvas.hidden = false;
-  statsRow.hidden = false;
+  statsGrid.hidden = false;
   emptyEl.hidden = true;
 
   const latest = _bodyLogs[_bodyLogs.length - 1];
-  document.getElementById('hp-weight').textContent = latest.weight_kg      != null ? `${latest.weight_kg}kg` : '-';
-  document.getElementById('hp-fat').textContent    = latest.body_fat_pct  != null ? `${latest.body_fat_pct}%` : '-';
-  document.getElementById('hp-muscle').textContent = latest.muscle_mass_kg != null ? `${latest.muscle_mass_kg}kg` : '-';
+  for (const key of Object.keys(BODY_METRICS)) {
+    const el = document.getElementById('bs-' + key);
+    if (!el) continue;
+    const v = latest[key];
+    el.textContent = v != null ? `${v}${BODY_METRICS[key].unit}` : '-';
+  }
 
+  const metric = BODY_METRICS[_bodyMetric];
   const labels = _bodyLogs.map(r => fmtDateLabel(r.date));
   const ctx = canvas.getContext('2d');
   if (_bodyChart) _bodyChart.destroy();
@@ -322,10 +389,10 @@ function renderBodyComp() {
     data: {
       labels,
       datasets: [{
-        label: '体重(kg)',
-        data: _bodyLogs.map(r => r.weight_kg),
-        borderColor: '#2563EB',
-        backgroundColor: '#2563EB',
+        label: metric.label,
+        data: _bodyLogs.map(r => r[_bodyMetric]),
+        borderColor: metric.color,
+        backgroundColor: metric.color,
         tension: 0.3,
         pointRadius: 2,
         spanGaps: true,
@@ -335,7 +402,7 @@ function renderBodyComp() {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: false } },
+      scales: { y: { beginAtZero: false, title: { display: true, text: metric.unit || metric.label } } },
     },
   });
 }
@@ -384,20 +451,34 @@ function renderAll() {
   renderChart();
   renderPfcChart();
   renderLogList();
-  renderCalorieBalance();
+  renderBalanceChart();
   renderBodyComp();
 }
 
 // ============================================================
 // 初期化
 // ============================================================
-document.querySelectorAll('.range-btn').forEach(btn => {
+document.querySelectorAll('#nutrition-range-toggle .range-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#nutrition-range-toggle .range-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     _range = parseInt(btn.dataset.range);
     renderChart();
   });
+});
+
+document.querySelectorAll('#balance-range-toggle .range-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#balance-range-toggle .range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _balanceRange = parseInt(btn.dataset.range);
+    renderBalanceChart();
+  });
+});
+
+document.getElementById('body-metric-select').addEventListener('change', (e) => {
+  _bodyMetric = e.target.value;
+  renderBodyComp();
 });
 
 document.getElementById('btn-refresh').addEventListener('click', async (e) => {
