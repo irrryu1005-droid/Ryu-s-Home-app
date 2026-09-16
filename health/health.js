@@ -31,6 +31,7 @@ let _logs  = [];
 let _range = 14;
 let _chart = null;
 let _pfcChart = null;
+let _goals = { protein_target: 100, fat_target: 60, carb_target: 250 };
 
 // ============================================================
 // ユーティリティ
@@ -61,6 +62,19 @@ async function addLog(row) {
   renderAll();
 }
 
+async function loadGoals() {
+  const { data, error } = await db.from('health_goals').select('*').eq('id', 1).single();
+  if (error) { console.error(error); return; }
+  if (data) _goals = data;
+}
+
+async function saveGoals(g) {
+  const { data, error } = await db.from('health_goals').update(g).eq('id', 1).select().single();
+  if (error) { console.error(error); alert('保存に失敗しました'); return; }
+  _goals = data;
+  renderAll();
+}
+
 // ============================================================
 // 今日の合計
 // ============================================================
@@ -78,6 +92,22 @@ function renderTodaySummary() {
   document.getElementById('today-fat').textContent     = `${totals.fat}g`;
   document.getElementById('today-carbs').textContent   = `${totals.carb}g`;
   document.getElementById('today-kcal').textContent    = `${totals.kcal}kcal`;
+
+  renderRemain('remain-protein', _goals.protein_target, totals.protein);
+  renderRemain('remain-fat',     _goals.fat_target,     totals.fat);
+  renderRemain('remain-carb',    _goals.carb_target,    totals.carb);
+}
+
+function renderRemain(elId, target, consumed) {
+  const el = document.getElementById(elId);
+  const diff = target - consumed;
+  if (diff >= 0) {
+    el.textContent = `残り${diff}g`;
+    el.classList.remove('over');
+  } else {
+    el.textContent = `+${Math.abs(diff)}g超過`;
+    el.classList.add('over');
+  }
 }
 
 // ============================================================
@@ -248,7 +278,7 @@ document.querySelectorAll('.range-btn').forEach(btn => {
 document.getElementById('btn-refresh').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   btn.classList.add('spinning');
-  await loadLogs();
+  await Promise.all([loadLogs(), loadGoals()]);
   renderAll();
   setTimeout(() => btn.classList.remove('spinning'), 400);
 });
@@ -311,7 +341,38 @@ logForm.addEventListener('submit', async (e) => {
   closeLogModal();
 });
 
+// ============================================================
+// 目標編集モーダル
+// ============================================================
+const goalModal = document.getElementById('goal-modal-overlay');
+const goalForm  = document.getElementById('goal-form');
+
+function openGoalModal() {
+  goalForm.protein_target.value = _goals.protein_target;
+  goalForm.fat_target.value     = _goals.fat_target;
+  goalForm.carb_target.value    = _goals.carb_target;
+  goalModal.hidden = false;
+}
+function closeGoalModal() {
+  goalModal.hidden = true;
+}
+
+document.getElementById('btn-edit-goal').addEventListener('click', openGoalModal);
+document.getElementById('btn-cancel-goal').addEventListener('click', closeGoalModal);
+goalModal.addEventListener('click', (e) => { if (e.target === goalModal) closeGoalModal(); });
+
+goalForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(goalForm);
+  await saveGoals({
+    protein_target: parseInt(fd.get('protein_target')) || 0,
+    fat_target:     parseInt(fd.get('fat_target'))     || 0,
+    carb_target:    parseInt(fd.get('carb_target'))    || 0,
+  });
+  closeGoalModal();
+});
+
 (async function init() {
-  await loadLogs();
+  await Promise.all([loadLogs(), loadGoals()]);
   renderAll();
 })();

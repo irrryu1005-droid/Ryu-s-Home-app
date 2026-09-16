@@ -67,6 +67,25 @@ body {
 /* ============================================================
    サマリーバー（今日の合計）
 ============================================================ */
+.summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.summary-title { font-size: 12px; font-weight: 700; color: var(--muted); }
+.btn-goal-edit {
+  padding: 4px 10px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-goal-edit:hover { border-color: var(--accent); color: var(--accent); }
 .summary-bar {
   display: flex;
   background: var(--white);
@@ -79,6 +98,8 @@ body {
 .s-item:last-child { border-right: none; }
 .s-label { font-size: 10px; color: var(--muted); font-weight: 600; margin-bottom: 3px; }
 .s-val   { font-size: 20px; font-weight: 800; }
+.s-remain { font-size: 10px; color: var(--muted); margin-top: 3px; font-weight: 600; }
+.s-remain.over { color: var(--red); }
 #today-protein { color: var(--protein); }
 #today-fat     { color: var(--fat); }
 #today-carbs   { color: var(--carbs); }

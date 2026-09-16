@@ -38,22 +38,56 @@
     <main class="tab-content">
 
       <!-- 今日の合計 -->
+      <div class="summary-header">
+        <span class="summary-title">今日の摂取量</span>
+        <button id="btn-edit-goal" class="btn-goal-edit" title="目標を編集">🎯 目標</button>
+      </div>
       <div class="summary-bar">
         <div class="s-item">
           <div class="s-label">タンパク質</div>
           <div class="s-val" id="today-protein">0g</div>
+          <div class="s-remain" id="remain-protein">残り0g</div>
         </div>
         <div class="s-item">
           <div class="s-label">脂質</div>
           <div class="s-val" id="today-fat">0g</div>
+          <div class="s-remain" id="remain-fat">残り0g</div>
         </div>
         <div class="s-item">
           <div class="s-label">炭水化物</div>
           <div class="s-val" id="today-carbs">0g</div>
+          <div class="s-remain" id="remain-carb">残り0g</div>
         </div>
         <div class="s-item">
           <div class="s-label">カロリー</div>
           <div class="s-val" id="today-kcal">0kcal</div>
+        </div>
+      </div>
+
+      <!-- 目標編集モーダル -->
+      <div id="goal-modal-overlay" class="modal-overlay" hidden>
+        <div class="form-card modal-card">
+          <h3>1日の目標を編集</h3>
+          <form id="goal-form" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label>タンパク質(g)</label>
+                <input type="number" name="protein_target" min="0" required>
+              </div>
+              <div class="form-group">
+                <label>脂質(g)</label>
+                <input type="number" name="fat_target" min="0" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>炭水化物(g)</label>
+              <input type="number" name="carb_target" min="0" required>
+            </div>
+            <div class="form-btns">
+              <button type="button" id="btn-cancel-goal" class="btn-cancel">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+          </form>
         </div>
       </div>
 
