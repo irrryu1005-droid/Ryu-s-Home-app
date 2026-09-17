@@ -43,6 +43,7 @@ let _bodyChart = null;
 let _goals = { protein_target: 100, fat_target: 60, carb_target: 250 };
 let _energyLogs = [];
 let _balanceRange = 14;
+let _logListDate = todayJST();
 let _balanceChart = null;
 let _bodyLogs = [];
 
@@ -56,6 +57,9 @@ function escapeHtml(str) {
 }
 function roundG(n) {
   return Math.round((n || 0) * 10) / 10;
+}
+function fmtG(n) {
+  return (n || 0).toFixed(1);
 }
 
 // ============================================================
@@ -116,9 +120,9 @@ function renderTodaySummary() {
     totals.carb    += log.carb_g   || 0;
     totals.kcal    += log.kcal     || 0;
   }
-  document.getElementById('today-protein').textContent = `${roundG(totals.protein)}g`;
-  document.getElementById('today-fat').textContent     = `${roundG(totals.fat)}g`;
-  document.getElementById('today-carbs').textContent   = `${roundG(totals.carb)}g`;
+  document.getElementById('today-protein').textContent = `${fmtG(totals.protein)}g`;
+  document.getElementById('today-fat').textContent     = `${fmtG(totals.fat)}g`;
+  document.getElementById('today-carbs').textContent   = `${fmtG(totals.carb)}g`;
   document.getElementById('today-kcal').textContent    = `${totals.kcal}kcal`;
 
   renderRemain('remain-protein', _goals.protein_target, totals.protein);
@@ -128,12 +132,12 @@ function renderTodaySummary() {
 
 function renderRemain(elId, target, consumed) {
   const el = document.getElementById(elId);
-  const diff = roundG(target - consumed);
+  const diff = target - consumed;
   if (diff >= 0) {
-    el.textContent = `残り${diff}g`;
+    el.textContent = `残り${fmtG(diff)}g`;
     el.classList.remove('over');
   } else {
-    el.textContent = `+${Math.abs(diff)}g超過`;
+    el.textContent = `+${fmtG(Math.abs(diff))}g超過`;
     el.classList.add('over');
   }
 }
@@ -337,15 +341,15 @@ function renderBalanceChart() {
 // 体組成（TANITA、ジムのTANITA FITは個人API非対応のためチャット経由で手入力）
 // ============================================================
 const BODY_METRICS = {
-  weight_kg:              { label: '体重',       unit: 'kg',   color: '#2563EB' },
-  bmi:                    { label: 'BMI',        unit: '',     color: '#8B5CF6' },
-  body_fat_pct:           { label: '体脂肪率',   unit: '%',    color: '#E67E22' },
-  visceral_fat_level:     { label: '内臓脂肪Lv', unit: '',     color: '#DC2626' },
-  muscle_mass_kg:         { label: '筋肉量',     unit: 'kg',   color: '#16A085' },
-  estimated_bone_mass_kg: { label: '推定骨量',   unit: 'kg',   color: '#64748B' },
-  bmr_kcal:               { label: '基礎代謝',   unit: 'kcal', color: '#F59E0B' },
-  body_age:               { label: '体内年齢',   unit: '歳',   color: '#0EA5E9' },
-  muscle_quality_score:   { label: '筋質点数',   unit: '点',   color: '#10B981' },
+  weight_kg:              { label: '体重',       unit: 'kg',   color: '#2563EB', decimals: 1 },
+  bmi:                    { label: 'BMI',        unit: '',     color: '#8B5CF6', decimals: 1 },
+  body_fat_pct:           { label: '体脂肪率',   unit: '%',    color: '#E67E22', decimals: 1 },
+  visceral_fat_level:     { label: '内臓脂肪Lv', unit: '',     color: '#DC2626', decimals: 0 },
+  muscle_mass_kg:         { label: '筋肉量',     unit: 'kg',   color: '#16A085', decimals: 1 },
+  estimated_bone_mass_kg: { label: '推定骨量',   unit: 'kg',   color: '#64748B', decimals: 1 },
+  bmr_kcal:               { label: '基礎代謝',   unit: 'kcal', color: '#F59E0B', decimals: 0 },
+  body_age:               { label: '体内年齢',   unit: '歳',   color: '#0EA5E9', decimals: 0 },
+  muscle_quality_score:   { label: '筋質点数',   unit: '点',   color: '#10B981', decimals: 0 },
 };
 let _bodyMetric = 'weight_kg';
 
@@ -377,7 +381,8 @@ function renderBodyComp() {
     const el = document.getElementById('bs-' + key);
     if (!el) continue;
     const v = latest[key];
-    el.textContent = v != null ? `${v}${BODY_METRICS[key].unit}` : '-';
+    const m = BODY_METRICS[key];
+    el.textContent = v != null ? `${Number(v).toFixed(m.decimals)}${m.unit}` : '-';
   }
 
   const metric = BODY_METRICS[_bodyMetric];
@@ -412,35 +417,41 @@ function renderBodyComp() {
 // ============================================================
 function renderLogList() {
   const el = document.getElementById('log-list');
-  if (_logs.length === 0) {
-    el.innerHTML = '<div class="empty-state">まだ記録がありません</div>';
+  document.getElementById('log-date-input').value = _logListDate;
+  document.getElementById('log-next').disabled = _logListDate >= todayJST();
+
+  const dayLogs = _logs.filter(log => log.date === _logListDate);
+  if (dayLogs.length === 0) {
+    el.innerHTML = '<div class="empty-state">この日の記録はありません</div>';
     return;
   }
-  const groups = {};
-  for (const log of _logs) {
-    if (!groups[log.date]) groups[log.date] = [];
-    groups[log.date].push(log);
-  }
-  const dates = Object.keys(groups).sort().reverse();
-  el.innerHTML = dates.map(date => `
-    <div class="day-group">
-      <div class="day-group-header">${date}</div>
-      ${groups[date].map(log => `
-        <div class="log-row">
-          <div class="log-desc">
-            <span class="log-source">${escapeHtml(log.source || '記録')}</span>
-            ${log.note ? `<span class="log-note">${escapeHtml(log.note)}</span>` : ''}
-          </div>
-          <div class="log-macros">
-            <span class="macro-tag protein">P ${roundG(log.amount_g)}g</span>
-            <span class="macro-tag fat">F ${roundG(log.fat_g)}g</span>
-            <span class="macro-tag carb">C ${roundG(log.carb_g)}g</span>
-            ${log.kcal ? `<span class="macro-tag kcal">${log.kcal}kcal</span>` : ''}
-          </div>
+  const dayKcal = dayLogs.reduce((sum, log) => sum + (log.kcal || 0), 0);
+  el.innerHTML = `
+    <div class="day-total">合計 ${dayKcal}kcal</div>
+    ${dayLogs.map(log => `
+      <div class="log-row">
+        <div class="log-desc">
+          <span class="log-source">${escapeHtml(log.source || '記録')}</span>
+          ${log.note ? `<span class="log-note">${escapeHtml(log.note)}</span>` : ''}
         </div>
-      `).join('')}
-    </div>
-  `).join('');
+        <div class="log-macros">
+          <span class="macro-tag protein">P ${fmtG(log.amount_g)}g</span>
+          <span class="macro-tag fat">F ${fmtG(log.fat_g)}g</span>
+          <span class="macro-tag carb">C ${fmtG(log.carb_g)}g</span>
+          ${log.kcal ? `<span class="macro-tag kcal">${log.kcal}kcal</span>` : ''}
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function shiftLogDate(days) {
+  const d = new Date(_logListDate + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  const newDate = ymdStr(d);
+  if (newDate > todayJST()) return;
+  _logListDate = newDate;
+  renderLogList();
 }
 
 // ============================================================
@@ -476,13 +487,22 @@ document.querySelectorAll('#balance-range-toggle .range-btn').forEach(btn => {
   });
 });
 
-document.querySelectorAll('#body-metric-toggle .metric-btn').forEach(btn => {
+document.querySelectorAll('#body-stats-grid .body-stat-item').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('#body-metric-toggle .metric-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#body-stats-grid .body-stat-item').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     _bodyMetric = btn.dataset.metric;
     renderBodyComp();
   });
+});
+
+document.getElementById('log-prev').addEventListener('click', () => shiftLogDate(-1));
+document.getElementById('log-next').addEventListener('click', () => shiftLogDate(1));
+document.getElementById('log-date-input').addEventListener('change', (e) => {
+  const v = e.target.value;
+  if (!v) return;
+  _logListDate = v > todayJST() ? todayJST() : v;
+  renderLogList();
 });
 
 document.getElementById('btn-refresh').addEventListener('click', async (e) => {

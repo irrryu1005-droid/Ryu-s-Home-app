@@ -130,6 +130,11 @@
       <div class="tab-header-simple">
         <h2>📋 記録一覧</h2>
       </div>
+      <div class="log-nav">
+        <button id="log-prev" class="log-nav-btn">‹</button>
+        <input type="date" id="log-date-input" class="log-date-input">
+        <button id="log-next" class="log-nav-btn">›</button>
+      </div>
       <div id="log-list"></div>
 
       <!-- 記録追加モーダル -->
@@ -203,27 +208,15 @@
         </div>
 
         <div class="body-stats-grid" id="body-stats-grid" hidden>
-          <div class="body-stat-item"><div class="body-stat-label">体重</div><div class="body-stat-val" id="bs-weight_kg">-</div></div>
-          <div class="body-stat-item"><div class="body-stat-label">BMI</div><div class="body-stat-val" id="bs-bmi">-</div></div>
-          <div class="body-stat-item"><div class="body-stat-label">体脂肪率</div><div class="body-stat-val" id="bs-body_fat_pct">-</div></div>
-          <div class="body-stat-item"><div class="body-stat-label">内臓脂肪Lv</div><div class="body-stat-val" id="bs-visceral_fat_level">-</div></div>
-          <div class="body-stat-item"><div class="body-stat-label">筋肉量</div><div class="body-stat-val" id="bs-muscle_mass_kg">-</div></div>
-          <div class="body-stat-item"><div class="body-stat-label">推定骨量</div><div class="body-stat-val" id="bs-estimated_bone_mass_kg">-</div></div>
-          <div class="body-stat-item"><div class="body-stat-label">基礎代謝</div><div class="body-stat-val" id="bs-bmr_kcal">-</div></div>
-          <div class="body-stat-item"><div class="body-stat-label">体内年齢</div><div class="body-stat-val" id="bs-body_age">-</div></div>
-          <div class="body-stat-item"><div class="body-stat-label">筋質点数</div><div class="body-stat-val" id="bs-muscle_quality_score">-</div></div>
-        </div>
-
-        <div class="metric-toggle" id="body-metric-toggle">
-          <button class="metric-btn active" data-metric="weight_kg"              style="--mc:#2563EB">体重</button>
-          <button class="metric-btn"        data-metric="bmi"                    style="--mc:#8B5CF6">BMI</button>
-          <button class="metric-btn"        data-metric="body_fat_pct"           style="--mc:#E67E22">体脂肪率</button>
-          <button class="metric-btn"        data-metric="visceral_fat_level"     style="--mc:#DC2626">内臓脂肪Lv</button>
-          <button class="metric-btn"        data-metric="muscle_mass_kg"         style="--mc:#16A085">筋肉量</button>
-          <button class="metric-btn"        data-metric="estimated_bone_mass_kg" style="--mc:#64748B">推定骨量</button>
-          <button class="metric-btn"        data-metric="bmr_kcal"               style="--mc:#F59E0B">基礎代謝</button>
-          <button class="metric-btn"        data-metric="body_age"               style="--mc:#0EA5E9">体内年齢</button>
-          <button class="metric-btn"        data-metric="muscle_quality_score"   style="--mc:#10B981">筋質点数</button>
+          <button class="body-stat-item active" data-metric="weight_kg"              style="--mc:#2563EB"><div class="body-stat-label">体重</div><div class="body-stat-val" id="bs-weight_kg">-</div></button>
+          <button class="body-stat-item"        data-metric="bmi"                    style="--mc:#8B5CF6"><div class="body-stat-label">BMI</div><div class="body-stat-val" id="bs-bmi">-</div></button>
+          <button class="body-stat-item"        data-metric="body_fat_pct"           style="--mc:#E67E22"><div class="body-stat-label">体脂肪率</div><div class="body-stat-val" id="bs-body_fat_pct">-</div></button>
+          <button class="body-stat-item"        data-metric="visceral_fat_level"     style="--mc:#DC2626"><div class="body-stat-label">内臓脂肪Lv</div><div class="body-stat-val" id="bs-visceral_fat_level">-</div></button>
+          <button class="body-stat-item"        data-metric="muscle_mass_kg"         style="--mc:#16A085"><div class="body-stat-label">筋肉量</div><div class="body-stat-val" id="bs-muscle_mass_kg">-</div></button>
+          <button class="body-stat-item"        data-metric="estimated_bone_mass_kg" style="--mc:#64748B"><div class="body-stat-label">推定骨量</div><div class="body-stat-val" id="bs-estimated_bone_mass_kg">-</div></button>
+          <button class="body-stat-item"        data-metric="bmr_kcal"               style="--mc:#F59E0B"><div class="body-stat-label">基礎代謝</div><div class="body-stat-val" id="bs-bmr_kcal">-</div></button>
+          <button class="body-stat-item"        data-metric="body_age"               style="--mc:#0EA5E9"><div class="body-stat-label">体内年齢</div><div class="body-stat-val" id="bs-body_age">-</div></button>
+          <button class="body-stat-item"        data-metric="muscle_quality_score"   style="--mc:#10B981"><div class="body-stat-label">筋質点数</div><div class="body-stat-val" id="bs-muscle_quality_score">-</div></button>
         </div>
 
         <div class="chart-wrap">
