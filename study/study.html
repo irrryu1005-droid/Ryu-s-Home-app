@@ -55,15 +55,15 @@
       <!-- サマリーバー -->
       <div class="summary-bar">
         <div class="s-item">
-          <div class="s-label">読中</div>
+          <div class="s-label">読書中</div>
           <div class="s-val" id="count-reading">0</div>
         </div>
         <div class="s-item">
-          <div class="s-label">完読</div>
+          <div class="s-label">読了</div>
           <div class="s-val" id="count-completed">0</div>
         </div>
         <div class="s-item">
-          <div class="s-label">積読</div>
+          <div class="s-label">読書前</div>
           <div class="s-val" id="count-unread">0</div>
         </div>
       </div>
@@ -71,22 +71,16 @@
       <div class="tab-header">
         <div class="status-filters">
           <button class="filter-btn active" data-status="all">すべて</button>
-          <button class="filter-btn" data-status="reading">読中</button>
-          <button class="filter-btn" data-status="unread">未読</button>
-          <button class="filter-btn" data-status="completed">完読</button>
+          <button class="filter-btn" data-status="reading">読書中</button>
+          <button class="filter-btn" data-status="unread">読書前</button>
+          <button class="filter-btn" data-status="completed">読了</button>
         </div>
         <button id="btn-add-book" class="btn-primary">＋ 追加</button>
       </div>
 
-      <!-- カテゴリフィルター -->
-      <div class="cat-filters">
+      <!-- ジャンルフィルター（登録済みジャンルから自動生成） -->
+      <div class="cat-filters" id="genre-filters">
         <button class="cat-filter-btn active" data-cat="all">すべて</button>
-        <button class="cat-filter-btn" data-cat="小説">小説</button>
-        <button class="cat-filter-btn" data-cat="ビジネス">ビジネス</button>
-        <button class="cat-filter-btn" data-cat="思想・哲学">思想・哲学</button>
-        <button class="cat-filter-btn" data-cat="技術">技術</button>
-        <button class="cat-filter-btn" data-cat="英語">英語</button>
-        <button class="cat-filter-btn" data-cat="その他">その他</button>
       </div>
 
       <div id="book-list"></div>
@@ -108,23 +102,32 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>カテゴリ</label>
-                <select name="category">
-                  <option value="">未分類</option>
-                  <option value="小説">小説</option>
-                  <option value="ビジネス">ビジネス</option>
-                  <option value="思想・哲学">思想・哲学</option>
-                  <option value="技術">技術</option>
-                  <option value="英語">英語</option>
-                  <option value="その他">その他</option>
-                </select>
+                <label>ジャンル（カンマ区切り）</label>
+                <input type="text" name="genres" placeholder="評論, 認知学">
               </div>
               <div class="form-group">
                 <label>ステータス</label>
                 <select name="status">
-                  <option value="unread">未読</option>
-                  <option value="reading">読中</option>
-                  <option value="completed">完読</option>
+                  <option value="unread">読書前</option>
+                  <option value="reading">読書中</option>
+                  <option value="completed">読了</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>出版社</label>
+                <input type="text" name="publisher" placeholder="岩波書店">
+              </div>
+              <div class="form-group">
+                <label>評価</label>
+                <select name="rating">
+                  <option value="">未評価</option>
+                  <option value="5">★★★★★</option>
+                  <option value="4">★★★★☆</option>
+                  <option value="3">★★★☆☆</option>
+                  <option value="2">★★☆☆☆</option>
+                  <option value="1">★☆☆☆☆</option>
                 </select>
               </div>
             </div>
@@ -136,6 +139,16 @@
               <div class="form-group">
                 <label>総ページ数</label>
                 <input type="number" name="totalPages" min="1" placeholder="300">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>出版日</label>
+                <input type="date" name="publishedDate">
+              </div>
+              <div class="form-group">
+                <label>読書開始日</label>
+                <input type="date" name="startedAt">
               </div>
             </div>
             <div class="form-group" id="completed-at-wrap">

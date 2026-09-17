@@ -265,75 +265,63 @@ body {
 }
 
 /* ============================================================
-   本リスト
+   本リスト（Notion風テーブル表示）
 ============================================================ */
-.book-list-wrap {
+.book-table-wrap {
   background: var(--white);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  overflow: hidden;
+  overflow-x: auto;
 }
-
-.book-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+.book-table {
+  width: 100%;
+  min-width: 800px;
+  border-collapse: collapse;
+}
+.book-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 10px;
+  background: var(--bg);
+  border-bottom: 1.5px solid var(--border);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+.book-table td {
+  padding: 6px 10px;
   border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  vertical-align: middle;
+  white-space: nowrap;
 }
-.book-row:last-child { border-bottom: none; }
+.book-table tbody tr:last-child td { border-bottom: none; }
+.book-table tbody tr:hover { background: var(--bg); }
 
-.book-row-left {
-  flex: 1;
-  min-width: 0;
-}
-.book-title {
-  font-size: 14px;
+.book-table .col-title { max-width: 220px; white-space: normal; }
+.title-text {
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.book-author {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 1px;
-}
-.book-progress-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-}
-.progress-bar-bg {
-  flex: 1;
-  height: 4px;
-  background: var(--border);
-  border-radius: 99px;
-  overflow: hidden;
-}
-.progress-bar-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 99px;
-  transition: width 0.3s;
-}
-.progress-text { font-size: 10px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.progress-mini { font-size: 9px; color: var(--muted); margin-top: 1px; }
 
-.book-row-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 5px;
-  flex-shrink: 0;
-}
-.book-actions { display: flex; gap: 4px; }
+.book-table .col-genres { display: flex; gap: 3px; flex-wrap: wrap; max-width: 200px; white-space: normal; }
+.book-table .col-period { font-size: 11px; color: var(--muted); }
+.book-table .col-actions { display: flex; gap: 4px; }
+.cell-muted { color: var(--muted); }
 
 /* ステータスバッジ */
 .badge-status {
-  padding: 2px 8px;
+  padding: 1px 7px;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
 }
 .badge-unread    { background: #F4F6F7; color: #8A9BB0; }
@@ -341,15 +329,16 @@ body {
 .badge-completed { background: #EAFAF1; color: #16A085; }
 
 .badge-cat {
-  padding: 2px 7px;
+  padding: 1px 6px;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   background: #F0F4FF;
   color: #2563EB;
+  white-space: nowrap;
 }
 
-.completed-date { font-size: 11px; color: var(--muted); }
+.book-rating { font-size: 11px; color: #F1C40F; letter-spacing: 0.5px; white-space: nowrap; }
 
 .empty-msg {
   text-align: center;
@@ -568,11 +557,10 @@ body {
   .summary-bar    { padding: 7px 0; margin-bottom: 10px; }
   .s-label        { font-size: 9px; margin-bottom: 1px; }
   .s-val          { font-size: 14px; }
-  .book-row       { padding: 8px 11px; }
-  .book-title     { font-size: 13px; }
-  .book-author    { font-size: 11px; }
-  .book-progress-wrap { gap: 4px; margin-top: 3px; }
+  .book-table th, .book-table td { padding: 5px 8px; font-size: 11px; }
+  .title-text     { font-size: 12px; }
   .badge-status   { padding: 1px 6px; font-size: 9px; }
+  .small-btn      { padding: 2px 7px; font-size: 10px; }
   .ielts-goal-card { padding: 11px 13px; gap: 11px; margin-bottom: 10px; }
   .ielts-sections { gap: 10px; }
   .ielts-section-header { padding: 9px 11px; font-size: 13px; }

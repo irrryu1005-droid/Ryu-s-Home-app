@@ -44,25 +44,33 @@ function fmtMin(min) {
 // ============================================================
 function normalizeBook(row) {
   return {
-    id:          row.id,
-    title:       row.title,
-    author:      row.author       || '',
-    status:      row.status       || 'unread',
-    currentPage: row.current_page || 0,
-    totalPages:  row.total_pages  || null,
-    category:    row.category     || '',
-    completedAt: row.completed_at || null,
+    id:            row.id,
+    title:         row.title,
+    author:        row.author         || '',
+    status:        row.status         || 'unread',
+    currentPage:   row.current_page   || 0,
+    totalPages:    row.total_pages    || null,
+    genres:        row.genres         || [],
+    rating:        row.rating         || null,
+    publisher:     row.publisher      || '',
+    publishedDate: row.published_date || null,
+    startedAt:     row.started_at     || null,
+    completedAt:   row.completed_at   || null,
   };
 }
 function bookToRow(b) {
   return {
-    title:        b.title,
-    author:       b.author       || null,
-    status:       b.status,
-    current_page: b.currentPage  ? parseInt(b.currentPage) : 0,
-    total_pages:  b.totalPages   ? parseInt(b.totalPages)  : null,
-    category:     b.category     || null,
-    completed_at: b.completedAt  || null,
+    title:          b.title,
+    author:         b.author         || null,
+    status:         b.status,
+    current_page:   b.currentPage    ? parseInt(b.currentPage) : 0,
+    total_pages:    b.totalPages     ? parseInt(b.totalPages)  : null,
+    genres:         b.genres         || [],
+    rating:         b.rating         ? parseInt(b.rating) : null,
+    publisher:      b.publisher      || null,
+    published_date: b.publishedDate  || null,
+    started_at:     b.startedAt      || null,
+    completed_at:   b.completedAt    || null,
   };
 }
 
@@ -91,13 +99,44 @@ async function deleteBook(id) {
 // ============================================================
 // Reading — レンダリング
 // ============================================================
-const STATUS_LABEL = { unread: '未読', reading: '読中', completed: '完読' };
+const STATUS_LABEL = { unread: '読書前', reading: '読書中', completed: '読了' };
 const STATUS_BADGE = { unread: 'badge-unread', reading: 'badge-reading', completed: 'badge-completed' };
 
+function starsHtml(rating) {
+  if (!rating) return '<span class="cell-muted">—</span>';
+  return `<span class="book-rating">${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}</span>`;
+}
+function periodText(b) {
+  if (b.startedAt && b.completedAt) return `${b.startedAt} → ${b.completedAt}`;
+  if (b.completedAt) return b.completedAt;
+  if (b.startedAt) return `${b.startedAt} →`;
+  return '—';
+}
+
+function renderGenreFilters() {
+  const genres = [...new Set(_books.flatMap(b => b.genres))].sort();
+  const container = document.getElementById('genre-filters');
+  const buttons = ['<button class="cat-filter-btn' + (_catFilter === 'all' ? ' active' : '') + '" data-cat="all">すべて</button>']
+    .concat(genres.map(g =>
+      `<button class="cat-filter-btn${_catFilter === g ? ' active' : ''}" data-cat="${escapeHtml(g)}">${escapeHtml(g)}</button>`
+    ));
+  container.innerHTML = buttons.join('');
+  container.querySelectorAll('.cat-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      container.querySelectorAll('.cat-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _catFilter = btn.dataset.cat;
+      renderBooks();
+    });
+  });
+}
+
 function renderBooks() {
+  renderGenreFilters();
+
   let list = _books;
   if (_statusFilter !== 'all') list = list.filter(b => b.status === _statusFilter);
-  if (_catFilter    !== 'all') list = list.filter(b => b.category === _catFilter);
+  if (_catFilter    !== 'all') list = list.filter(b => b.genres.includes(_catFilter));
 
   document.getElementById('count-reading').textContent   = _books.filter(b => b.status === 'reading').length;
   document.getElementById('count-completed').textContent = _books.filter(b => b.status === 'completed').length;
@@ -112,38 +151,36 @@ function renderBooks() {
   const rows = list.map(b => {
     const pct = (b.totalPages && b.currentPage)
       ? Math.min(100, Math.round(b.currentPage / b.totalPages * 100)) : null;
-    const progressHtml = (b.status === 'reading' && pct !== null)
-      ? `<div class="book-progress-wrap">
-           <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
-           <span class="progress-text">${b.currentPage}/${b.totalPages}p (${pct}%)</span>
-         </div>`
-      : '';
-    const completedHtml = b.status === 'completed' && b.completedAt
-      ? `<span class="completed-date">✅ ${b.completedAt}</span>` : '';
-    const catBadge = b.category
-      ? `<span class="badge-cat">${escapeHtml(b.category)}</span>` : '';
+    const progressMini = (b.status === 'reading' && pct !== null)
+      ? `<div class="progress-mini">${b.currentPage}/${b.totalPages}p (${pct}%)</div>` : '';
+    const genreBadges = b.genres.map(g => `<span class="badge-cat">${escapeHtml(g)}</span>`).join('') || '<span class="cell-muted">—</span>';
 
-    return `<div class="book-row">
-      <div class="book-row-left">
-        <div class="book-title">${escapeHtml(b.title)}</div>
-        ${b.author ? `<div class="book-author">${escapeHtml(b.author)}</div>` : ''}
-        ${progressHtml}
-      </div>
-      <div class="book-row-right">
-        <div style="display:flex;gap:4px;align-items:center;">
-          ${catBadge}
-          <span class="badge-status ${STATUS_BADGE[b.status]}">${STATUS_LABEL[b.status]}</span>
-        </div>
-        ${completedHtml}
-        <div class="book-actions">
-          <button class="small-btn btn-edit" data-id="${b.id}">編集</button>
-          <button class="small-btn btn-delete" data-id="${b.id}">削除</button>
-        </div>
-      </div>
-    </div>`;
+    return `<tr>
+      <td class="col-title">
+        <div class="title-text">${escapeHtml(b.title)}</div>
+        ${progressMini}
+      </td>
+      <td>${escapeHtml(b.author) || '<span class="cell-muted">—</span>'}</td>
+      <td><div class="col-genres">${genreBadges}</div></td>
+      <td><span class="badge-status ${STATUS_BADGE[b.status]}">${STATUS_LABEL[b.status]}</span></td>
+      <td>${starsHtml(b.rating)}</td>
+      <td>${escapeHtml(b.publisher) || '<span class="cell-muted">—</span>'}</td>
+      <td class="col-period">${periodText(b)}</td>
+      <td class="col-actions">
+        <button class="small-btn btn-edit" data-id="${b.id}">編集</button>
+        <button class="small-btn btn-delete" data-id="${b.id}">削除</button>
+      </td>
+    </tr>`;
   }).join('');
 
-  container.innerHTML = `<div class="book-list-wrap">${rows}</div>`;
+  container.innerHTML = `<div class="book-table-wrap"><table class="book-table">
+    <thead>
+      <tr>
+        <th>題名</th><th>著者</th><th>ジャンル</th><th>状況</th><th>評価</th><th>出版社</th><th>期間</th><th></th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
 
   container.querySelectorAll('.btn-edit').forEach(btn =>
     btn.addEventListener('click', () => openEditBook(btn.dataset.id))
@@ -168,14 +205,18 @@ function openEditBook(id) {
   const b = _books.find(x => x.id === id);
   if (!b) return;
   const form = document.getElementById('book-form');
-  form.elements.id.value          = b.id;
-  form.elements.title.value       = b.title;
-  form.elements.author.value      = b.author      || '';
-  form.elements.category.value    = b.category    || '';
-  form.elements.status.value      = b.status;
-  form.elements.currentPage.value = b.currentPage || '';
-  form.elements.totalPages.value  = b.totalPages  || '';
-  form.elements.completedAt.value = b.completedAt || '';
+  form.elements.id.value            = b.id;
+  form.elements.title.value         = b.title;
+  form.elements.author.value        = b.author        || '';
+  form.elements.genres.value        = (b.genres || []).join(', ');
+  form.elements.status.value        = b.status;
+  form.elements.publisher.value     = b.publisher     || '';
+  form.elements.rating.value        = b.rating        || '';
+  form.elements.currentPage.value   = b.currentPage   || '';
+  form.elements.totalPages.value    = b.totalPages    || '';
+  form.elements.publishedDate.value = b.publishedDate || '';
+  form.elements.startedAt.value     = b.startedAt     || '';
+  form.elements.completedAt.value   = b.completedAt   || '';
   updateCompletedAt(b.status);
   document.getElementById('book-form-title').textContent = '編集';
   document.getElementById('book-modal-overlay').hidden = false;
@@ -674,26 +715,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderBooks();
     });
   });
-  document.querySelectorAll('.cat-filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.cat-filter-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      _catFilter = btn.dataset.cat;
-      renderBooks();
-    });
-  });
-
   document.getElementById('book-form').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
     const book = {
-      title:       f.elements.title.value.trim(),
-      author:      f.elements.author.value.trim()      || null,
-      category:    f.elements.category.value           || null,
-      status:      f.elements.status.value,
-      currentPage: f.elements.currentPage.value        || 0,
-      totalPages:  f.elements.totalPages.value         || null,
-      completedAt: f.elements.completedAt.value        || null,
+      title:         f.elements.title.value.trim(),
+      author:        f.elements.author.value.trim()      || null,
+      genres:        f.elements.genres.value.split(',').map(g => g.trim()).filter(Boolean),
+      status:        f.elements.status.value,
+      publisher:     f.elements.publisher.value.trim()    || null,
+      rating:        f.elements.rating.value              || null,
+      currentPage:   f.elements.currentPage.value         || 0,
+      totalPages:    f.elements.totalPages.value          || null,
+      publishedDate: f.elements.publishedDate.value       || null,
+      startedAt:     f.elements.startedAt.value            || null,
+      completedAt:   f.elements.completedAt.value          || null,
     };
     const id = f.elements.id.value;
     if (id) await updateBook(id, book); else await addBook(book);
