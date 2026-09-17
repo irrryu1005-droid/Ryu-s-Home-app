@@ -476,9 +476,13 @@ document.querySelectorAll('#balance-range-toggle .range-btn').forEach(btn => {
   });
 });
 
-document.getElementById('body-metric-select').addEventListener('change', (e) => {
-  _bodyMetric = e.target.value;
-  renderBodyComp();
+document.querySelectorAll('#body-metric-toggle .metric-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#body-metric-toggle .metric-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _bodyMetric = btn.dataset.metric;
+    renderBodyComp();
+  });
 });
 
 document.getElementById('btn-refresh').addEventListener('click', async (e) => {

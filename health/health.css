@@ -187,14 +187,23 @@ body {
 .balance-row .s-item { padding: 8px 0; }
 .balance-today { text-align: center; font-size: 11px; color: var(--muted); margin-bottom: 8px; }
 
-.metric-select {
-  padding: 4px 8px;
-  border-radius: 8px;
-  border: 1.5px solid var(--border);
-  background: var(--white);
+.metric-toggle { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.metric-btn {
+  padding: 4px 10px;
+  border-radius: 20px;
   font-size: 11px;
-  color: var(--text);
-  max-width: 130px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1.5px solid var(--mc, var(--border));
+  background: var(--white);
+  color: var(--mc, var(--muted));
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.metric-btn.active {
+  background: var(--mc, var(--accent));
+  border-color: var(--mc, var(--accent));
+  color: var(--white);
 }
 .body-stats-grid {
   display: grid;
