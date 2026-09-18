@@ -313,10 +313,16 @@ function renderBalanceChart() {
           { type: 'bar',  label: '摂取', data: days.map(d => dayMap[d].intake), backgroundColor: '#2563EB' },
           { type: 'bar',  label: '消費', data: days.map(d => dayMap[d].burn !== null ? Math.round(dayMap[d].burn) : null), backgroundColor: '#E67E22' },
           {
-            type: 'line', label: '収支',
-            data: days.map(d => dayMap[d].burn !== null ? Math.round(dayMap[d].intake - dayMap[d].burn) : null),
+            type: 'line', label: '収支(累計)',
+            data: (() => {
+              let cum = 0;
+              return days.map(d => {
+                if (dayMap[d].burn !== null) cum += Math.round(dayMap[d].intake - dayMap[d].burn);
+                return cum;
+              });
+            })(),
             borderColor: '#16A085', backgroundColor: '#16A085',
-            tension: 0.3, pointRadius: 2, spanGaps: true,
+            tension: 0.3, pointRadius: 2,
           },
         ],
       },
