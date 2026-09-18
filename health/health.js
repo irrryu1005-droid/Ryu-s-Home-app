@@ -278,7 +278,7 @@ function renderBalanceChart() {
   const startDate = dateJSTMinusDays(_balanceRange - 1);
   const dayMap = {};
   for (let i = _balanceRange - 1; i >= 0; i--) {
-    dayMap[dateJSTMinusDays(i)] = { intake: 0, burn: null };
+    dayMap[dateJSTMinusDays(i)] = { intake: 0, burn: null, active: 0, resting: 0 };
   }
   for (const log of _logs) {
     if (log.date < startDate) continue;
@@ -288,10 +288,13 @@ function renderBalanceChart() {
   for (const e of _energyLogs) {
     if (e.date < startDate) continue;
     if (!dayMap[e.date]) continue;
+    const active  = e.active_kcal || 0;
     const resting = e.resting_kcal != null
       ? e.resting_kcal
       : (latestBmrKcal() || 0) * bmrFractionForDate(e.date);
-    dayMap[e.date].burn = (e.active_kcal || 0) + resting;
+    dayMap[e.date].active  = Math.round(active);
+    dayMap[e.date].resting = Math.round(resting);
+    dayMap[e.date].burn    = active + resting;
   }
   const days = Object.keys(dayMap).sort();
   const labels = days.map(fmtDateLabel);
@@ -331,6 +334,17 @@ function renderBalanceChart() {
         maintainAspectRatio: false,
         plugins: {
           legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              label: (item) => {
+                if (item.dataset.label === '消費') {
+                  const d = days[item.dataIndex];
+                  return `消費: ${d ? dayMap[d].active : 0}kcal(運動) + ${d ? dayMap[d].resting : 0}kcal(基礎代謝)`;
+                }
+                return `${item.dataset.label}: ${item.formattedValue}kcal`;
+              },
+            },
+          },
         },
         scales: { y: { title: { display: true, text: 'kcal' } } },
       },
