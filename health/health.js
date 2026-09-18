@@ -9,15 +9,13 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ============================================================
 // 日付ユーティリティ（JST）
 // toISOString() はUTC変換でJSTとズレるため、日付文字列化には使わない
-// 「今日」はルーティン（routine_logsのgetRoutineDate）と同じく深夜3時前は前日扱い
+// 「今日」は0時切り替え（シンプルさ優先。Routineの3時ルールとは別物）
 // ============================================================
 function ymdStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function healthTodayDate() {
-  const d = new Date();
-  if (d.getHours() < 3) d.setDate(d.getDate() - 1);
-  return d;
+  return new Date();
 }
 function todayJST() {
   return ymdStr(healthTodayDate());
@@ -79,6 +77,14 @@ async function addLog(row) {
   const { data, error } = await db.from('protein_logs').insert([row]).select().single();
   if (error) { console.error(error); alert('保存に失敗しました'); return; }
   _logs.unshift(data);
+  renderAll();
+}
+
+async function updateLog(id, row) {
+  const { data, error } = await db.from('protein_logs').update(row).eq('id', id).select().single();
+  if (error) { console.error(error); alert('更新に失敗しました'); return; }
+  const idx = _logs.findIndex(l => l.id === id);
+  if (idx !== -1) _logs[idx] = data;
   renderAll();
 }
 
@@ -282,8 +288,10 @@ function renderBalanceChart() {
   for (const e of _energyLogs) {
     if (e.date < startDate) continue;
     if (!dayMap[e.date]) continue;
-    const resting = e.resting_kcal != null ? e.resting_kcal : latestBmrKcal();
-    dayMap[e.date].burn = (e.active_kcal || 0) + (resting || 0);
+    const resting = e.resting_kcal != null
+      ? e.resting_kcal
+      : (latestBmrKcal() || 0) * bmrFractionForDate(e.date);
+    dayMap[e.date].burn = (e.active_kcal || 0) + resting;
   }
   const days = Object.keys(dayMap).sort();
   const labels = days.map(fmtDateLabel);
@@ -303,10 +311,10 @@ function renderBalanceChart() {
         labels,
         datasets: [
           { type: 'bar',  label: '摂取', data: days.map(d => dayMap[d].intake), backgroundColor: '#2563EB' },
-          { type: 'bar',  label: '消費', data: days.map(d => dayMap[d].burn),   backgroundColor: '#E67E22' },
+          { type: 'bar',  label: '消費', data: days.map(d => dayMap[d].burn !== null ? Math.round(dayMap[d].burn) : null), backgroundColor: '#E67E22' },
           {
             type: 'line', label: '収支',
-            data: days.map(d => dayMap[d].burn !== null ? dayMap[d].intake - dayMap[d].burn : null),
+            data: days.map(d => dayMap[d].burn !== null ? Math.round(dayMap[d].intake - dayMap[d].burn) : null),
             borderColor: '#16A085', backgroundColor: '#16A085',
             tension: 0.3, pointRadius: 2, spanGaps: true,
           },
@@ -332,8 +340,9 @@ function renderBalanceChart() {
   if (t.burn === null) {
     capEl.textContent = `今日: 摂取${t.intake}kcal / 消費データなし`;
   } else {
-    const net = t.intake - t.burn;
-    capEl.textContent = `今日: 摂取${t.intake}kcal / 消費${t.burn}kcal / 収支${net > 0 ? '+' : ''}${net}kcal`;
+    const burn = Math.round(t.burn);
+    const net = t.intake - burn;
+    capEl.textContent = `今日: 摂取${t.intake}kcal / 消費${burn}kcal / 収支${net > 0 ? '+' : ''}${net}kcal`;
   }
 }
 
@@ -358,6 +367,15 @@ function latestBmrKcal() {
     if (_bodyLogs[i].bmr_kcal != null) return _bodyLogs[i].bmr_kcal;
   }
   return null;
+}
+
+// 今日はまだ1日が終わっていないので、基礎代謝を24分割して経過時間分だけ加算する
+// （過去の日はすでに1日が終わっているので満額）
+function bmrFractionForDate(dateStr) {
+  const today = todayJST();
+  if (dateStr < today) return 1;
+  if (dateStr > today) return 0;
+  return new Date().getHours() / 24;
 }
 
 function renderBodyComp() {
@@ -433,6 +451,7 @@ function renderLogList() {
         <div class="log-desc">
           <span class="log-source">${escapeHtml(log.source || '記録')}</span>
           ${log.note ? `<span class="log-note">${escapeHtml(log.note)}</span>` : ''}
+          <button class="btn-edit-log" data-id="${log.id}" title="編集">✎</button>
         </div>
         <div class="log-macros">
           <span class="macro-tag protein">P ${fmtG(log.amount_g)}g</span>
@@ -538,18 +557,33 @@ document.getElementById('btn-quick-protein').addEventListener('click', async (e)
 const logModal = document.getElementById('log-modal-overlay');
 const logForm  = document.getElementById('log-form');
 
-function openLogModal() {
+function openLogModal(log) {
   logForm.reset();
-  logForm.date.value = todayJST();
+  document.getElementById('log-form-title').textContent = log ? '記録を編集' : '記録を追加';
+  logForm.elements['id'].value = log ? log.id : '';
+  logForm.date.value     = log ? log.date : todayJST();
+  logForm.source.value   = log ? (log.source || '') : '';
+  logForm.amount_g.value = log ? log.amount_g : '';
+  logForm.fat_g.value    = log ? log.fat_g : '';
+  logForm.carb_g.value   = log ? log.carb_g : '';
+  logForm.kcal.value     = log ? log.kcal : '';
+  logForm.note.value     = log ? (log.note || '') : '';
   logModal.hidden = false;
 }
 function closeLogModal() {
   logModal.hidden = true;
 }
 
-document.getElementById('btn-add-log').addEventListener('click', openLogModal);
+document.getElementById('btn-add-log').addEventListener('click', () => openLogModal());
 document.getElementById('btn-cancel-log').addEventListener('click', closeLogModal);
 logModal.addEventListener('click', (e) => { if (e.target === logModal) closeLogModal(); });
+
+document.getElementById('log-list').addEventListener('click', (e) => {
+  const btn = e.target.closest('.btn-edit-log');
+  if (!btn) return;
+  const log = _logs.find(l => l.id === btn.dataset.id);
+  if (log) openLogModal(log);
+});
 
 logForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -559,8 +593,9 @@ logForm.addEventListener('submit', async (e) => {
   const carb    = parseFloat(fd.get('carb_g'))   || 0;
   const kcalRaw = fd.get('kcal');
   const kcal    = kcalRaw ? parseInt(kcalRaw) : Math.round(protein * 4 + fat * 9 + carb * 4);
+  const id      = fd.get('id');
 
-  await addLog({
+  const row = {
     date:     fd.get('date') || todayJST(),
     source:   fd.get('source') || '記録',
     amount_g: protein,
@@ -568,7 +603,10 @@ logForm.addEventListener('submit', async (e) => {
     carb_g:   carb,
     kcal,
     note:     fd.get('note') || null,
-  });
+  };
+
+  if (id) await updateLog(id, row);
+  else await addLog(row);
   closeLogModal();
 });
 

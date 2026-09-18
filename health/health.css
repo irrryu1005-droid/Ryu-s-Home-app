@@ -340,7 +340,17 @@ body {
 }
 .log-desc { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .log-source { font-weight: 700; font-size: 13px; }
-.log-note { font-size: 12px; color: var(--muted); }
+.log-note { font-size: 12px; color: var(--muted); flex: 1; }
+.btn-edit-log {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.btn-edit-log:hover { color: var(--accent); }
 .log-macros { display: flex; gap: 6px; flex-wrap: wrap; }
 .macro-tag {
   font-size: 11px;
