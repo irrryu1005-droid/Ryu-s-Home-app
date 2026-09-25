@@ -155,7 +155,7 @@ function renderChart() {
   const startDate = dateJSTMinusDays(_range - 1);
   const dayMap = {};
   for (let i = _range - 1; i >= 0; i--) {
-    dayMap[dateJSTMinusDays(i)] = { protein: 0, fat: 0, carb: 0 };
+    dayMap[dateJSTMinusDays(i)] = { protein: 0, fat: 0, carb: 0, kcal: 0 };
   }
   for (const log of _logs) {
     if (log.date < startDate) continue;
@@ -163,22 +163,35 @@ function renderChart() {
     dayMap[log.date].protein += log.amount_g || 0;
     dayMap[log.date].fat     += log.fat_g    || 0;
     dayMap[log.date].carb    += log.carb_g   || 0;
+    dayMap[log.date].kcal    += log.kcal     || 0;
   }
   const days = Object.keys(dayMap).sort();
   const labels = days.map(fmtDateLabel);
 
-  const datasets = [
+  const macroDatasets = [
     { key: 'protein', label: 'タンパク質', color: '#2563EB' },
     { key: 'fat',     label: '脂質',       color: '#E67E22' },
     { key: 'carb',    label: '炭水化物',   color: '#16A085' },
   ].map(({ key, label, color }) => ({
+    type: 'line',
     label,
     data: days.map(d => roundG(dayMap[d][key])),
     borderColor: color,
     backgroundColor: color,
     tension: 0.3,
     pointRadius: 2,
+    yAxisID: 'y',
+    order: 0,
   }));
+  const kcalDataset = {
+    type: 'bar',
+    label: 'カロリー(kcal)',
+    data: days.map(d => dayMap[d].kcal),
+    backgroundColor: 'rgba(138,155,176,0.3)',
+    yAxisID: 'y1',
+    order: 1,
+  };
+  const datasets = [...macroDatasets, kcalDataset];
 
   const ctx = document.getElementById('chart-nutrition').getContext('2d');
   if (_chart) _chart.destroy();
@@ -192,7 +205,13 @@ function renderChart() {
         legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
       },
       scales: {
-        y: { beginAtZero: true, title: { display: true, text: 'g' } },
+        y:  { beginAtZero: true, title: { display: true, text: 'g' } },
+        y1: {
+          beginAtZero: true,
+          position: 'right',
+          title: { display: true, text: 'kcal' },
+          grid: { drawOnChartArea: false },
+        },
       },
     },
   });
