@@ -405,11 +405,9 @@ function renderBalanceChart() {
 }
 
 // ============================================================
-// 体組成（TANITA、ジムのTANITA FITは個人API非対応のためチャット経由で手入力）
+// 体組成（Evolt 360、ジムで測定しチャット経由で手入力）
 // ============================================================
-// メインタイルの並び（機種ごとに固定、BMIはTANITAのみ）
-const TANITA_MAIN = ['weight_kg', 'bmi', 'body_fat_pct', 'visceral_fat_level', 'muscle_mass_kg', 'estimated_bone_mass_kg', 'bmr_kcal', 'body_age', 'muscle_quality_score'];
-const EVOLT_MAIN  = ['weight_kg', 'body_fat_pct', 'skeletal_muscle_mass_kg', 'lean_body_mass_kg', 'visceral_fat_level', 'bmr_kcal', 'body_age'];
+const EVOLT_MAIN = ['weight_kg', 'body_fat_pct', 'skeletal_muscle_mass_kg', 'lean_body_mass_kg', 'visceral_fat_level', 'bmr_kcal', 'body_age'];
 const EVOLT_SUB   = [
   'body_fat_mass_kg', 'subcutaneous_fat_mass_kg', 'visceral_fat_area_cm2',
   'total_body_water_kg', 'icf_kg', 'ecf_kg', 'abdominal_circumference_cm',
@@ -422,15 +420,10 @@ const EVOLT_SUB   = [
 
 const BODY_METRICS = {
   weight_kg:              { label: '体重',         unit: 'kg',   color: '#2563EB', decimals: 1 },
-  bmi:                    { label: 'BMI',          unit: '',     color: '#8B5CF6', decimals: 1 },
   body_fat_pct:           { label: '体脂肪率',     unit: '%',    color: '#E67E22', decimals: 1 },
   visceral_fat_level:     { label: '内臓脂肪Lv',   unit: '',     color: '#DC2626', decimals: 0 },
   bmr_kcal:               { label: '基礎代謝',     unit: 'kcal', color: '#F59E0B', decimals: 0 },
   body_age:               { label: '体内年齢',     unit: '歳',   color: '#0EA5E9', decimals: 0 },
-  // TANITA専用
-  muscle_mass_kg:         { label: '筋肉量',       unit: 'kg',   color: '#16A085', decimals: 1 },
-  estimated_bone_mass_kg: { label: '推定骨量',     unit: 'kg',   color: '#64748B', decimals: 1 },
-  muscle_quality_score:   { label: '筋質点数',     unit: '点',   color: '#10B981', decimals: 0 },
   // Evoltメイン
   skeletal_muscle_mass_kg:{ label: '骨格筋量',     unit: 'kg',   color: '#16A085', decimals: 1 },
   lean_body_mass_kg:      { label: '除脂肪量',     unit: 'kg',   color: '#0D9488', decimals: 1 },
@@ -485,13 +478,12 @@ function buildStatTile(key, value, metric) {
 }
 
 function renderBodyComp() {
-  const canvas      = document.getElementById('chart-body');
-  const emptyEl     = document.getElementById('hp-empty');
-  const statsGrid   = document.getElementById('body-stats-grid');
-  const sourceBadge = document.getElementById('body-source-badge');
-  const subSection  = document.getElementById('body-sub-section');
-  const subGrid     = document.getElementById('body-sub-grid');
-  const caption     = document.getElementById('body-chart-caption');
+  const canvas     = document.getElementById('chart-body');
+  const emptyEl    = document.getElementById('hp-empty');
+  const statsGrid  = document.getElementById('body-stats-grid');
+  const subSection = document.getElementById('body-sub-section');
+  const subGrid    = document.getElementById('body-sub-grid');
+  const caption    = document.getElementById('body-chart-caption');
 
   const latest = latestBodyRow();
 
@@ -499,28 +491,17 @@ function renderBodyComp() {
     canvas.hidden = true;
     statsGrid.hidden = true;
     subSection.hidden = true;
-    sourceBadge.textContent = '';
     emptyEl.hidden = false;
     if (_bodyChart) { _bodyChart.destroy(); _bodyChart = null; }
     return;
   }
   canvas.hidden = false;
   statsGrid.hidden = false;
+  subSection.hidden = false;
   emptyEl.hidden = true;
 
-  const isEvolt = latest.source === 'evolt360';
-  sourceBadge.textContent = isEvolt ? 'Evolt 360' : 'TANITA';
-
-  const mainKeys = isEvolt ? EVOLT_MAIN : TANITA_MAIN;
-  statsGrid.innerHTML = mainKeys.map(key => buildStatTile(key, latest[key], BODY_METRICS[key])).join('');
-
-  if (isEvolt) {
-    subSection.hidden = false;
-    subGrid.innerHTML = EVOLT_SUB.map(key => buildStatTile(key, latest[key], BODY_METRICS[key])).join('');
-  } else {
-    subSection.hidden = true;
-    subGrid.innerHTML = '';
-  }
+  statsGrid.innerHTML = EVOLT_MAIN.map(key => buildStatTile(key, latest[key], BODY_METRICS[key])).join('');
+  subGrid.innerHTML = EVOLT_SUB.map(key => buildStatTile(key, latest[key], BODY_METRICS[key])).join('');
 
   const metric = BODY_METRICS[_bodyMetric];
   const days = bodyRowsByDay();
