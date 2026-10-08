@@ -12,6 +12,7 @@
 3. 実行後に以下を明示して報告する:
    - 「Obsidian: ○○を更新しました」（更新したノートと内容）
    - 「デプロイ: このメッセージの送信でgit pushが自動実行されます」（フックが「ありがとう」を検知して自動デプロイ）
+   - 単語テストサイト（`../新単語テスト/`）も同じフックで、変更があれば `netlify deploy --prod` される（`.claude/hooks/thanks-deploy.sh`）
 
 **Obsidianのパス**: `/Users/ryu_i/Desktop/obsidian/`
 
