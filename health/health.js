@@ -113,6 +113,9 @@ async function loadBodyLogs() {
   _bodyLogs = data || [];
 }
 
+// 身長（固定値、BMI算出用。Evoltは体重しか測らないのでここから計算する）
+const HEIGHT_M = 1.63;
+
 // 日付ごとに measured_at が最新の1行だけを残す（トレンドグラフ・一覧用）
 function bodyRowsByDay() {
   const map = {};
@@ -120,7 +123,11 @@ function bodyRowsByDay() {
     const cur = map[row.date];
     if (!cur || new Date(row.measured_at) > new Date(cur.measured_at)) map[row.date] = row;
   }
-  return Object.keys(map).sort().map(d => map[d]);
+  return Object.keys(map).sort().map(d => {
+    const row = map[d];
+    if (row.bmi == null && row.weight_kg != null) row.bmi = row.weight_kg / (HEIGHT_M * HEIGHT_M);
+    return row;
+  });
 }
 
 // 全体で一番新しい1行（カードのメイン表示用）
@@ -407,7 +414,7 @@ function renderBalanceChart() {
 // ============================================================
 // 体組成（Evolt 360、ジムで測定しチャット経由で手入力）
 // ============================================================
-const EVOLT_MAIN = ['weight_kg', 'body_fat_pct', 'skeletal_muscle_mass_kg', 'lean_body_mass_kg', 'visceral_fat_level', 'bmr_kcal', 'body_age'];
+const EVOLT_MAIN = ['weight_kg', 'bmi', 'body_fat_pct', 'skeletal_muscle_mass_kg', 'lean_body_mass_kg', 'visceral_fat_level', 'bmr_kcal', 'body_age'];
 const EVOLT_SUB   = [
   'body_fat_mass_kg', 'subcutaneous_fat_mass_kg', 'visceral_fat_area_cm2',
   'total_body_water_kg', 'icf_kg', 'ecf_kg', 'abdominal_circumference_cm',
@@ -420,6 +427,7 @@ const EVOLT_SUB   = [
 
 const BODY_METRICS = {
   weight_kg:              { label: '体重',         unit: 'kg',   color: '#2563EB', decimals: 1 },
+  bmi:                    { label: 'BMI',          unit: '',     color: '#8B5CF6', decimals: 1 },
   body_fat_pct:           { label: '体脂肪率',     unit: '%',    color: '#E67E22', decimals: 1 },
   visceral_fat_level:     { label: '内臓脂肪Lv',   unit: '',     color: '#DC2626', decimals: 0 },
   bmr_kcal:               { label: '基礎代謝',     unit: 'kcal', color: '#F59E0B', decimals: 0 },
