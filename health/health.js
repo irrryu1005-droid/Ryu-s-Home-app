@@ -414,11 +414,11 @@ function renderBalanceChart() {
 // ============================================================
 // 体組成（Evolt 360、ジムで測定しチャット経由で手入力）
 // ============================================================
-const EVOLT_MAIN = ['weight_kg', 'bmi', 'body_fat_pct', 'skeletal_muscle_mass_kg', 'lean_body_mass_kg', 'visceral_fat_level', 'bmr_kcal', 'body_age'];
+const EVOLT_MAIN = ['weight_kg', 'bmi', 'body_fat_pct', 'skeletal_muscle_mass_kg', 'lean_body_mass_kg', 'visceral_fat_level', 'bmr_kcal', 'tee_kcal', 'body_age'];
 const EVOLT_SUB   = [
   'body_fat_mass_kg', 'subcutaneous_fat_mass_kg', 'visceral_fat_area_cm2',
   'total_body_water_kg', 'icf_kg', 'ecf_kg', 'abdominal_circumference_cm',
-  'waist_hip_ratio', 'bwi_score', 'tee_kcal',
+  'waist_hip_ratio', 'bwi_score',
   'lean_mass_left_arm_kg', 'lean_mass_right_arm_kg', 'lean_mass_torso_kg',
   'lean_mass_left_leg_kg', 'lean_mass_right_leg_kg',
   'fat_mass_left_arm_kg', 'fat_mass_right_arm_kg', 'fat_mass_torso_kg',
