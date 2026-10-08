@@ -213,6 +213,35 @@ body {
 .body-stat-item.active .body-stat-label,
 .body-stat-item.active .body-stat-val { color: var(--white); }
 
+.body-source-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--bg);
+  border-radius: 20px;
+  padding: 2px 8px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.body-stats-grid-sub {
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+.body-stats-grid-sub .body-stat-val { font-size: 12px; }
+#body-sub-section { margin-top: 10px; }
+.btn-ghost {
+  padding: 6px 12px;
+  background: none;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 /* ============================================================
    モーダル・フォーム
 ============================================================ */

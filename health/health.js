@@ -108,9 +108,25 @@ async function loadEnergyLogs() {
 }
 
 async function loadBodyLogs() {
-  const { data, error } = await db.from('health_body_logs').select('*').order('date', { ascending: true }).limit(90);
+  const { data, error } = await db.from('health_body_logs').select('*').order('measured_at', { ascending: true }).limit(300);
   if (error) { console.error(error); return; }
   _bodyLogs = data || [];
+}
+
+// 日付ごとに measured_at が最新の1行だけを残す（トレンドグラフ・一覧用）
+function bodyRowsByDay() {
+  const map = {};
+  for (const row of _bodyLogs) {
+    const cur = map[row.date];
+    if (!cur || new Date(row.measured_at) > new Date(cur.measured_at)) map[row.date] = row;
+  }
+  return Object.keys(map).sort().map(d => map[d]);
+}
+
+// 全体で一番新しい1行（カードのメイン表示用）
+function latestBodyRow() {
+  const days = bodyRowsByDay();
+  return days.length ? days[days.length - 1] : null;
 }
 
 // ============================================================
@@ -134,16 +150,19 @@ function renderTodaySummary() {
   renderRemain('remain-protein', _goals.protein_target, totals.protein);
   renderRemain('remain-fat',     _goals.fat_target,     totals.fat);
   renderRemain('remain-carb',    _goals.carb_target,    totals.carb);
+
+  const kcalTarget = (_goals.protein_target || 0) * 4 + (_goals.fat_target || 0) * 9 + (_goals.carb_target || 0) * 4;
+  renderRemain('remain-kcal', kcalTarget, totals.kcal, 'kcal', (n) => String(Math.round(n)));
 }
 
-function renderRemain(elId, target, consumed) {
+function renderRemain(elId, target, consumed, unit = 'g', fmt = fmtG) {
   const el = document.getElementById(elId);
   const diff = target - consumed;
   if (diff >= 0) {
-    el.textContent = `残り${fmtG(diff)}g`;
+    el.textContent = `残り${fmt(diff)}${unit}`;
     el.classList.remove('over');
   } else {
-    el.textContent = `+${fmtG(Math.abs(diff))}g超過`;
+    el.textContent = `+${fmt(Math.abs(diff))}${unit}超過`;
     el.classList.add('over');
   }
 }
@@ -388,22 +407,61 @@ function renderBalanceChart() {
 // ============================================================
 // 体組成（TANITA、ジムのTANITA FITは個人API非対応のためチャット経由で手入力）
 // ============================================================
+// メインタイルの並び（機種ごとに固定、BMIはTANITAのみ）
+const TANITA_MAIN = ['weight_kg', 'bmi', 'body_fat_pct', 'visceral_fat_level', 'muscle_mass_kg', 'estimated_bone_mass_kg', 'bmr_kcal', 'body_age', 'muscle_quality_score'];
+const EVOLT_MAIN  = ['weight_kg', 'body_fat_pct', 'skeletal_muscle_mass_kg', 'lean_body_mass_kg', 'visceral_fat_level', 'bmr_kcal', 'body_age'];
+const EVOLT_SUB   = [
+  'body_fat_mass_kg', 'subcutaneous_fat_mass_kg', 'visceral_fat_area_cm2',
+  'total_body_water_kg', 'icf_kg', 'ecf_kg', 'abdominal_circumference_cm',
+  'waist_hip_ratio', 'bwi_score', 'tee_kcal',
+  'lean_mass_left_arm_kg', 'lean_mass_right_arm_kg', 'lean_mass_torso_kg',
+  'lean_mass_left_leg_kg', 'lean_mass_right_leg_kg',
+  'fat_mass_left_arm_kg', 'fat_mass_right_arm_kg', 'fat_mass_torso_kg',
+  'fat_mass_left_leg_kg', 'fat_mass_right_leg_kg',
+];
+
 const BODY_METRICS = {
-  weight_kg:              { label: '体重',       unit: 'kg',   color: '#2563EB', decimals: 1 },
-  bmi:                    { label: 'BMI',        unit: '',     color: '#8B5CF6', decimals: 1 },
-  body_fat_pct:           { label: '体脂肪率',   unit: '%',    color: '#E67E22', decimals: 1 },
-  visceral_fat_level:     { label: '内臓脂肪Lv', unit: '',     color: '#DC2626', decimals: 0 },
-  muscle_mass_kg:         { label: '筋肉量',     unit: 'kg',   color: '#16A085', decimals: 1 },
-  estimated_bone_mass_kg: { label: '推定骨量',   unit: 'kg',   color: '#64748B', decimals: 1 },
-  bmr_kcal:               { label: '基礎代謝',   unit: 'kcal', color: '#F59E0B', decimals: 0 },
-  body_age:               { label: '体内年齢',   unit: '歳',   color: '#0EA5E9', decimals: 0 },
-  muscle_quality_score:   { label: '筋質点数',   unit: '点',   color: '#10B981', decimals: 0 },
+  weight_kg:              { label: '体重',         unit: 'kg',   color: '#2563EB', decimals: 1 },
+  bmi:                    { label: 'BMI',          unit: '',     color: '#8B5CF6', decimals: 1 },
+  body_fat_pct:           { label: '体脂肪率',     unit: '%',    color: '#E67E22', decimals: 1 },
+  visceral_fat_level:     { label: '内臓脂肪Lv',   unit: '',     color: '#DC2626', decimals: 0 },
+  bmr_kcal:               { label: '基礎代謝',     unit: 'kcal', color: '#F59E0B', decimals: 0 },
+  body_age:               { label: '体内年齢',     unit: '歳',   color: '#0EA5E9', decimals: 0 },
+  // TANITA専用
+  muscle_mass_kg:         { label: '筋肉量',       unit: 'kg',   color: '#16A085', decimals: 1 },
+  estimated_bone_mass_kg: { label: '推定骨量',     unit: 'kg',   color: '#64748B', decimals: 1 },
+  muscle_quality_score:   { label: '筋質点数',     unit: '点',   color: '#10B981', decimals: 0 },
+  // Evoltメイン
+  skeletal_muscle_mass_kg:{ label: '骨格筋量',     unit: 'kg',   color: '#16A085', decimals: 1 },
+  lean_body_mass_kg:      { label: '除脂肪量',     unit: 'kg',   color: '#0D9488', decimals: 1 },
+  // Evoltサブ
+  body_fat_mass_kg:              { label: '体脂肪量',       unit: 'kg',  color: '#64748B', decimals: 1 },
+  subcutaneous_fat_mass_kg:      { label: '皮下脂肪量',     unit: 'kg',  color: '#64748B', decimals: 1 },
+  visceral_fat_area_cm2:         { label: '内臓脂肪面積',   unit: 'cm²', color: '#64748B', decimals: 1 },
+  total_body_water_kg:           { label: '体水分量',       unit: 'kg',  color: '#64748B', decimals: 1 },
+  icf_kg:                        { label: '細胞内液',       unit: 'kg',  color: '#64748B', decimals: 1 },
+  ecf_kg:                        { label: '細胞外液',       unit: 'kg',  color: '#64748B', decimals: 1 },
+  abdominal_circumference_cm:    { label: '腹囲',           unit: 'cm',  color: '#64748B', decimals: 1 },
+  waist_hip_ratio:               { label: 'ウエストヒップ比', unit: '',  color: '#64748B', decimals: 2 },
+  bwi_score:                     { label: 'BWIスコア',      unit: '',    color: '#64748B', decimals: 1 },
+  tee_kcal:                      { label: 'TEE',            unit: 'kcal',color: '#64748B', decimals: 0 },
+  lean_mass_left_arm_kg:         { label: '左腕筋肉量',     unit: 'kg',  color: '#64748B', decimals: 1 },
+  lean_mass_right_arm_kg:        { label: '右腕筋肉量',     unit: 'kg',  color: '#64748B', decimals: 1 },
+  lean_mass_torso_kg:            { label: '体幹筋肉量',     unit: 'kg',  color: '#64748B', decimals: 1 },
+  lean_mass_left_leg_kg:         { label: '左脚筋肉量',     unit: 'kg',  color: '#64748B', decimals: 1 },
+  lean_mass_right_leg_kg:        { label: '右脚筋肉量',     unit: 'kg',  color: '#64748B', decimals: 1 },
+  fat_mass_left_arm_kg:          { label: '左腕脂肪量',     unit: 'kg',  color: '#64748B', decimals: 1 },
+  fat_mass_right_arm_kg:         { label: '右腕脂肪量',     unit: 'kg',  color: '#64748B', decimals: 1 },
+  fat_mass_torso_kg:             { label: '体幹脂肪量',     unit: 'kg',  color: '#64748B', decimals: 1 },
+  fat_mass_left_leg_kg:          { label: '左脚脂肪量',     unit: 'kg',  color: '#64748B', decimals: 1 },
+  fat_mass_right_leg_kg:         { label: '右脚脂肪量',     unit: 'kg',  color: '#64748B', decimals: 1 },
 };
 let _bodyMetric = 'weight_kg';
 
 function latestBmrKcal() {
-  for (let i = _bodyLogs.length - 1; i >= 0; i--) {
-    if (_bodyLogs[i].bmr_kcal != null) return _bodyLogs[i].bmr_kcal;
+  const days = bodyRowsByDay();
+  for (let i = days.length - 1; i >= 0; i--) {
+    if (days[i].bmr_kcal != null) return days[i].bmr_kcal;
   }
   return null;
 }
@@ -417,14 +475,31 @@ function bmrFractionForDate(dateStr) {
   return new Date().getHours() / 24;
 }
 
-function renderBodyComp() {
-  const canvas    = document.getElementById('chart-body');
-  const emptyEl   = document.getElementById('hp-empty');
-  const statsGrid = document.getElementById('body-stats-grid');
+function buildStatTile(key, value, metric) {
+  if (value == null) return '';
+  const active = key === _bodyMetric ? ' active' : '';
+  return `<button class="body-stat-item${active}" data-metric="${key}" style="--mc:${metric.color}">
+    <div class="body-stat-label">${metric.label}</div>
+    <div class="body-stat-val">${Number(value).toFixed(metric.decimals)}${metric.unit}</div>
+  </button>`;
+}
 
-  if (_bodyLogs.length === 0) {
+function renderBodyComp() {
+  const canvas      = document.getElementById('chart-body');
+  const emptyEl     = document.getElementById('hp-empty');
+  const statsGrid   = document.getElementById('body-stats-grid');
+  const sourceBadge = document.getElementById('body-source-badge');
+  const subSection  = document.getElementById('body-sub-section');
+  const subGrid     = document.getElementById('body-sub-grid');
+  const caption     = document.getElementById('body-chart-caption');
+
+  const latest = latestBodyRow();
+
+  if (!latest) {
     canvas.hidden = true;
     statsGrid.hidden = true;
+    subSection.hidden = true;
+    sourceBadge.textContent = '';
     emptyEl.hidden = false;
     if (_bodyChart) { _bodyChart.destroy(); _bodyChart = null; }
     return;
@@ -433,17 +508,23 @@ function renderBodyComp() {
   statsGrid.hidden = false;
   emptyEl.hidden = true;
 
-  const latest = _bodyLogs[_bodyLogs.length - 1];
-  for (const key of Object.keys(BODY_METRICS)) {
-    const el = document.getElementById('bs-' + key);
-    if (!el) continue;
-    const v = latest[key];
-    const m = BODY_METRICS[key];
-    el.textContent = v != null ? `${Number(v).toFixed(m.decimals)}${m.unit}` : '-';
+  const isEvolt = latest.source === 'evolt360';
+  sourceBadge.textContent = isEvolt ? 'Evolt 360' : 'TANITA';
+
+  const mainKeys = isEvolt ? EVOLT_MAIN : TANITA_MAIN;
+  statsGrid.innerHTML = mainKeys.map(key => buildStatTile(key, latest[key], BODY_METRICS[key])).join('');
+
+  if (isEvolt) {
+    subSection.hidden = false;
+    subGrid.innerHTML = EVOLT_SUB.map(key => buildStatTile(key, latest[key], BODY_METRICS[key])).join('');
+  } else {
+    subSection.hidden = true;
+    subGrid.innerHTML = '';
   }
 
   const metric = BODY_METRICS[_bodyMetric];
-  const labels = _bodyLogs.map(r => fmtDateLabel(r.date));
+  const days = bodyRowsByDay();
+  const labels = days.map(r => fmtDateLabel(r.date));
   const ctx = canvas.getContext('2d');
   if (_bodyChart) _bodyChart.destroy();
   _bodyChart = new Chart(ctx, {
@@ -452,7 +533,7 @@ function renderBodyComp() {
       labels,
       datasets: [{
         label: metric.label,
-        data: _bodyLogs.map(r => r[_bodyMetric]),
+        data: days.map(r => (r[_bodyMetric] != null ? r[_bodyMetric] : null)),
         borderColor: metric.color,
         backgroundColor: metric.color,
         tension: 0.3,
@@ -467,6 +548,8 @@ function renderBodyComp() {
       scales: { y: { beginAtZero: false, title: { display: true, text: metric.unit || metric.label } } },
     },
   });
+
+  caption.hidden = !(_bodyMetric === 'weight_kg' || _bodyMetric === 'body_fat_pct');
 }
 
 // ============================================================
@@ -545,13 +628,20 @@ document.querySelectorAll('#balance-range-toggle .range-btn').forEach(btn => {
   });
 });
 
-document.querySelectorAll('#body-stats-grid .body-stat-item').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('#body-stats-grid .body-stat-item').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    _bodyMetric = btn.dataset.metric;
-    renderBodyComp();
-  });
+function handleBodyMetricClick(e) {
+  const btn = e.target.closest('.body-stat-item');
+  if (!btn) return;
+  _bodyMetric = btn.dataset.metric;
+  renderBodyComp();
+}
+document.getElementById('body-stats-grid').addEventListener('click', handleBodyMetricClick);
+document.getElementById('body-sub-grid').addEventListener('click', handleBodyMetricClick);
+
+document.getElementById('body-sub-toggle').addEventListener('click', () => {
+  const grid = document.getElementById('body-sub-grid');
+  const open = !grid.hidden;
+  grid.hidden = open;
+  document.getElementById('body-sub-toggle').textContent = open ? '詳細を見る ▾' : '閉じる ▴';
 });
 
 document.getElementById('log-prev').addEventListener('click', () => shiftLogDate(-1));

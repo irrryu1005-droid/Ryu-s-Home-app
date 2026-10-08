@@ -61,6 +61,7 @@
         <div class="s-item">
           <div class="s-label">カロリー</div>
           <div class="s-val" id="today-kcal">0kcal</div>
+          <div class="s-remain" id="remain-kcal">残り0kcal</div>
         </div>
       </div>
 
@@ -202,28 +203,24 @@
         <div id="balance-empty" class="empty-state" hidden>消費カロリーの記録がありません(iOSショートカット連携が必要です)</div>
       </div>
 
-      <!-- 体組成(TANITA) -->
+      <!-- 体組成 -->
       <div class="chart-card">
         <div class="chart-card-header">
-          <span class="chart-card-title">🏋 体組成(TANITA)</span>
+          <span class="chart-card-title">🏋 体組成 <span class="body-source-badge" id="body-source-badge"></span></span>
         </div>
 
-        <div class="body-stats-grid" id="body-stats-grid" hidden>
-          <button class="body-stat-item active" data-metric="weight_kg"              style="--mc:#2563EB"><div class="body-stat-label">体重</div><div class="body-stat-val" id="bs-weight_kg">-</div></button>
-          <button class="body-stat-item"        data-metric="bmi"                    style="--mc:#8B5CF6"><div class="body-stat-label">BMI</div><div class="body-stat-val" id="bs-bmi">-</div></button>
-          <button class="body-stat-item"        data-metric="body_fat_pct"           style="--mc:#E67E22"><div class="body-stat-label">体脂肪率</div><div class="body-stat-val" id="bs-body_fat_pct">-</div></button>
-          <button class="body-stat-item"        data-metric="visceral_fat_level"     style="--mc:#DC2626"><div class="body-stat-label">内臓脂肪Lv</div><div class="body-stat-val" id="bs-visceral_fat_level">-</div></button>
-          <button class="body-stat-item"        data-metric="muscle_mass_kg"         style="--mc:#16A085"><div class="body-stat-label">筋肉量</div><div class="body-stat-val" id="bs-muscle_mass_kg">-</div></button>
-          <button class="body-stat-item"        data-metric="estimated_bone_mass_kg" style="--mc:#64748B"><div class="body-stat-label">推定骨量</div><div class="body-stat-val" id="bs-estimated_bone_mass_kg">-</div></button>
-          <button class="body-stat-item"        data-metric="bmr_kcal"               style="--mc:#F59E0B"><div class="body-stat-label">基礎代謝</div><div class="body-stat-val" id="bs-bmr_kcal">-</div></button>
-          <button class="body-stat-item"        data-metric="body_age"               style="--mc:#0EA5E9"><div class="body-stat-label">体内年齢</div><div class="body-stat-val" id="bs-body_age">-</div></button>
-          <button class="body-stat-item"        data-metric="muscle_quality_score"   style="--mc:#10B981"><div class="body-stat-label">筋質点数</div><div class="body-stat-val" id="bs-muscle_quality_score">-</div></button>
-        </div>
+        <div class="body-stats-grid" id="body-stats-grid" hidden></div>
 
         <div class="chart-wrap">
           <canvas id="chart-body"></canvas>
         </div>
+        <div class="chart-pfc-caption" id="body-chart-caption" hidden>機種差により多少の誤差があります</div>
         <div id="hp-empty" class="empty-state" hidden>まだ記録がありません。ジムで測定したら結果をチャットで教えてください</div>
+
+        <div id="body-sub-section" hidden>
+          <button id="body-sub-toggle" class="btn-ghost">詳細を見る ▾</button>
+          <div class="body-stats-grid body-stats-grid-sub" id="body-sub-grid" hidden></div>
+        </div>
       </div>
 
     </main>
