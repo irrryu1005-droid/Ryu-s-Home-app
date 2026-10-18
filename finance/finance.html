@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../shared/m-nav.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 </head>
 <body>
   <div id="app">
@@ -582,10 +583,13 @@
           <button class="wl-pri-btn" data-pri="1">★</button>
         </div>
         <select id="wl-sort" class="wl-sort">
+          <option value="manual">自由な順番</option>
           <option value="priority_desc">優先度 高い順</option>
           <option value="priority_asc">優先度 低い順</option>
           <option value="price_desc">金額 高い順</option>
           <option value="price_asc">金額 安い順</option>
+          <option value="deadline_asc">期限 近い順</option>
+          <option value="deadline_desc">期限 遠い順</option>
         </select>
       </div>
 
@@ -594,9 +598,10 @@
 
       <!-- テーブル -->
       <div class="wl-table-wrap">
-        <table class="wl-table">
+        <table id="wl-table" class="wl-table">
           <thead>
             <tr>
+              <th class="wl-th-handle"></th>
               <th class="wl-th-check"><input type="checkbox" id="wl-check-all" title="表示中をすべて選択"></th>
               <th class="wl-th-priority">優先度</th>
               <th class="wl-th-name">アイテム</th>

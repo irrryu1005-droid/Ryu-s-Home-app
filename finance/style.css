@@ -341,6 +341,18 @@ h3.section-title {
 .txn-dot.expense { background: var(--expense); }
 
 .txn-info { flex: 1; min-width: 0; }
+.txn-drag-handle {
+  flex-shrink: 0;
+  margin: -6px -6px -6px -8px;   /* 押しやすいようにタップ範囲を広げる */
+  padding: 6px 4px;
+  font-size: 15px;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;   /* スマホでハンドルを触ってもスクロールしない */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.txn-ghost { opacity: 0.4; }
 .txn-category {
   font-size: 14px;
   font-weight: 700;
@@ -1349,6 +1361,20 @@ h3.section-title {
   color: var(--text);
   background: var(--white);
 }
+
+/* ドラッグ並べ替え（自由な順番では全体、ほかの並び順では同じ値の中だけ動かせる） */
+.wl-th-handle, .wl-td-handle { width: 24px; text-align: center; }
+.wl-drag-handle {
+  display: inline-block;
+  padding: 4px 2px;
+  font-size: 16px;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;   /* スマホでハンドルを触ってもスクロールしない */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.wl-row-ghost td { background: #DBEAFE; opacity: 0.6; }
 
 /* 選択チェック */
 .wl-th-check, .wl-td-check { width: 28px; text-align: center; }

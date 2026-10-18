@@ -453,7 +453,8 @@ async function renderList() {
     .from('transactions')
     .select('*')
     .gte('date', start)
-    .lte('date', end);
+    .lte('date', end)
+    .order('sort_order');
 
   // 支払い科目フィルターの選択肢を更新
   const payments = [...new Set((txns || []).map(t => t.payment_method).filter(Boolean))].sort();
@@ -468,9 +469,10 @@ async function renderList() {
 
   const container = document.getElementById('transaction-list');
 
+  // 同じ日付・同じ金額どうしは sort_order 順（ドラッグで決めた順）のまま（sort は安定）
+  const listKey = t => _listSort.key === 'date' ? t.date : t.amount;
   const sortFn = (a, b) => {
-    const va = _listSort.key === 'date' ? a.date : a.amount;
-    const vb = _listSort.key === 'date' ? b.date : b.amount;
+    const va = listKey(a), vb = listKey(b);
     if (va < vb) return _listSort.asc ? -1 : 1;
     if (va > vb) return _listSort.asc ? 1 : -1;
     return 0;
@@ -485,7 +487,8 @@ async function renderList() {
         const memo     = t.memo     ? ` · ${t.memo}`     : '';
         const location = t.location ? ` · 📍${t.location}` : '';
         return `
-          <div class="txn-item">
+          <div class="txn-item" data-id="${t.id}">
+            <span class="txn-drag-handle" title="ドラッグで並べ替え（同じ${_listSort.key === 'date' ? '日付' : '金額'}の中）">⠿</span>
             <div class="txn-info">
               <div class="txn-category">${t.category}</div>
               <div class="txn-meta">${t.date}${location}${memo}</div>
@@ -517,6 +520,8 @@ async function renderList() {
       </div>
     </div>`;
 
+  setupTxnSortable(container, filtered, listKey);
+
   container.querySelectorAll('.txn-edit').forEach(btn => {
     btn.addEventListener('click', async () => {
       const { data: txn } = await db.from('transactions').select('*').eq('id', btn.dataset.id).single();
@@ -546,6 +551,35 @@ async function renderList() {
         }
         renderList();
       }
+    });
+  });
+}
+
+// 収入・支出の列それぞれでドラッグ並べ替え。同じ日付（金額順なら同じ金額）の明細の中でだけ動かせる
+function setupTxnSortable(container, txns, listKey) {
+  if (typeof Sortable === 'undefined') return;
+  const byId  = id => txns.find(t => t.id === id);
+  const keyOf = el => listKey(byId(el.dataset.id));
+
+  container.querySelectorAll('.list-col').forEach(col => {
+    Sortable.create(col, {
+      draggable: '.txn-item',
+      handle: '.txn-drag-handle',
+      animation: 150,
+      ghostClass: 'txn-ghost',
+      onMove: e => keyOf(e.dragged) === keyOf(e.related),
+      onEnd: async e => {
+        if (e.oldIndex === e.newIndex) return;
+        // 同じグループの明細がもともと持っていた sort_order を、新しい並びの順に配り直す
+        const key   = keyOf(e.item);
+        const group = [...col.querySelectorAll('.txn-item')].filter(el => keyOf(el) === key).map(el => byId(el.dataset.id));
+        const slots = group.map(t => t.sort_order).sort((a, b) => a - b);
+        const changed = group.filter((t, i) => t.sort_order !== slots[i]).map(t => ({ id: t.id, sort_order: slots[group.indexOf(t)] }));
+        const results = await Promise.all(changed.map(c =>
+          db.from('transactions').update({ sort_order: c.sort_order }).eq('id', c.id)));
+        if (results.some(r => r.error)) alert('並び順の保存に失敗しました。');
+        renderList();
+      },
     });
   });
 }
@@ -1750,7 +1784,8 @@ let _wlTags    = [];
 let _wlFilter  = 'all';
 let _wlTagFilter = new Set();
 let _wlPriFilter = new Set();      // 絞り込む優先度（1〜3）
-let _wlSort    = 'priority_desc';
+let _wlSort    = 'manual';         // manual = sort_order（ドラッグで決めた順）
+let _wlSortable = null;
 let _wlSelected = new Set();       // チェックで選んだアイテムのid
 let _wlOnlySelected = false;       // true なら選んだものだけ表示
 let _wlInited  = false;
@@ -1767,6 +1802,7 @@ async function initWishList() {
   _wlInited = true;
   await Promise.all([loadWlTags(), loadWlItems()]);
   renderWlTagFilters();
+  setupWlSortable();
   renderWishList();
   setupWishListUI();
 }
@@ -1777,8 +1813,50 @@ async function loadWlTags() {
 }
 
 async function loadWlItems() {
-  const { data } = await db.from('wish_list').select('*').order('priority', { ascending: false }).order('created_at');
+  const { data } = await db.from('wish_list').select('*').order('sort_order', { nullsFirst: false }).order('created_at');
   _wlItems = data || [];
+}
+
+// ドラッグ後: 動かしたアイテムと同じグループ（同じ値）の表示中アイテムだけで、
+// もともと持っていた sort_order の値を新しい並びの順に配り直す
+// （グループ外・絞り込みで隠れているアイテムの順番は変わらない）
+async function saveWlOrder(movedId) {
+  const byId  = id => _wlItems.find(i => i.id === id);
+  const key   = wlSortKey(byId(movedId));
+  const group = [...document.querySelectorAll('#wl-tbody tr[data-id]')]
+    .map(tr => byId(tr.dataset.id))
+    .filter(i => wlSortKey(i) === key);
+  const slots = group.map(i => i.sort_order).sort((a, b) => a - b);
+
+  const changed = [];
+  group.forEach((item, idx) => {
+    if (item.sort_order !== slots[idx]) {
+      item.sort_order = slots[idx];
+      changed.push(item);
+    }
+  });
+  _wlItems.sort((a, b) => a.sort_order - b.sort_order);
+
+  const results = await Promise.all(changed.map(i =>
+    db.from('wish_list').update({ sort_order: i.sort_order }).eq('id', i.id)));
+  if (results.some(r => r.error)) {
+    alert('並び順の保存に失敗しました。再読み込みします。');
+    await loadWlItems();
+  }
+  renderWishList();
+}
+
+function setupWlSortable() {
+  if (_wlSortable || typeof Sortable === 'undefined') return;
+  const keyOf = tr => wlSortKey(_wlItems.find(i => i.id === tr.dataset.id));
+  _wlSortable = Sortable.create(document.getElementById('wl-tbody'), {
+    handle: '.wl-drag-handle',
+    animation: 150,
+    ghostClass: 'wl-row-ghost',
+    // 同じ値の行の上にしか動かせない（金額順なら同じ金額どうしの中だけ）
+    onMove: e => keyOf(e.dragged) === keyOf(e.related),
+    onEnd: e => { if (e.oldIndex !== e.newIndex) saveWlOrder(e.item.dataset.id); },
+  });
 }
 
 function renderWlTagFilters() {
@@ -1835,7 +1913,8 @@ function renderWishList() {
     const deadline = item.deadline ? item.deadline.slice(0, 7).replace('-', '/') : '—';
     const purchased = item.purchased_at ? `<span class="wl-purchased-badge">${item.purchased_at.slice(0,10)}</span>` : '—';
     const rowCls = [item.purchased_at ? 'wl-row-purchased' : '', _wlSelected.has(item.id) ? 'wl-row-selected' : ''].join(' ');
-    return `<tr class="${rowCls}">
+    return `<tr class="${rowCls}" data-id="${item.id}">
+      <td class="wl-td-handle"><span class="wl-drag-handle" title="ドラッグで並べ替え">⠿</span></td>
       <td class="wl-td-check"><input type="checkbox" class="wl-row-check" data-id="${item.id}"${_wlSelected.has(item.id) ? ' checked' : ''}></td>
       <td class="wl-td-priority">${stars}</td>
       <td class="wl-td-name">${nameCell}</td>
@@ -1862,24 +1941,30 @@ function renderWishList() {
     }));
 }
 
-// 並べ替え。金額は価格帯の中央値で比べ、価格未設定は常に最後。同順位は元の並び（優先度→登録順）のまま
-function sortWlItems(items) {
-  const mid = i => { const r = wlPriceRange(i); return r ? (r[0] + r[1]) / 2 : null; };
-  const sorted = [...items];
+// 並べ替えの基準値。同じ値どうしは「同じグループ」で、その中は sort_order（ドラッグで決めた順）になる
+// manual は全部同じグループ（= 全体を自由に並べ替え）
+function wlSortKey(item) {
   switch (_wlSort) {
-    case 'priority_desc': return sorted.sort((a, b) => b.priority - a.priority);
-    case 'priority_asc':  return sorted.sort((a, b) => a.priority - b.priority);
+    case 'priority_desc':
+    case 'priority_asc':  return item.priority;
     case 'price_desc':
-    case 'price_asc': {
-      const dir = _wlSort === 'price_desc' ? -1 : 1;
-      return sorted.sort((a, b) => {
-        const ma = mid(a), mb = mid(b);
-        if (ma == null || mb == null) return (ma == null) - (mb == null);
-        return (ma - mb) * dir;
-      });
-    }
+    case 'price_asc':     { const r = wlPriceRange(item); return r ? (r[0] + r[1]) / 2 : null; }
+    case 'deadline_asc':
+    case 'deadline_desc': return item.deadline || null;
+    default:              return 0;
   }
-  return sorted;
+}
+
+// 並べ替え。金額は価格帯の中央値で比べる。値なし（価格未設定・期限なし）は常に最後
+// _wlItems は sort_order 順で読み込み済みで、sort は安定なので、同じ値どうしは sort_order 順のまま
+function sortWlItems(items) {
+  const dir = _wlSort.endsWith('_desc') ? -1 : 1;
+  return [...items].sort((a, b) => {
+    const ka = wlSortKey(a), kb = wlSortKey(b);
+    if (ka === kb) return 0;
+    if (ka == null || kb == null) return (ka == null) - (kb == null);
+    return (ka < kb ? -1 : 1) * dir;
+  });
 }
 
 // 表示中アイテムの合計金額（下限〜上限）。チェックがあれば、表示中のうちチェックしたものだけを合計する
@@ -1986,6 +2071,8 @@ async function saveWlItem(e) {
   if (id) {
     await db.from('wish_list').update(payload).eq('id', id);
   } else {
+    // 新しいアイテムは一番下に追加
+    payload.sort_order = Math.max(0, ..._wlItems.map(i => i.sort_order || 0)) + 1;
     await db.from('wish_list').insert(payload);
   }
   document.getElementById('wl-modal').hidden = true;
