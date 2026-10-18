@@ -1749,7 +1749,18 @@ let _wlItems   = [];
 let _wlTags    = [];
 let _wlFilter  = 'all';
 let _wlTagFilter = new Set();
+let _wlPriFilter = new Set();      // 絞り込む優先度（1〜3）
+let _wlSort    = 'priority_desc';
+let _wlSelected = new Set();       // チェックで選んだアイテムのid
+let _wlOnlySelected = false;       // true なら選んだものだけ表示
 let _wlInited  = false;
+
+// 価格の下限・上限（片方しか入っていない場合はその値を両端に使う）
+function wlPriceRange(item) {
+  const lo = item.price_min ?? item.price_max;
+  const hi = item.price_max ?? item.price_min;
+  return lo == null ? null : [lo, hi];
+}
 
 async function initWishList() {
   if (_wlInited) { renderWishList(); return; }
@@ -1795,6 +1806,14 @@ function renderWishList() {
   if (_wlFilter === 'unpurchased') items = items.filter(i => !i.purchased_at);
   if (_wlFilter === 'purchased')   items = items.filter(i =>  i.purchased_at);
   if (_wlTagFilter.size > 0)       items = items.filter(i => i.tags?.some(t => _wlTagFilter.has(t)));
+  if (_wlPriFilter.size > 0)       items = items.filter(i => _wlPriFilter.has(i.priority));
+  if (_wlOnlySelected)             items = items.filter(i => _wlSelected.has(i.id));
+
+  items = sortWlItems(items);
+  renderWlTotal(items);
+
+  const checkAll = document.getElementById('wl-check-all');
+  checkAll.checked = items.length > 0 && items.every(i => _wlSelected.has(i.id));
 
   if (items.length === 0) {
     tbody.innerHTML = '';
@@ -1815,7 +1834,9 @@ function renderWishList() {
     const tags = (item.tags || []).map(t => `<span class="wl-tag-badge">${escapeHtmlF(t)}</span>`).join('');
     const deadline = item.deadline ? item.deadline.slice(0, 7).replace('-', '/') : '—';
     const purchased = item.purchased_at ? `<span class="wl-purchased-badge">${item.purchased_at.slice(0,10)}</span>` : '—';
-    return `<tr class="${item.purchased_at ? 'wl-row-purchased' : ''}">
+    const rowCls = [item.purchased_at ? 'wl-row-purchased' : '', _wlSelected.has(item.id) ? 'wl-row-selected' : ''].join(' ');
+    return `<tr class="${rowCls}">
+      <td class="wl-td-check"><input type="checkbox" class="wl-row-check" data-id="${item.id}"${_wlSelected.has(item.id) ? ' checked' : ''}></td>
       <td class="wl-td-priority">${stars}</td>
       <td class="wl-td-name">${nameCell}</td>
       <td class="wl-td-price">${price}</td>
@@ -1833,6 +1854,74 @@ function renderWishList() {
     btn.addEventListener('click', () => openWlModal(btn.dataset.id)));
   tbody.querySelectorAll('.wl-delete-btn').forEach(btn =>
     btn.addEventListener('click', () => deleteWlItem(btn.dataset.id)));
+  tbody.querySelectorAll('.wl-row-check').forEach(cb =>
+    cb.addEventListener('change', () => {
+      cb.checked ? _wlSelected.add(cb.dataset.id) : _wlSelected.delete(cb.dataset.id);
+      if (_wlSelected.size === 0) _wlOnlySelected = false;
+      renderWishList();
+    }));
+}
+
+// 並べ替え。金額は価格帯の中央値で比べ、価格未設定は常に最後。同順位は元の並び（優先度→登録順）のまま
+function sortWlItems(items) {
+  const mid = i => { const r = wlPriceRange(i); return r ? (r[0] + r[1]) / 2 : null; };
+  const sorted = [...items];
+  switch (_wlSort) {
+    case 'priority_desc': return sorted.sort((a, b) => b.priority - a.priority);
+    case 'priority_asc':  return sorted.sort((a, b) => a.priority - b.priority);
+    case 'price_desc':
+    case 'price_asc': {
+      const dir = _wlSort === 'price_desc' ? -1 : 1;
+      return sorted.sort((a, b) => {
+        const ma = mid(a), mb = mid(b);
+        if (ma == null || mb == null) return (ma == null) - (mb == null);
+        return (ma - mb) * dir;
+      });
+    }
+  }
+  return sorted;
+}
+
+// 表示中アイテムの合計金額（下限〜上限）。チェックがあれば、表示中のうちチェックしたものだけを合計する
+function renderWlTotal(items) {
+  const el = document.getElementById('wl-total');
+  if (!el) return;
+  const picked = items.filter(i => _wlSelected.has(i.id));
+  const target = picked.length > 0 ? picked : items;
+  let sumMin = 0, sumMax = 0, noPrice = 0;
+  target.forEach(i => {
+    const r = wlPriceRange(i);
+    if (!r) { noPrice++; return; }
+    sumMin += r[0];
+    sumMax += r[1];
+  });
+  const amount = sumMin === sumMax
+    ? `¥${sumMin.toLocaleString()}`
+    : `¥${sumMin.toLocaleString()} 〜 ¥${sumMax.toLocaleString()}`;
+  const label = picked.length > 0
+    ? `選択中 <span class="wl-total-count">${picked.length}件</span>`
+    : `合計 <span class="wl-total-count">${items.length}件</span>`;
+  const selBtns = _wlSelected.size > 0
+    ? `<span class="wl-total-actions">
+        <button type="button" class="wl-sel-btn${_wlOnlySelected ? ' active' : ''}" id="wl-only-sel-btn">選択だけ表示</button>
+        <button type="button" class="wl-sel-btn" id="wl-clear-sel-btn">選択解除</button>
+      </span>`
+    : '';
+  el.innerHTML = `
+    <span class="wl-total-label">${label}</span>
+    <span class="wl-total-amount">${amount}</span>
+    ${noPrice ? `<span class="wl-total-note">価格未設定 ${noPrice}件</span>` : ''}
+    ${selBtns}`;
+
+  document.getElementById('wl-only-sel-btn')?.addEventListener('click', () => {
+    _wlOnlySelected = !_wlOnlySelected;
+    renderWishList();
+  });
+  document.getElementById('wl-clear-sel-btn')?.addEventListener('click', () => {
+    _wlSelected.clear();
+    _wlOnlySelected = false;
+    renderWishList();
+  });
 }
 
 function renderWlFormTags(selectedTags = []) {
@@ -1952,6 +2041,29 @@ function setupWishListUI() {
       _wlFilter = btn.dataset.filter;
       renderWishList();
     });
+  });
+
+  document.querySelectorAll('.wl-pri-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = parseInt(btn.dataset.pri);
+      _wlPriFilter.has(p) ? _wlPriFilter.delete(p) : _wlPriFilter.add(p);
+      btn.classList.toggle('active', _wlPriFilter.has(p));
+      renderWishList();
+    });
+  });
+
+  document.getElementById('wl-sort').addEventListener('change', e => {
+    _wlSort = e.target.value;
+    renderWishList();
+  });
+
+  // ヘッダーのチェック: 表示中のアイテムをまとめて選択／解除
+  document.getElementById('wl-check-all').addEventListener('change', e => {
+    document.querySelectorAll('#wl-tbody .wl-row-check').forEach(cb => {
+      e.target.checked ? _wlSelected.add(cb.dataset.id) : _wlSelected.delete(cb.dataset.id);
+    });
+    if (_wlSelected.size === 0) _wlOnlySelected = false;
+    renderWishList();
   });
 
   document.getElementById('wl-new-tag-btn').addEventListener('click', async () => {

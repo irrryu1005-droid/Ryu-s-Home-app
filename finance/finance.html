@@ -574,11 +574,30 @@
       <!-- タグフィルター -->
       <div id="wl-tag-filters" class="wl-tag-filters"></div>
 
+      <!-- 優先度フィルター・並べ替え -->
+      <div class="wl-sub-toolbar">
+        <div class="wl-pri-filters">
+          <button class="wl-pri-btn" data-pri="3">★★★</button>
+          <button class="wl-pri-btn" data-pri="2">★★</button>
+          <button class="wl-pri-btn" data-pri="1">★</button>
+        </div>
+        <select id="wl-sort" class="wl-sort">
+          <option value="priority_desc">優先度 高い順</option>
+          <option value="priority_asc">優先度 低い順</option>
+          <option value="price_desc">金額 高い順</option>
+          <option value="price_asc">金額 安い順</option>
+        </select>
+      </div>
+
+      <!-- 絞り込み中アイテムの合計金額 -->
+      <div id="wl-total" class="wl-total"></div>
+
       <!-- テーブル -->
       <div class="wl-table-wrap">
         <table class="wl-table">
           <thead>
             <tr>
+              <th class="wl-th-check"><input type="checkbox" id="wl-check-all" title="表示中をすべて選択"></th>
               <th class="wl-th-priority">優先度</th>
               <th class="wl-th-name">アイテム</th>
               <th class="wl-th-price">価格帯</th>

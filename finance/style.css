@@ -1285,6 +1285,76 @@ h3.section-title {
   color: #fff;
 }
 
+/* 合計金額 */
+.wl-total {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 10px 16px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+}
+.wl-total-label  { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.wl-total-count  { color: var(--text); }
+.wl-total-amount { font-size: 18px; font-weight: 800; color: var(--expense); }
+.wl-total-note   { font-size: 11px; color: var(--text-muted); }
+.wl-total-actions { display: flex; gap: 6px; margin-left: auto; }
+.wl-sel-btn {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.wl-sel-btn.active {
+  background: var(--expense);
+  border-color: var(--expense);
+  color: #fff;
+}
+
+/* 優先度フィルター・並べ替え */
+.wl-sub-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+}
+.wl-pri-filters { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
+.wl-pri-btn {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px;
+  color: #F5A623;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wl-pri-btn.active {
+  background: #F5A623;
+  border-color: #F5A623;
+  color: #fff;
+}
+.wl-sort {
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--white);
+}
+
+/* 選択チェック */
+.wl-th-check, .wl-td-check { width: 28px; text-align: center; }
+.wl-th-check input, .wl-td-check input { width: 16px; height: 16px; cursor: pointer; }
+.wl-row-selected td { background: #EFF6FF; }
+
 /* テーブル */
 .wl-table-wrap {
   padding: 12px 16px;
