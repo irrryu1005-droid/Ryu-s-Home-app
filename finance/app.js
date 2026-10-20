@@ -143,7 +143,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 
     if (tab === 'data')     { renderFinancePnl(); }
     if (tab === 'list')     renderList();
-    if (tab === 'accounts') renderAccounts();
+    if (tab === 'accounts') { renderAccounts(); renderAccountHistory(); }
     if (tab === 'planned')  renderPlannedTab();
     if (tab === 'sim')      renderSim();
     if (tab === 'wishlist') initWishList();
@@ -2250,7 +2250,7 @@ document.getElementById('btn-refresh').addEventListener('click', async () => {
   const tab = document.querySelector('.nav-btn.active')?.dataset.tab;
   if      (tab === 'data')     await renderFinancePnl();
   else if (tab === 'list')     await renderList();
-  else if (tab === 'accounts') await renderAccounts();
+  else if (tab === 'accounts') { await renderAccounts(); await renderAccountHistory(); }
   else if (tab === 'planned')  await renderPlannedTab();
   else if (tab === 'sim')      await renderSim();
   else if (tab === 'wishlist') await initWishList();
@@ -2275,7 +2275,7 @@ let _simInited = false;
 let _simChart = null;
 let _simSaveTimers = {}; // 月ごとの保存待ち（別の月の保存を消さないよう分ける）
 
-const SIM_EXCLUDE_CATEGORIES = ['科目変換']; // 口座間の移動は収入・支出に数えない
+const SIM_MONEY_ACCOUNTS = ['deposit（銀行）', 'PayPay', 'cash（現金）']; // シミュで「手元のお金」として合計する口座
 
 function simYm(y, m) {
   return `${y}-${String(m + 1).padStart(2, '0')}`;
@@ -2300,6 +2300,8 @@ function simPayWhenLabel(ym, it) {
   return `${m}月${it.pay_day ? it.pay_day + '日' : ''}に受取`;
 }
 const SIM_PAY_OFFSET_MAX = 2;
+const SIM_DEFAULT_ACCOUNT = 'deposit（銀行）'; // 入る口座を決めていない収入は銀行に入ることにする
+const SIM_ADVANCE_ACCOUNT = 'cash（現金）';    // 日払いは手渡し
 
 function simSignedYen(n) {
   return (n < 0 ? '−' : n > 0 ? '+' : '') + yen(n);
@@ -2334,6 +2336,20 @@ function simMonthPlan(ym) {
   const workDays = prev ? { ..._simMonths[prev].work_days } : {};
   // 研修が途中で終わった月から引き継ぐときは、研修中＋研修後の合計を出勤日数にする
   for (const job of _simJobs) {
+    // 塾（コマ制）はコマ数が月ごとにバラバラなので引き継がない（コマ数・キャンセル・出勤日とも0から）
+    if (job.job_type === 'koma') {
+      for (const k of Object.keys(workDays)) {
+        if (k === String(job.id) || k.startsWith(`${job.id}:`)) delete workDays[k];
+      }
+      continue;
+    }
+    delete workDays[`${job.id}:advd`];  // 日払いの日は月ごとに違うので引き継がない
+    // カレンダーで選んだ出勤日は、次の月には「日数」として引き継ぐ
+    if (Array.isArray(workDays[`${job.id}:wd`])) {
+      workDays[job.id] = workDays[`${job.id}:wd`].length;
+      delete workDays[`${job.id}:wd`];
+      delete workDays[`${job.id}:t`];
+    }
     const tKey = `${job.id}:t`;
     if (workDays[tKey] != null && simTrainingPhase(job, ym) !== 'both') {
       workDays[job.id] = (Number(workDays[job.id]) || 0) + (Number(workDays[tKey]) || 0);
@@ -2409,15 +2425,24 @@ function simJobMonth(job, wd, ym) {
       cancelCount += x;
       cancelPay += x * simKomaCancelPay(r, l);
     }
-    const days = n(id);
+    const wdDates = Array.isArray(wd[`${id}:wd`]) ? wd[`${id}:wd`] : null;
+    const days = wdDates ? wdDates.length : n(id);
     const transport = days * (job.transport_per_day || 0);
     const wh = simWithholding(job, komaPay + cancelPay);
     const earned = komaPay + cancelPay + transport;
-    return { days, earned, net: earned - wh.tax, tax: wh.tax, taxEstimate: wh.estimate, advance: 0, komaCount, cancelCount, cancelPay };
+    return { days, earned, net: earned - wh.tax, tax: wh.tax, taxEstimate: wh.estimate, advance: 0, komaCount, cancelCount, cancelPay, wdDates };
   }
   const phase = simTrainingPhase(job, ym);
+  // 出勤日: `${id}:wd` に日にちの配列（カレンダーで選んだ日）。なければ前の作りの日数 `${id}` / `${id}:t`
+  const wdDates = Array.isArray(wd[`${id}:wd`]) ? [...wd[`${id}:wd`]].sort((a, b) => a - b) : null;
   let days, earned;
-  if (phase === 'both') {
+  if (wdDates) {
+    // 研修が途中で終わる月は、研修の最終日までの日を研修中の時給で
+    const endDay = phase === 'both' ? Number(job.settings.training_end.slice(8, 10)) : null;
+    const tDays = phase === 'training' ? wdDates.length : phase === 'both' ? wdDates.filter(d => d <= endDay).length : 0;
+    days = wdDates.length;
+    earned = tDays * simHourlyDayPay(job, true) + (days - tDays) * simHourlyDayPay(job);
+  } else if (phase === 'both') {
     days = n(id) + n(`${id}:t`);
     earned = n(id) * simHourlyDayPay(job) + n(`${id}:t`) * simHourlyDayPay(job, true);
   } else {
@@ -2425,9 +2450,13 @@ function simJobMonth(job, wd, ym) {
     earned = days * simHourlyDayPay(job, phase === 'training');
   }
   const advPer = Math.min(job.settings?.advance_per_day || 0, simHourlyDayPay(job, phase === 'training'));
-  const advance = Math.min(n(`${id}:adv`), days) * advPer;
+  // 日払いの日: `${id}:advd` に日にちの配列（なければ前の作りの日数 `${id}:adv` だけ）
+  let advDays = Array.isArray(wd[`${id}:advd`]) ? [...wd[`${id}:advd`]].sort((a, b) => a - b) : null;
+  if (advDays && wdDates) advDays = advDays.filter(d => wdDates.includes(d));  // 日払いは出勤した日だけ
+  const advCount = Math.min(advDays ? advDays.length : n(`${id}:adv`), days);
+  const advance = advCount * advPer;
   const wh = simWithholding(job, earned - days * (job.transport_per_day || 0));
-  return { days, earned, net: earned - wh.tax, tax: wh.tax, taxEstimate: wh.estimate, advance, phase };
+  return { days, earned, net: earned - wh.tax, tax: wh.tax, taxEstimate: wh.estimate, advance, advPer, advDays: advDays ? advDays.slice(0, advCount) : null, advCount, phase, wdDates };
 }
 
 function simPlannedTotal(y, m) {
@@ -2467,6 +2496,10 @@ function simCalc(ym) {
 
   let workDays = 0, workIncome = 0, paidWage = 0, withheld = 0;
   const jobMonths = {};
+  // この月に入るお金の明細 { name, note, day, amount, fromPrev }
+  const pm = simYmToDate(simPrevYm(ym)).getMonth() + 1, cm = m + 1;
+  const cashRows = [];
+  const pushRow = (row) => { if (row.amount) cashRows.push({ account: SIM_DEFAULT_ACCOUNT, ...row }); };
   for (const job of _simJobs) {
     const cur = simJobMonth(job, plan.workDays, ym);
     jobMonths[job.id] = cur;
@@ -2474,19 +2507,41 @@ function simCalc(ym) {
     workIncome += cur.net;
     // 実際にこの月に入るお金: 日払いはその月、残り（差額）は給料日に入る（翌月払いなら前の月に働いた分）
     // 源泉徴収は給料日の支払いから引かれる
-    if (job.pay_timing === 'same') { paidWage += cur.net; withheld += cur.tax; }
-    else {
+    const taxNote = t => t ? `・源泉 −${yen(t)}` : '';
+    if (job.pay_timing === 'same') {
+      paidWage += cur.net; withheld += cur.tax;
+      pushRow({ name: job.name, note: `${cm}月に働いた分${taxNote(cur.tax)}`, day: job.pay_day, amount: cur.net, fromPrev: false, account: job.settings?.account || SIM_DEFAULT_ACCOUNT });
+    } else {
       const prev = simJobMonth(job, prevPlan.workDays, simPrevYm(ym));
       paidWage += cur.advance + (prev.net - prev.advance);
       withheld += prev.tax;
+      if (cur.advDays) {
+        for (const dd of cur.advDays) pushRow({ name: job.name, note: '日払い', day: dd, amount: cur.advPer, fromPrev: false, account: SIM_ADVANCE_ACCOUNT });
+      } else {
+        pushRow({ name: job.name, note: `日払い（${cm}月・${cur.advCount}日）`, day: null, amount: cur.advance, fromPrev: false, account: SIM_ADVANCE_ACCOUNT });
+      }
+      pushRow({ name: job.name, note: `${pm}月に働いた分${prev.advance ? '（日払いの残り）' : ''}${taxNote(prev.tax)}`, day: job.pay_day, amount: prev.net - prev.advance, fromPrev: true, account: job.settings?.account || SIM_DEFAULT_ACCOUNT });
     }
   }
+  // 出勤した日の数（カレンダーで選んだ日は、同じ日に2つ働いても1日として数える）
+  const datedDays = new Set();
+  let undatedDays = 0;
+  for (const job of _simJobs) {
+    const jm = jobMonths[job.id];
+    if (jm.wdDates) jm.wdDates.forEach(d => datedDays.add(d)); else undatedDays += jm.days;
+  }
+  workDays = datedDays.size + undatedDays;
   // 臨時収入（短期バイトなど）に日数が入っていれば出勤日に数える
   workDays += plan.items.reduce((s, it) => s + (it.kind === 'income' ? (Number(it.days) || 0) : 0), 0);
 
   const need = planned + recurringExp + monthExp;
   // 入るお金 − 必要な額 = 余り。余りを「貯金」と「自由に使えるお金」に分ける
   // 貯金の額を決めていない月は、余りを全部貯金に回したことにする
+  for (const r of _simRecurring.filter(r => r.kind === 'income')) pushRow({ name: r.name, note: '毎月', day: r.day || null, amount: Number(r.amount) || 0, fromPrev: false, account: r.account || SIM_DEFAULT_ACCOUNT });
+  for (const it of arriving) {
+    const from = it.fromYm !== ym;
+    pushRow({ name: it.name, note: from ? `${simYmToDate(it.fromYm).getMonth() + 1}月の臨時収入` : '臨時収入', day: it.pay_day || null, amount: Number(it.amount) || 0, fromPrev: from, account: it.account || SIM_DEFAULT_ACCOUNT });
+  }
   const cashIncome = recurringInc + oneOffCash + paidWage;
   const leftover = cashIncome - need;
   const room = Math.max(0, leftover);
@@ -2498,7 +2553,7 @@ function simCalc(ym) {
     otherIncome, workDays, workIncome,
     income: otherIncome + workIncome,          // 働いた月で数えた収入（計画用）
     cashIncome,                                // 実際にこの月に入る収入（推移用・源泉徴収を引いた後）
-    arriving,
+    arriving, cashRows,
     withheld,                                  // この月の支払いから引かれる源泉徴収
     daysInMonth: new Date(y, m + 1, 0).getDate(),
   };
@@ -2511,18 +2566,6 @@ async function simSaveMonth(ym, plan) {
   if (error) alert('保存に失敗しました: ' + error.message);
 }
 
-// 今月の実績（科目変換を除く）
-async function simActualThisMonth() {
-  const { start, end } = monthRange(new Date());
-  const { data } = await db.from('transactions').select('type, amount, category').gte('date', start).lte('date', end);
-  let income = 0, expense = 0;
-  for (const t of (data || [])) {
-    if (SIM_EXCLUDE_CATEGORIES.includes(t.category)) continue;
-    if (t.type === 'income') income += t.amount; else expense += t.amount;
-  }
-  return { income, expense };
-}
-
 async function renderSim() {
   if (!_simInited) { initSim(); _simInited = true; }
   await loadSimData();
@@ -2531,7 +2574,19 @@ async function renderSim() {
   else                 await renderSimMonth();
 }
 
+// 月の切り替え（＜ ○月 ＞）を、上のタブの下に固定する。上に固定されている部品の高さを測って位置を決める
+function simUpdateStickyTop() {
+  let top = 0;
+  for (const el of document.querySelectorAll('.header, .pc-app-nav, .nav')) {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || !['sticky', 'fixed'].includes(cs.position) || cs.top === 'auto') continue;
+    top = Math.max(top, parseFloat(cs.top) + el.offsetHeight);
+  }
+  document.getElementById('tab-sim').style.setProperty('--sim-sticky-top', top + 'px');
+}
+
 async function renderSimMonth() {
+  simUpdateStickyTop();
   const ym = ymKey(_simMonth);
   const c = simCalc(ym);
   document.getElementById('sim-month-label').textContent = monthLabel(_simMonth);
@@ -2566,6 +2621,7 @@ async function renderSimMonth() {
   document.getElementById('sim-days-fill').style.width = Math.min(100, c.workDays / c.daysInMonth * 100) + '%';
   renderSimHint(c, c.income - c.need, off);
 
+  renderSimCalendar(c);
   renderSimJobs(c);
   renderSimItems(c);
 
@@ -2598,14 +2654,13 @@ function renderSimUse(c) {
         <div class="sim-row-sub">${c.savingSet ? `余りの ${c.leftover ? Math.round(c.saving / c.leftover * 100) : 0}%` : '未設定（余りを全部貯金）'}</div>
       </div>
     </div>
-    <input type="range" class="sim-use-range" id="sim-saving-range" min="0" max="${c.leftover}" step="1000" value="${c.saving}">
     <div class="sim-use-actions">
+      <input type="range" class="sim-use-range" id="sim-saving-range" min="0" max="${c.leftover}" step="1000" value="${c.saving}" title="貯金に回す額">
       <div class="sim-stepper">
-        <button data-saving-step="-5000">−</button>
+        <button data-saving-step="-5000" title="5,000円減らす">−</button>
         <input type="number" id="sim-saving-input" min="0" max="${c.leftover}" step="1000" value="${c.saving}" inputmode="numeric">
-        <button data-saving-step="5000">＋</button>
+        <button data-saving-step="5000" title="5,000円増やす">＋</button>
       </div>
-      <span class="sim-row-sub">貯金に回す額（5,000円ずつ）</span>
     </div>`;
 
   const range = document.getElementById('sim-saving-range');
@@ -2635,6 +2690,43 @@ function simSetSaving(val, saveNow = false) {
   _simSaveTimers[ym] = setTimeout(() => simSaveMonth(ym, plan), saveNow ? 0 : 600);
 }
 
+// 予定支出（月別）をシミュの上にモーダルで開く。予定支出タブの #sub-monthly をそのまま中へ移して使い、閉じたら戻す
+async function openSimPlannedModal() {
+  const monthly = document.getElementById('sub-monthly');
+  document.getElementById('sim-planned-body').appendChild(monthly);
+  monthly.hidden = false;
+  _plannedMonth = new Date(_simMonth);
+  document.getElementById('sim-planned-modal').hidden = false;
+  await renderPlannedTab();
+}
+
+async function closeSimPlannedModal() {
+  const monthly = document.getElementById('sub-monthly');
+  document.getElementById('sub-subscriptions').before(monthly);
+  monthly.hidden = (document.querySelector('.sub-nav-btn.active')?.dataset.sub || 'monthly') !== 'monthly';
+  document.getElementById('sim-planned-modal').hidden = true;
+  // 予定支出で変えた金額をシミュに反映
+  await loadSimData();
+  await renderSimMonth();
+}
+
+// 「この月に入るお金」の明細（日にち順）
+function openSimCashModal() {
+  const c = simCalc(ymKey(_simMonth));
+  const rows = [...c.cashRows].sort((a, b) => (a.day ?? 99) - (b.day ?? 99));
+  document.getElementById('sim-cash-title').textContent = `${_simMonth.getMonth() + 1}月に入るお金`;
+  document.getElementById('sim-cash-list').innerHTML = rows.length ? rows.map(r => `
+    <div class="sim-row">
+      <div>
+        <div class="sim-row-name">${escapeHtmlF(r.name)}</div>
+        <div class="sim-row-sub">${r.day ? `${r.day}日 ・ ` : ''}${escapeHtmlF(r.note)}</div>
+      </div>
+      <span class="sim-row-amount">${yen(r.amount)}</span>
+    </div>`).join('') : '<p class="sim-empty">この月に入るお金はありません</p>';
+  document.getElementById('sim-cash-total').textContent = yen(c.cashIncome);
+  document.getElementById('sim-cash-modal').hidden = false;
+}
+
 function renderSimHint(c, diff, off) {
   const hint = document.getElementById('sim-hint');
   // 1日（コマなら1コマ）増やすといくら増えるか
@@ -2650,7 +2742,7 @@ function renderSimHint(c, diff, off) {
       return best && { job: j, pay: simKomaPay(best.r, best.l), unit: 'コマ', label: `${escapeHtmlF(j.name)}（${best.r}円・${best.l}分コマ）`, key: `${j.id}:k:${best.r}-${best.l}`, cur: best.cnt };
     }
     const training = jm.phase === 'training';
-    return { job: j, pay: simHourlyDayPay(j, training), unit: '日', label: escapeHtmlF(j.name), key: String(j.id), cur: Number(c.plan.workDays[j.id]) || 0 };
+    return { job: j, pay: simHourlyDayPay(j, training), unit: '日', label: escapeHtmlF(j.name), key: String(j.id), cur: jm.days, noBtn: !!jm.wdDates };
   }).filter(u => u && u.pay > 0)
     // 乙欄なら手取りで数える（交通費にはかからないが、ここでは少し多めに見積もる）
     .map(u => u.job.settings?.withholding === 'otsu' ? { ...u, pay: Math.floor(u.pay * (1 - 0.03063)) } : u);
@@ -2666,16 +2758,20 @@ function renderSimHint(c, diff, off) {
       const n = Math.ceil(-diff / u.pay);
       const offNote = u.unit === '日' ? (n <= off ? `（休みは${off - n}日）` : '（休みの日が足りません）') : '';
       return `<div class="sim-hint-line"><span>${u.label}なら <b>あと${n}${u.unit}</b>${offNote}</span>
-        <button class="sim-hint-btn" data-key="${u.key}" data-val="${u.cur + n}">${u.cur + n}${u.unit}にする</button></div>`;
+        ${u.noBtn ? '' : `<button class="sim-hint-btn" data-key="${u.key}" data-val="${u.cur + n}">${u.cur + n}${u.unit}にする</button>`}</div>`;
     }).join('');
     hint.innerHTML = `<div class="sim-hint-head sim-short">この働き方を毎月続けると あと ${yen(diff)} 足りません</div>${lines}`;
   } else {
     const lines = units.map(u => {
       const n = Math.min(u.cur, Math.floor(diff / u.pay));
-      if (n <= 0) return '';
+      // 減らせないときも行は残す（0のときは理由を出す）
+      if (n <= 0) {
+        const why = u.cur === 0 ? `今は0${u.unit}です` : `減らすと足りなくなります`;
+        return `<div class="sim-hint-line"><span>${u.label}は <b>0${u.unit}</b>しか減らせません（${why}）</span></div>`;
+      }
       const offNote = u.unit === '日' ? `（休みは${off + n}日）` : '';
       return `<div class="sim-hint-line"><span>${u.label}を <b>${n}${u.unit}減らしても</b>足ります${offNote}</span>
-        <button class="sim-hint-btn" data-key="${u.key}" data-val="${u.cur - n}">${u.cur - n}${u.unit}にする</button></div>`;
+        ${u.noBtn ? '' : `<button class="sim-hint-btn" data-key="${u.key}" data-val="${u.cur - n}">${u.cur - n}${u.unit}にする</button>`}</div>`;
     }).join('');
     hint.innerHTML = `<div class="sim-hint-head sim-ok">この働き方を毎月続けると ${yen(diff)} 余ります</div>${lines}`;
   }
@@ -2691,15 +2787,6 @@ function renderSimJobs(c) {
     return;
   }
   const wd = c.plan.workDays;
-  const stepper = (key, label, max) => `
-    <div class="sim-step-row">
-      <span class="sim-step-label">${label}</span>
-      <div class="sim-stepper">
-        <button data-key="${key}" data-step="-1">−</button>
-        <input type="number" min="0" max="${max}" value="${Number(wd[key]) || 0}" data-key="${key}" inputmode="numeric">
-        <button data-key="${key}" data-step="1">＋</button>
-      </div>
-    </div>`;
 
   wrap.innerHTML = _simJobs.map(j => {
     const jm = c.jobMonths[j.id];
@@ -2724,24 +2811,16 @@ function renderSimJobs(c) {
           <summary>当日キャンセル（0.6倍）${jm.cancelCount ? ` ${jm.cancelCount}コマ・${yen(jm.cancelPay)}` : ''}</summary>
           ${komaTable('c', simKomaCancelPay)}
         </details>
-        ${stepper(String(j.id), '出勤日', c.daysInMonth)}`;
+        ${simJobDaysLine(j, jm, wd)}`;
     } else {
       const phase = jm.phase;
       const wageText = phase === 'training' ? `研修中 時給${yen(s.training_wage)}`
                      : phase === 'both'     ? `研修中 ${yen(s.training_wage)} → ${yen(j.hourly_wage)}`
                      : `時給${yen(j.hourly_wage)}`;
       detail = `${wageText} × ${Number(j.hours_per_day)}時間${j.transport_per_day ? ` ＋ 交通費${yen(j.transport_per_day)}` : ''}`;
-      if (phase === 'both') {
-        const endDay = Number(s.training_end.slice(8, 10));
-        body = stepper(`${j.id}:t`, `研修中（〜${endDay}日）`, c.daysInMonth) + stepper(String(j.id), `研修後（${endDay + 1}日〜）`, c.daysInMonth);
-      } else {
-        body = stepper(String(j.id), phase === 'training' ? '出勤日（研修中）' : '出勤日', c.daysInMonth);
-      }
-      if (s.advance_per_day) {
-        body += stepper(`${j.id}:adv`, `日払い（1日${yen(s.advance_per_day)}）`, c.daysInMonth);
-        if (jm.advance > 0) {
-          body += `<div class="sim-row-sub">日払いで ${yen(jm.advance)} → 残り ${yen(jm.net - jm.advance)} は${payLabel.replace('払い', '')}に受け取り</div>`;
-        }
+      body = simJobDaysLine(j, jm, wd);
+      if (jm.advance > 0) {
+        body += `<div class="sim-row-sub">日払いで ${yen(jm.advance)} → 残り ${yen(jm.net - jm.advance)} は${payLabel.replace('払い', '')}に受け取り</div>`;
       }
     }
     return `
@@ -2759,18 +2838,144 @@ function renderSimJobs(c) {
       </div>`;
   }).join('');
 
-  wrap.querySelectorAll('.sim-stepper button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const cur = Number(simMonthPlan(ymKey(_simMonth)).workDays[btn.dataset.key]) || 0;
-      simSetWork(btn.dataset.key, cur + Number(btn.dataset.step));
-    });
-  });
   wrap.querySelectorAll('input[data-key]').forEach(inp => {
     inp.addEventListener('change', () => simSetWork(inp.dataset.key, Number(inp.value) || 0, true));
   });
   wrap.querySelectorAll('.sim-job-edit').forEach(btn => {
     btn.addEventListener('click', () => openSimJobModal(btn.dataset.id));
   });
+}
+
+// 出勤日のカレンダー。タップで 休み → 出勤 →（日払いがあるバイトは）出勤＋日払い → 休み と切り替わる
+// 日本の祝日（振替休日・国民の休日を含む）。{ 'YYYY-MM-DD': '名前' }
+const _jpHolidayCache = {};
+function jpHolidays(y) {
+  if (_jpHolidayCache[y]) return _jpHolidayCache[y];
+  const h = {};
+  const add = (m, d, name) => { h[dateStr(y, m - 1, d)] = name; };
+  const nthMonday = (m, n) => { const f = new Date(y, m - 1, 1).getDay(); return 1 + ((8 - f) % 7) + (n - 1) * 7; };
+  const t = y - 1980, leap = Math.floor(t / 4);
+  add(1, 1, '元日'); add(1, nthMonday(1, 2), '成人の日'); add(2, 11, '建国記念の日'); add(2, 23, '天皇誕生日');
+  add(3, Math.floor(20.8431 + 0.242194 * t - leap), '春分の日'); add(4, 29, '昭和の日');
+  add(5, 3, '憲法記念日'); add(5, 4, 'みどりの日'); add(5, 5, 'こどもの日');
+  add(7, nthMonday(7, 3), '海の日'); add(8, 11, '山の日'); add(9, nthMonday(9, 3), '敬老の日');
+  add(9, Math.floor(23.2488 + 0.242194 * t - leap), '秋分の日'); add(10, nthMonday(10, 2), 'スポーツの日');
+  add(11, 3, '文化の日'); add(11, 23, '勤労感謝の日');
+  const base = Object.keys(h).sort();
+  // 国民の休日: 祝日にはさまれた平日
+  for (const ds of base) {
+    const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + 2);
+    const after = dateStr(d.getFullYear(), d.getMonth(), d.getDate());
+    d.setDate(d.getDate() - 1);
+    const mid = dateStr(d.getFullYear(), d.getMonth(), d.getDate());
+    if (h[after] && !h[mid] && d.getDay() !== 0) h[mid] = '国民の休日';
+  }
+  // 振替休日: 日曜の祝日の次の、祝日でない日
+  for (const ds of Object.keys(h).sort()) {
+    const d = new Date(ds + 'T00:00:00');
+    if (d.getDay() !== 0) continue;
+    do { d.setDate(d.getDate() + 1); } while (h[dateStr(d.getFullYear(), d.getMonth(), d.getDate())]);
+    h[dateStr(d.getFullYear(), d.getMonth(), d.getDate())] = '振替休日';
+  }
+  return (_jpHolidayCache[y] = h);
+}
+
+const SIM_JOB_COLORS = ['#4A90D9', '#8E44AD', '#16A085', '#C0392B', '#2C3E50'];
+let _simCalJob = null;  // まとめカレンダーで今入れているバイトの id
+
+// バイトのカードに出す「出勤 ○日・日払い ○日」（日にちはまとめカレンダーで選ぶ）
+function simJobDaysLine(j, jm, wd) {
+  const hasAdv = j.job_type !== 'koma' && !!j.settings?.advance_per_day;
+  const legacy = !jm.wdDates && jm.days
+    ? `<div class="sim-row-sub">前の月から出勤 ${jm.days}日を引き継いでいます（上のカレンダーで日を選ぶと、選んだ日に切り替わります）</div>` : '';
+  const legacyAdv = hasAdv && !jm.advDays && Number(wd[`${j.id}:adv`])
+    ? `<div class="sim-row-sub">日にちが未設定の日払い ${Number(wd[`${j.id}:adv`])}日分</div>` : '';
+  return `
+    <div class="sim-step-row">
+      <span class="sim-step-label"><i class="sim-job-dot" style="background:${simJobColor(j)}"></i>出勤日</span>
+      <span class="sim-row-sub">${jm.days}日${hasAdv ? `・日払い ${jm.advCount}日` : ''}${jm.wdDates ? '' : '（日にち未設定）'}</span>
+    </div>${legacy}${legacyAdv}`;
+}
+
+function simJobColor(j) {
+  return SIM_JOB_COLORS[Math.max(0, _simJobs.indexOf(j)) % SIM_JOB_COLORS.length];
+}
+
+// 出勤カレンダー（全部のバイトをまとめて1つ）。上のボタンで入れるバイトを選んで、日をタップ
+function renderSimCalendar(c) {
+  const el = document.getElementById('sim-calendar');
+  if (_simJobs.length === 0) { el.innerHTML = ''; return; }
+  if (!_simJobs.some(j => String(j.id) === String(_simCalJob))) _simCalJob = _simJobs[0].id;
+  const sel = _simJobs.find(j => String(j.id) === String(_simCalJob));
+  const selJm = c.jobMonths[sel.id];
+  const selAdv = sel.job_type !== 'koma' && !!sel.settings?.advance_per_day;
+  const endDay = sel.job_type === 'koma' ? 0 : selJm.phase === 'both' ? Number(sel.settings.training_end.slice(8, 10)) : selJm.phase === 'training' ? 99 : 0;
+  const first = new Date(_simMonth.getFullYear(), _simMonth.getMonth(), 1).getDay();
+
+  const cells = Array.from({ length: c.daysInMonth }, (_, i) => i + 1).map(dd => {
+    // その日に行くバイトの印（日払いは ¥）
+    const marks = _simJobs.map(j => {
+      const jm = c.jobMonths[j.id];
+      if (!jm.wdDates?.includes(dd)) return '';
+      const adv = jm.advDays?.includes(dd);
+      return `<span class="sim-cal-mark" style="background:${simJobColor(j)}">${escapeHtmlF(j.name.slice(0, 1))}${adv ? '¥' : ''}</span>`;
+    }).join('');
+    const tr = dd <= endDay ? ' training' : '';
+    const on = selJm.wdDates?.includes(dd) ? ' sel-on' : '';
+    // 日曜・祝日は赤（どちらのバイトも休み）。土曜は青
+    const ds = dateStr(_simMonth.getFullYear(), _simMonth.getMonth(), dd);
+    const holiday = jpHolidays(_simMonth.getFullYear())[ds];
+    const wday = new Date(_simMonth.getFullYear(), _simMonth.getMonth(), dd).getDay();
+    const dayCls = holiday || wday === 0 ? ' holiday' : wday === 6 ? ' saturday' : '';
+    return `<button type="button" class="sim-cal-day${tr}${on}${dayCls}" data-day="${dd}"${holiday ? ` title="${holiday}"` : ''}><span class="sim-cal-num">${dd}</span>${holiday ? `<span class="sim-cal-hname">${holiday}</span>` : ''}<span class="sim-cal-marks">${marks}</span></button>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="sim-cal-head">
+      <span class="sim-step-label">📅 出勤カレンダー</span>
+      <span class="sim-row-sub">出勤 ${c.workDays}日・休み ${Math.max(0, c.daysInMonth - c.workDays)}日</span>
+    </div>
+    <div class="sim-cal-jobs">
+      ${_simJobs.map(j => `<button type="button" class="sim-cal-job${String(j.id) === String(sel.id) ? ' active' : ''}" data-job="${j.id}" style="--job-color:${simJobColor(j)}">${escapeHtmlF(j.name)}</button>`).join('')}
+    </div>
+    <div class="sim-row-sub sim-cal-how">「${escapeHtmlF(sel.name)}」を入れる日をタップ${selAdv ? `（1回＝出勤・2回＝出勤＋日払い ${yen(sel.settings.advance_per_day)}・3回＝外す）` : '（もう一度タップで外す）'}${endDay ? `　薄い紫＝研修中（時給${yen(sel.settings.training_wage)}）` : ''}</div>
+    <div class="sim-adv-cal sim-cal-grid">
+      ${['日', '月', '火', '水', '木', '金', '土'].map((w, i) => `<span class="sim-adv-w${i === 0 ? ' holiday' : i === 6 ? ' saturday' : ''}">${w}</span>`).join('')}
+      ${'<span></span>'.repeat(first)}
+      ${cells}
+    </div>`;
+
+  el.querySelectorAll('.sim-cal-job').forEach(btn => {
+    btn.addEventListener('click', () => { _simCalJob = btn.dataset.job; renderSimCalendar(simCalc(ymKey(_simMonth))); });
+  });
+  el.querySelectorAll('.sim-cal-day').forEach(btn => {
+    btn.addEventListener('click', () => simCycleDay(sel.id, Number(btn.dataset.day)));
+  });
+}
+
+function simCycleDay(jobId, day) {
+  const job = _simJobs.find(j => String(j.id) === String(jobId));
+  const hasAdv = job && job.job_type !== 'koma' && !!job.settings?.advance_per_day;
+  const ym = ymKey(_simMonth);
+  const plan = simMonthPlan(ym);
+  const wd = { ...plan.workDays };
+  const wKey = `${jobId}:wd`, aKey = `${jobId}:advd`;
+  const work = new Set(Array.isArray(wd[wKey]) ? wd[wKey] : []);
+  const adv  = new Set(Array.isArray(wd[aKey]) ? wd[aKey] : []);
+  // 日数だけ（前の作り・引き継ぎ）だった月は、カレンダーの方に切り替える
+  delete wd[jobId]; delete wd[`${jobId}:t`]; delete wd[`${jobId}:adv`];
+  if (!work.has(day))              { work.add(day); adv.delete(day); }  // 休み → 出勤（日払いなしから始める）
+  else if (hasAdv && !adv.has(day)) adv.add(day);
+  else { work.delete(day); adv.delete(day); }
+  wd[wKey] = [...work].sort((a, b) => a - b);
+  // 日払いは出勤した日だけ（前の作りで残った日払いの日も、ここで消える）
+  if (hasAdv) wd[aKey] = [...adv].filter(d => work.has(d)).sort((a, b) => a - b);
+  else delete wd[aKey];
+  plan.workDays = wd;
+  _simMonths[ym] = { year_month: ym, items: plan.items, work_days: plan.workDays, saving: plan.saving ?? null };
+  renderSimMonth();
+  clearTimeout(_simSaveTimers[ym]);
+  _simSaveTimers[ym] = setTimeout(() => simSaveMonth(ym, plan), 500);
 }
 
 // 出勤日数を変える（＋−は連打できるよう、保存は少し待ってからまとめて）
@@ -2796,18 +3001,25 @@ function renderSimItems(c) {
   const empty = '<p class="sim-empty">なし</p>';
   const fill = (id, html) => { document.getElementById(id).innerHTML = html || empty; };
 
-  fill('sim-recurring-expense', _simRecurring.filter(r => r.kind === 'expense').map(r => row(r.name, r.amount, 'recurring-expense', r.id)).join(''));
-  fill('sim-recurring-income',  _simRecurring.filter(r => r.kind === 'income').map(r => row(r.name, r.amount, 'recurring-income', r.id)).join(''));
-  fill('sim-month-expense', c.plan.items.map((it, i) => it.kind === 'expense' ? row(it.name, it.amount, 'month-expense', i) : '').join(''));
+  const dayBadge = d => d ? `毎月${d}日` : '';
+  fill('sim-recurring-expense', _simRecurring.filter(r => r.kind === 'expense').map(r => row(r.name, r.amount, 'recurring-expense', r.id, null, dayBadge(r.day))).join(''));
+  fill('sim-recurring-income',  _simRecurring.filter(r => r.kind === 'income').map(r => row(r.name, r.amount, 'recurring-income', r.id, null, dayBadge(r.day))).join(''));
+  fill('sim-month-expense', c.plan.items.map((it, i) => it.kind === 'expense' ? row(it.name, it.amount, 'month-expense', i, null, it.day ? `${it.day}日` : '') : '').join(''));
   // この月の臨時収入（受け取りが先の月なら、その時期を表示）＋ 前の月の分でこの月に受け取るもの
-  const fromPrev = c.arriving.filter(it => it.fromYm !== c.ym).map(it => `
-    <div class="sim-row sim-row-from">
-      <span class="sim-row-name">${escapeHtmlF(it.name)}<span class="sim-badge">${simYmToDate(it.fromYm).getMonth() + 1}月の分</span></span>
-      <span class="sim-row-amount">${yen(Number(it.amount) || 0)}</span>
+  fill('sim-month-income', c.plan.items.map((it, i) => it.kind === 'income' ? row(it.name, it.amount, 'month-income', i, it.days, simPayWhenLabel(c.ym, it)) : '').join(''));
+  // 前の月に働いた・決まった分で、この月に受け取るお金（給料・臨時収入）
+  const fromPrev = c.cashRows.filter(r => r.fromPrev);
+  document.getElementById('sim-from-prev-wrap').hidden = fromPrev.length === 0;
+  document.getElementById('sim-from-prev').innerHTML = fromPrev.map(r => `
+    <div class="sim-row">
+      <div>
+        <div class="sim-row-name">${escapeHtmlF(r.name)}${r.day ? `<span class="sim-badge sim-badge-when">${r.day}日</span>` : ''}</div>
+        <div class="sim-row-sub">${escapeHtmlF(r.note)}</div>
+      </div>
+      <span class="sim-row-amount">${yen(r.amount)}</span>
     </div>`).join('');
-  fill('sim-month-income', c.plan.items.map((it, i) => it.kind === 'income' ? row(it.name, it.amount, 'month-income', i, it.days, simPayWhenLabel(c.ym, it)) : '').join('') + fromPrev);
 
-  document.querySelectorAll('#tab-sim .sim-row-tap').forEach(el => {
+  document.querySelectorAll('#tab-sim .sim-row-tap[data-target]').forEach(el => {
     el.addEventListener('click', () => openSimItemModal(el.dataset.target, el.dataset.key));
   });
 }
@@ -2835,6 +3047,7 @@ function openSimJobModal(id = null) {
     f.elements.payTiming.value       = job.pay_timing;
     f.elements.payDay.value          = job.pay_day || '';
     f.elements.withholding.value     = s.withholding || 'none';
+    f.elements.account.value         = s.account || SIM_DEFAULT_ACCOUNT;
   }
   simToggleJobType(f.elements.jobType.value);
   document.getElementById('sim-job-title').textContent = job ? 'バイトを編集' : 'バイトを追加';
@@ -2853,6 +3066,7 @@ async function saveSimJob(e) {
     : { training_wage: num('trainingWage') || null, training_end: f.elements.trainingEnd.value || null,
         advance_per_day: num('advancePerDay') || null };
   settings.withholding = f.elements.withholding.value;
+  settings.account = f.elements.account.value;
   const row = {
     name:              f.elements.name.value.trim(),
     job_type:          type,
@@ -2904,9 +3118,18 @@ async function openSimItemModal(target, key = '') {
   if (item) {
     f.elements.name.value = item.name; f.elements.amount.value = item.amount; f.elements.days.value = item.days || '';
     f.elements.payOffset.value = item.pay_offset || 0; f.elements.payDay.value = item.pay_day || '';
+    f.elements.day.value = item.day || '';
   }
+  // 日にち（臨時収入は「受け取る時期」の方で入れる）
+  const dayWrap = document.getElementById('sim-item-day-wrap');
+  dayWrap.hidden = target === 'month-income';
+  dayWrap.querySelector('label').textContent = target.endsWith('income')
+    ? '入る日（任意）'
+    : '使う日（任意・空なら毎日少しずつ使う計算）';
   document.getElementById('sim-item-days-wrap').hidden = target !== 'month-income';
   document.getElementById('sim-item-when-wrap').hidden = target !== 'month-income';
+  document.getElementById('sim-item-account-wrap').hidden = !target.endsWith('income');
+  f.elements.account.value = item?.account || SIM_DEFAULT_ACCOUNT;
   // 受け取る時期の選択肢に月の名前を出す（例: 11月（この月）/ 12月（翌月））
   const offSel = f.elements.payOffset;
   [...offSel.options].forEach(o => {
@@ -2943,9 +3166,11 @@ async function saveSimItem(e) {
   const kind = target.endsWith('income') ? 'income' : 'expense';
 
   if (target.startsWith('recurring')) {
+    const account = kind === 'income' ? f.elements.account.value : null;
+    const day = Number(f.elements.day.value) || null;
     const { error } = key
-      ? await db.from('sim_recurring').update({ name, amount }).eq('id', key)
-      : await db.from('sim_recurring').insert({ kind, name, amount, sort_order: _simRecurring.length + 1 });
+      ? await db.from('sim_recurring').update({ name, amount, account, day }).eq('id', key)
+      : await db.from('sim_recurring').insert({ kind, name, amount, account, day, sort_order: _simRecurring.length + 1 });
     if (error) { alert('保存に失敗しました: ' + error.message); return; }
   } else {
     const ym = ymKey(_simMonth);
@@ -2953,10 +3178,12 @@ async function saveSimItem(e) {
     const items = [...plan.items];
     const it = { kind, name, amount };
     if (target === 'month-income') {
+      if (f.elements.account.value !== SIM_DEFAULT_ACCOUNT) it.account = f.elements.account.value;
       if (Number(f.elements.days.value) > 0)      it.days = Number(f.elements.days.value);
       if (Number(f.elements.payOffset.value) > 0) it.pay_offset = Number(f.elements.payOffset.value);
       if (Number(f.elements.payDay.value) > 0)    it.pay_day = Number(f.elements.payDay.value);
     }
+    if (target === 'month-expense' && Number(f.elements.day.value) > 0) it.day = Number(f.elements.day.value);
     if (key !== '') items[Number(key)] = it;
     else items.push(it);
     await simSaveMonth(ym, { ...plan, items });
@@ -2981,32 +3208,73 @@ async function deleteSimItem() {
 }
 
 // ---------- 貯金の推移 ----------
-async function renderSimTrend() {
-  const months = Number(document.getElementById('sim-trend-months').value) || 6;
-  const [{ data: accounts }, act] = await Promise.all([
-    db.from('accounts').select('balance'),
-    simActualThisMonth(),
-  ]);
-  const start = (accounts || []).reduce((s, a) => s + (a.balance || 0), 0);
-  document.getElementById('sim-start-balance').textContent = (start < 0 ? '−' : '') + yen(start);
-
-  const rows = [];
-  let balance = start;
+// シミュの推移のこれから分: 入金・予定支出は日付どおり、それ以外の支出（毎月の支出・この月だけの支出・自由に使うお金）は毎日少しずつ
+function simTrendEvents(today, months) {
+  const events = [], monthEnds = [];
   const d = new Date(); d.setDate(1);
-  for (let i = 0; i < months; i++) {
-    const ym = ymKey(d);
+  for (let k = 0; k < months; k++) {
+    const y = d.getFullYear(), m = d.getMonth(), ym = ymKey(d);
+    const last = new Date(y, m + 1, 0).getDate();
+    const dayStr = day => dateStr(y, m, Math.min(Math.max(Number(day) || 1, 1), last));
     const c = simCalc(ym);
-    // 自由に使えるお金は使い切る前提。残高が増えるのは貯金の分（足りない月は減る）
-    let inc = c.cashIncome, exp = c.need + c.free;
-    if (i === 0) {
-      // 今月は、もう口座に反映されている分を除いて「これからの分」だけ足し引きする
-      inc = Math.max(0, c.cashIncome - act.income);
-      exp = Math.max(0, c.need + c.free - act.expense);
+    for (const r of c.cashRows) events.push({ date: dayStr(r.day), label: `${r.name}（${r.note}）`, delta: r.amount, projected: true });
+    const { subItems, planItems, loanItems } = buildPlannedItems(_simPlannedSrc.subs, _simPlannedSrc.plans, _simPlannedSrc.loans, {}, _simAmountOverrides[ym] || {});
+    for (const it of [...subItems, ...planItems, ...loanItems]) {
+      if (isActiveInMonth(it, y, m)) events.push({ date: dayStr(it.billingDay), label: `${it.name}（予定支出）`, delta: -(it.amountMax || it.amount), projected: true });
     }
-    balance += inc - exp;
-    rows.push({ ym, label: `${d.getMonth() + 1}月`, year: d.getFullYear(), free: c.free, saving: c.leftover < 0 ? c.leftover : c.saving, balance, workDays: c.workDays, isNow: i === 0, withheld: c.withheld });
+    // 日にちを決めた支出（毎月の支出・この月だけの支出）はその日に
+    let dated = 0;
+    for (const r of _simRecurring) if (r.kind === 'expense' && r.day) { dated += Number(r.amount) || 0; events.push({ date: dayStr(r.day), label: `${r.name}（毎月の支出）`, delta: -(Number(r.amount) || 0), projected: true }); }
+    for (const it of c.plan.items) if (it.kind === 'expense' && it.day) { dated += Number(it.amount) || 0; events.push({ date: dayStr(it.day), label: `${it.name}（この月だけ）`, delta: -(Number(it.amount) || 0), projected: true }); }
+    // 残り（日にちのない支出＋自由に使えるお金）は毎日少しずつ。今月は残りの日数の分だけ
+    const daily = c.need - c.planned - dated + c.free;
+    const days = [];
+    for (let dd = 1; dd <= last; dd++) { const ds = dateStr(y, m, dd); if (ds > today) days.push(ds); }
+    const total = k === 0 ? Math.round(daily * days.length / last) : daily;
+    const base = days.length ? Math.floor(total / days.length) : 0;
+    days.forEach((ds, i) => events.push({ date: ds, label: '毎日の支出', delta: -(i === days.length - 1 ? total - base * (days.length - 1) : base), projected: true, noDedupe: true }));
+    monthEnds.push({ ym, end: dateStr(y, m, last), c, label: `${m + 1}月`, isNow: k === 0 });
     d.setMonth(d.getMonth() + 1);
   }
+  return { events: events.filter(e => e.date > today), monthEnds };
+}
+
+async function renderSimTrend() {
+  const months = Number(document.getElementById('sim-trend-months').value) || 6;
+  const today = todayJST();
+  // これまでは1ヶ月前から表示
+  const startD = new Date(); startD.setMonth(startD.getMonth() - 1);
+  const start = dateStr(startD.getFullYear(), startD.getMonth(), startD.getDate());
+  const [{ data: accounts }, { data: txns }] = await Promise.all([
+    db.from('accounts').select('account_name, balance').in('account_name', SIM_MONEY_ACCOUNTS),
+    db.from('transactions').select('date, type, amount, category, memo, payment_method, created_at')
+      .in('payment_method', SIM_MONEY_ACCOUNTS).gte('date', start).order('date').order('created_at'),
+  ]);
+  const endBalance = (accounts || []).reduce((s, a) => s + (a.balance || 0), 0);
+  const { list, past, startBalance, todayBalance } = acctReconstruct(endBalance, txns, today);
+
+  // 今日の残高（口座ごと＝未来の日付の取引を除いた額）
+  const signed = v => (v < 0 ? '−' : '') + yen(v);
+  const futureDelta = {};
+  for (const t of (txns || [])) if (t.date > today) futureDelta[t.payment_method] = (futureDelta[t.payment_method] || 0) + (t.type === 'income' ? t.amount : -t.amount);
+  document.getElementById('sim-start-balance').textContent = signed(todayBalance);
+  const short = { 'deposit（銀行）': '銀行', 'PayPay': 'PayPay', 'cash（現金）': '現金' };
+  document.getElementById('sim-start-breakdown').textContent = SIM_MONEY_ACCOUNTS
+    .map(n => `${short[n]} ${signed((accounts?.find(a => a.account_name === n)?.balance || 0) - (futureDelta[n] || 0))}`).join(' ＋ ');
+
+  // これから: 記録済みの未来の取引 ＋ 予想（同じ月・同じ金額の記録があれば予想は出さない）
+  const { events, monthEnds } = simTrendEvents(today, months);
+  const future = [...list.filter(e => e.future), ...acctDedupe(events, list)].sort((a, b) => a.date.localeCompare(b.date));
+  let fr = todayBalance;
+  for (const e of future) { fr += e.delta; e.after = fr; }
+
+  // 月末の残高 = その月の最後の日までの残高
+  const balanceAt = ds => { let b = todayBalance; for (const e of future) { if (e.date > ds) break; b = e.after; } return b; };
+  const rows = monthEnds.map(me => ({
+    ym: me.ym, label: me.label, isNow: me.isNow,
+    free: me.c.free, saving: me.c.leftover < 0 ? me.c.leftover : me.c.saving,
+    balance: balanceAt(me.end), workDays: me.c.workDays, withheld: me.c.withheld,
+  }));
 
   const withheldTotal = rows.reduce((s, r) => s + r.withheld, 0);
   const taxEl = document.getElementById('sim-trend-tax');
@@ -3018,7 +3286,7 @@ async function renderSimTrend() {
       <td>${r.label}${r.isNow ? '<span class="sim-badge">これから</span>' : ''}<div class="sim-row-sub">出勤${r.workDays}日</div></td>
       <td class="sim-free">${yen(r.free)}</td>
       <td class="${r.saving < 0 ? 'sim-neg' : 'sim-save'}">${r.saving < 0 ? '−' : ''}${yen(r.saving)}</td>
-      <td class="${r.balance < 0 ? 'sim-neg' : ''}"><b>${r.balance < 0 ? '−' : ''}${yen(r.balance)}</b></td>
+      <td class="${r.balance < 0 ? 'sim-neg' : ''}"><b>${signed(r.balance)}</b></td>
     </tr>`).join('');
   document.querySelectorAll('#sim-trend-tbody .sim-trend-row').forEach(tr => {
     tr.addEventListener('click', () => {
@@ -3027,29 +3295,8 @@ async function renderSimTrend() {
     });
   });
 
-  if (_simChart) _simChart.destroy();
-  const ctx = document.getElementById('sim-trend-chart');
-  _simChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: ['今', ...rows.map(r => r.label + '末')],
-      datasets: [{
-        label: '口座残高',
-        data: [start, ...rows.map(r => r.balance)],
-        borderColor: '#4A90D9',
-        backgroundColor: 'rgba(74,144,217,0.12)',
-        fill: true,
-        tension: 0,
-        pointBackgroundColor: [start, ...rows.map(r => r.balance)].map(v => v < 0 ? '#E74C3C' : '#4A90D9'),
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '¥' + c.parsed.y.toLocaleString() } } },
-      scales: { y: { ticks: { callback: v => '¥' + (v / 10000).toLocaleString() + '万' } } },
-    },
-  });
+  _simChart = drawBalanceChart(document.getElementById('sim-trend-chart'), _simChart, startD, monthEnds[monthEnds.length - 1].end, today, startBalance, past, future, document.getElementById('sim-day-detail'));
+  document.getElementById('sim-day-detail').innerHTML = '<div class="sim-row-sub">グラフの日をタップすると、その日に何で増えて何で減るかが出ます</div>';
 }
 
 function initSim() {
@@ -3067,8 +3314,13 @@ function initSim() {
   document.getElementById('sim-prev').addEventListener('click', () => { _simMonth.setMonth(_simMonth.getMonth() - 1); renderSimMonth(); });
   document.getElementById('sim-next').addEventListener('click', () => { _simMonth.setMonth(_simMonth.getMonth() + 1); renderSimMonth(); });
   document.getElementById('sim-trend-months').addEventListener('change', renderSimTrend);
+  window.addEventListener('resize', simUpdateStickyTop);
 
   document.getElementById('btn-sim-add-job').addEventListener('click', () => openSimJobModal());
+  document.getElementById('sim-income-card').addEventListener('click', openSimCashModal);
+  document.getElementById('sim-planned-row').addEventListener('click', openSimPlannedModal);
+  document.getElementById('btn-sim-planned-close').addEventListener('click', closeSimPlannedModal);
+  document.getElementById('sim-planned-modal').addEventListener('click', e => { if (e.target.id === 'sim-planned-modal') closeSimPlannedModal(); });
   document.getElementById('sim-job-form').addEventListener('submit', saveSimJob);
   document.getElementById('sim-job-type').addEventListener('change', e => simToggleJobType(e.target.value));
   document.getElementById('btn-sim-del-job').addEventListener('click', deleteSimJob);
@@ -3090,7 +3342,7 @@ function initSim() {
   document.querySelectorAll('#tab-sim [data-close]').forEach(btn => {
     btn.addEventListener('click', () => { document.getElementById(btn.dataset.close).hidden = true; });
   });
-  document.querySelectorAll('#tab-sim .sim-modal').forEach(m => {
+  document.querySelectorAll('#tab-sim .sim-modal:not(#sim-planned-modal)').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.hidden = true; });
   });
 }
@@ -3109,6 +3361,227 @@ function saveViewState(key, val) {
     localStorage.setItem('finance-view', JSON.stringify(st));
   } catch { /* 保存できない環境では何もしない */ }
 }
+
+// ============================================================
+// 口座の残高の推移（過去: 記録した取引から逆算 / これから: 給料・仕送りと予定支出から予想）
+// ============================================================
+let _acctChart = null;
+let _acctInited = false;
+const ACCT_PAST_ROWS = 15; // 表に最初から出す過去の取引の数
+
+// 記録した取引から残高をさかのぼる。endBalance は未来の日付の取引も入った後の残高（accounts.balance）
+//   → { list: 各取引（after=その取引の後の残高, future=今日より後）, startBalance, todayBalance }
+function acctReconstruct(endBalance, txns, today) {
+  const list = (txns || []).map(t => ({
+    date: t.date,
+    label: [t.category, t.memo].filter(Boolean).join(' '),
+    delta: t.type === 'income' ? t.amount : -t.amount,
+    projected: false,
+    future: t.date > today,
+  }));
+  let running = endBalance;
+  for (let i = list.length - 1; i >= 0; i--) { list[i].after = running; running -= list[i].delta; }
+  const past = list.filter(e => !e.future);
+  return { list, past, startBalance: running, todayBalance: past.length ? past[past.length - 1].after : running };
+}
+
+// 予想のうち、同じ月に同じ金額の記録がもうあるものを除く（1つの記録で消すのは1つの予想だけ）
+function acctDedupe(projected, recorded) {
+  const used = new Set();
+  return projected.filter(p => {
+    if (p.noDedupe) return true;
+    const i = recorded.findIndex((r, idx) => !used.has(idx) && r.date.slice(0, 7) === p.date.slice(0, 7) && r.delta === p.delta);
+    if (i === -1) return true;
+    used.add(i);
+    return false;
+  });
+}
+
+// 日ごとの残高グラフ（これまで＝実線・これから＝点線）。past / future は after（その後の残高）つきの日付順の配列
+// detailEl: グラフの日をタップしたときに、その日の増えた・減った内訳を出す場所
+function drawBalanceChart(canvas, oldChart, startD, end, today, startBalance, past, future, detailEl) {
+  const labels = [], pastData = [], futData = [], dates = [];
+  const byDate = {};
+  for (const e of [...past, ...future]) (byDate[e.date] ||= []).push(e);
+  const toMap = events => { const map = {}; for (const e of events) map[e.date] = e.after; return map; };
+  const pastMap = toMap(past), futMap = toMap(future);
+  let bal = startBalance;
+  for (let d = new Date(startD); ; d.setDate(d.getDate() + 1)) {
+    const ds = dateStr(d.getFullYear(), d.getMonth(), d.getDate());
+    if (ds > end) break;
+    labels.push(acctShortDate(ds));
+    dates.push(ds);
+    if (ds <= today) {
+      if (pastMap[ds] != null) bal = pastMap[ds];
+      pastData.push(bal);
+      futData.push(ds === today ? bal : null);
+    } else {
+      if (futMap[ds] != null) bal = futMap[ds];
+      pastData.push(null);
+      futData.push(bal);
+    }
+  }
+  if (oldChart) oldChart.destroy();
+  return new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '残高', data: pastData, borderColor: '#4A90D9', backgroundColor: 'rgba(74,144,217,0.10)', fill: true, stepped: true, pointRadius: 0, borderWidth: 2 },
+        { label: '予想', data: futData, borderColor: '#4A90D9', borderDash: [6, 4], stepped: true, pointRadius: 0, borderWidth: 2, fill: false },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: i => i.parsed.y != null,
+          callbacks: {
+            label: c => `${c.dataset.label} ¥${c.parsed.y.toLocaleString()}`,
+            // その日の動きを短く（多いときは4件まで）
+            footer: items => {
+              const evs = byDate[dates[items[0]?.dataIndex]] || [];
+              const lines = evs.slice(0, 4).map(e => `${e.delta >= 0 ? '+' : '−'}¥${Math.abs(e.delta).toLocaleString()} ${e.label}`);
+              if (evs.length > 4) lines.push(`ほか${evs.length - 4}件（タップで全部）`);
+              return lines;
+            },
+          },
+        },
+      },
+      onClick: (evt, _els, chart) => {
+        const pts = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
+        if (pts.length && detailEl) renderBalanceDayDetail(detailEl, dates[pts[0].index], byDate, pastData[pts[0].index] ?? futData[pts[0].index], today);
+      },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, maxRotation: 0 } },
+        y: { ticks: { callback: v => '¥' + (v / 10000).toLocaleString() + '万' } },
+      },
+    },
+  });
+}
+
+// その日の内訳（増えた・減った）
+function renderBalanceDayDetail(el, ds, byDate, balance, today) {
+  const evs = byDate[ds] || [];
+  const w = ['日', '月', '火', '水', '木', '金', '土'][new Date(ds + 'T00:00:00').getDay()];
+  const plus = evs.filter(e => e.delta > 0), minus = evs.filter(e => e.delta < 0);
+  const sum = arr => arr.reduce((t, e) => t + e.delta, 0);
+  const list = arr => arr.map(e => `
+    <div class="bal-day-row"><span>${escapeHtmlF(e.label || '—')}${e.projected ? '<span class="sim-badge">予想</span>' : ''}</span><span class="${e.delta >= 0 ? 'sim-inc' : 'sim-exp'}">${e.delta >= 0 ? '+' : '−'}${yen(e.delta)}</span></div>`).join('');
+  el.innerHTML = `
+    <div class="bal-day-head">
+      <b>${acctShortDate(ds)}（${w}）${ds === today ? ' 今日' : ds > today ? ' の予想' : ''}</b>
+      <span>この日の終わり <b class="${balance < 0 ? 'sim-neg' : ''}">${balance < 0 ? '−' : ''}${yen(balance ?? 0)}</b></span>
+    </div>
+    ${evs.length === 0 ? '<div class="sim-row-sub">この日はお金の動きがありません</div>' : `
+      ${plus.length ? `<div class="bal-day-title">増える ${yen(sum(plus))}</div>${list(plus)}` : ''}
+      ${minus.length ? `<div class="bal-day-title">減る −${yen(sum(minus))}</div>${list(minus)}` : ''}`}`;
+}
+
+function acctShortDate(ds) {
+  return `${Number(ds.slice(5, 7))}/${Number(ds.slice(8, 10))}`;
+}
+
+// これから（今日の翌日〜来月末）の入出金の予想。sim のデータ（loadSimData）を使う
+function acctProjectedEvents(account, today, end) {
+  const events = [];
+  const cur = new Date(); cur.setDate(1);
+  for (let k = 0; k <= 1; k++) {
+    const d = new Date(cur); d.setMonth(d.getMonth() + k);
+    const y = d.getFullYear(), m = d.getMonth(), ym = ymKey(d);
+    const last = new Date(y, m + 1, 0).getDate();
+    const dayStr = day => dateStr(y, m, Math.min(Math.max(Number(day) || 1, 1), last));
+    // 入金（シミュの「この月に入るお金」の明細のうち、この口座に入るもの）
+    for (const r of simCalc(ym).cashRows) {
+      if (r.account !== account) continue;
+      events.push({ date: dayStr(r.day), label: `${r.name}（${r.note}）`, delta: r.amount, projected: true, undated: !r.day });
+    }
+    // 引き落とし（予定支出。サブスクは登録した支払方法、それ以外は銀行から）
+    const { subItems, planItems, loanItems } = buildPlannedItems(_simPlannedSrc.subs, _simPlannedSrc.plans, _simPlannedSrc.loans, {}, _simAmountOverrides[ym] || {});
+    for (const it of [...subItems, ...planItems, ...loanItems]) {
+      if (!isActiveInMonth(it, y, m)) continue;
+      const acc = it.source === 'subscription' && it.paymentMethod ? it.paymentMethod : SIM_DEFAULT_ACCOUNT;
+      if (acc !== account) continue;
+      events.push({ date: dayStr(it.billingDay), label: `${it.name}（予定支出）`, delta: -(it.amountMax || it.amount), projected: true, undated: !it.billingDay });
+    }
+  }
+  // 今日より後・来月末まで。日にちが決まっていないものは今月なら入ったものとして除く
+  return events.filter(e => e.date > today && e.date <= end);
+}
+
+async function renderAccountHistory() {
+  const sel = document.getElementById('acct-history-account');
+  const rangeSel = document.getElementById('acct-history-range');
+  if (!_acctInited) {
+    _acctInited = true;
+    sel.innerHTML = PAYMENT_METHODS.map(a => `<option value="${a}">${a}</option>`).join('');
+    sel.value = SIM_DEFAULT_ACCOUNT;
+    sel.addEventListener('change', renderAccountHistory);
+    rangeSel.addEventListener('change', renderAccountHistory);
+  }
+  const account = sel.value;
+  const today = todayJST();
+  const startD = new Date(); startD.setMonth(startD.getMonth() - Number(rangeSel.value));
+  const start = dateStr(startD.getFullYear(), startD.getMonth(), startD.getDate());
+  const endD = new Date(); endD.setDate(1); endD.setMonth(endD.getMonth() + 2); endD.setDate(0);
+  const end = dateStr(endD.getFullYear(), endD.getMonth(), endD.getDate());
+
+  const [{ data: acc }, { data: txns }] = await Promise.all([
+    db.from('accounts').select('balance').eq('account_name', account).maybeSingle(),
+    db.from('transactions').select('id, date, type, amount, category, memo, created_at')
+      .eq('payment_method', account).gte('date', start).order('date').order('created_at'),
+    loadSimData(),
+  ]);
+
+  const { list, past, startBalance, todayBalance } = acctReconstruct(acc?.balance ?? 0, txns, today);
+
+  // これから: 記録済みの未来の取引 ＋ 予想
+  // 同じ月に同じ金額の記録がもうあれば、その予想は出さない（給料が予定より早く振り込まれた・✓で登録済み など）
+  const recordedFuture = list.filter(e => e.future).map(e => ({ ...e, label: e.label + '（記録済み）' }));
+  const projected = acctDedupe(acctProjectedEvents(account, today, end), list);
+  const future = [...recordedFuture, ...projected].sort((a, b) => a.date.localeCompare(b.date));
+  let fr = todayBalance;
+  for (const e of future) { fr += e.delta; e.after = fr; }
+
+  // 今の残高と、これからの一番少ない残高
+  const minFuture = future.reduce((mn, e) => e.after < mn.after ? e : mn, { after: todayBalance, date: today });
+  document.getElementById('acct-history-now').innerHTML = `
+    <div><span class="sim-row-sub">今日の残高</span><b class="${todayBalance < 0 ? 'sim-neg' : ''}">${todayBalance < 0 ? '−' : ''}${yen(todayBalance)}</b></div>
+    <div><span class="sim-row-sub">来月末の予想</span><b class="${fr < 0 ? 'sim-neg' : ''}">${fr < 0 ? '−' : ''}${yen(fr)}</b></div>
+    <div><span class="sim-row-sub">これから一番少ない日</span><b class="${minFuture.after < 0 ? 'sim-neg' : ''}">${acctShortDate(minFuture.date)} ${minFuture.after < 0 ? '−' : ''}${yen(minFuture.after)}</b></div>`;
+
+  _acctChart = drawBalanceChart(document.getElementById('acct-history-chart'), _acctChart, startD, end, today, startBalance, past, future, document.getElementById('acct-day-detail'));
+  document.getElementById('acct-day-detail').innerHTML = '<div class="sim-row-sub">グラフの日をタップすると、その日に何で増えて何で減るかが出ます</div>';
+
+  // 表: これから（近い順）→ 今日 → 過去（新しい順）
+  const row = (e, cls) => `
+    <tr class="${cls}">
+      <td>${acctShortDate(e.date)}</td>
+      <td class="acct-label">${escapeHtmlF(e.label || '—')}${e.projected ? '<span class="sim-badge">予想</span>' : ''}</td>
+      <td class="${e.delta >= 0 ? 'sim-inc' : 'sim-exp'}">${e.delta >= 0 ? '+' : '−'}${yen(e.delta)}</td>
+      <td class="${e.after < 0 ? 'sim-neg' : ''}">${e.after < 0 ? '−' : ''}${yen(e.after)}</td>
+    </tr>`;
+  document.getElementById('acct-history-tbody').innerHTML =
+    (future.length ? `<tr class="acct-row-section"><td colspan="4">これから（近い順）</td></tr>` : '') +
+    future.map(e => row(e, 'acct-row-future')).join('') +
+    `<tr class="acct-row-today"><td>${acctShortDate(today)}</td><td>今日</td><td></td><td><b>${todayBalance < 0 ? '−' : ''}${yen(todayBalance)}</b></td></tr>` +
+    (past.length ? `<tr class="acct-row-section"><td colspan="4">これまで（新しい順）</td></tr>` : '') +
+    [...past].reverse().map((e, i) => row(e, i >= ACCT_PAST_ROWS ? 'acct-row-more' : '')).join('') +
+    (past.length > ACCT_PAST_ROWS ? `<tr class="acct-row-toggle"><td colspan="4"><button id="btn-acct-more">過去の取引をもっと見る（あと${past.length - ACCT_PAST_ROWS}件）</button></td></tr>` : '');
+  const tbody = document.getElementById('acct-history-tbody');
+  tbody.classList.remove('show-all');
+  document.getElementById('btn-acct-more')?.addEventListener('click', e => {
+    tbody.classList.add('show-all');
+    e.currentTarget.closest('tr').remove();
+  });
+}
+
+// 予定支出タブの中にある編集用モーダルを body 直下へ移す（ほかのタブ＝シミュからも開けるように）
+['pr-flash', 'planned-register-modal', 'day-override-modal', 'amount-override-modal', 'planned-modal', 'sub-modal-f', 'loan-modal']
+  .forEach(id => { const el = document.getElementById(id); if (el) document.body.appendChild(el); });
 
 (function restoreView() {
   const st = loadViewState();

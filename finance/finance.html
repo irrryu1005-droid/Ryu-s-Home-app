@@ -231,6 +231,29 @@
       <div id="accounts-list">
         <div class="empty-msg">データを読み込み中...</div>
       </div>
+
+      <!-- 残高の推移（過去は記録から計算、これからは予想） -->
+      <section class="acct-history">
+        <div class="acct-history-head">
+          <h3>📈 残高の推移</h3>
+          <div class="acct-history-selects">
+            <select id="acct-history-account"></select>
+            <select id="acct-history-range">
+              <option value="1">過去1ヶ月</option>
+              <option value="3" selected>過去3ヶ月</option>
+              <option value="6">過去6ヶ月</option>
+            </select>
+          </div>
+        </div>
+        <div class="acct-history-now" id="acct-history-now"></div>
+        <div class="chart-container acct-chart"><canvas id="acct-history-chart"></canvas></div>
+        <div class="bal-day-detail" id="acct-day-detail"></div>
+        <p class="acct-history-note">実線＝記録から計算した残高　点線＝これからの予想（来月末まで。給料・仕送りなどの入金と、予定支出の引き落としだけ）</p>
+        <table class="data-table acct-history-table">
+          <thead><tr><th>日付</th><th>内容</th><th>入出金</th><th>残高</th></tr></thead>
+          <tbody id="acct-history-tbody"></tbody>
+        </table>
+      </section>
     </main>
 
     <!-- ======== 予定支出タブ ======== -->
@@ -603,8 +626,8 @@
             <div class="card-label">必要な額</div>
             <div class="card-value" id="sim-need">¥0</div>
           </div>
-          <div class="card income-card">
-            <div class="card-label">この月に入るお金</div>
+          <div class="card income-card sim-card-tap" id="sim-income-card" title="明細を見る">
+            <div class="card-label">この月に入るお金 ›</div>
             <div class="card-value" id="sim-income">¥0</div>
             <div class="sim-card-sub" id="sim-income-sub"></div>
           </div>
@@ -631,7 +654,12 @@
             <h3>💰 収入</h3>
             <button class="btn-primary-sm" id="btn-sim-add-job">＋ バイト</button>
           </div>
+          <div id="sim-calendar" class="sim-calendar"></div>
           <div id="sim-jobs"></div>
+          <div id="sim-from-prev-wrap" hidden>
+            <div class="sim-group-title">前の月の分（この月に受け取る）</div>
+            <div id="sim-from-prev"></div>
+          </div>
           <div class="sim-group-title">毎月（仕送りなど） <button class="sim-add-link" data-add="recurring-income">＋ 追加</button></div>
           <div id="sim-recurring-income"></div>
           <div class="sim-group-title">臨時収入（短期バイト・臨時の仕送りなど） <button class="sim-add-link" data-add="month-income">＋ 追加</button></div>
@@ -640,9 +668,9 @@
 
         <div class="sim-section">
           <div class="sim-section-head"><h3>💸 必要な支出</h3></div>
-          <div class="sim-row sim-row-auto">
+          <div class="sim-row sim-row-auto sim-row-tap" id="sim-planned-row" title="予定支出を開く">
             <div>
-              <div class="sim-row-name">予定支出（サブスク・ローンなど）</div>
+              <div class="sim-row-name">予定支出（サブスク・ローンなど） ›</div>
               <div class="sim-row-sub" id="sim-planned-sub">予定支出タブから自動で計算</div>
             </div>
             <span class="sim-row-amount" id="sim-planned-total">¥0</span>
@@ -658,8 +686,9 @@
       <div id="sim-sub-trend" class="sim-sub-content" hidden>
         <div class="sim-trend-head">
           <div>
-            <div class="sim-row-sub">スタート（今の口座残高の合計）</div>
+            <div class="sim-row-sub">今日の残高（銀行＋PayPay＋現金）</div>
             <div class="sim-start-balance" id="sim-start-balance">¥0</div>
+            <div class="sim-row-sub" id="sim-start-breakdown"></div>
           </div>
           <select id="sim-trend-months">
             <option value="3">3ヶ月</option>
@@ -670,6 +699,7 @@
         <div class="chart-container">
           <canvas id="sim-trend-chart"></canvas>
         </div>
+        <div class="bal-day-detail" id="sim-day-detail"></div>
         <div class="sim-trend-tax" id="sim-trend-tax" hidden></div>
         <table class="data-table sim-trend-table">
           <thead>
@@ -677,7 +707,7 @@
           </thead>
           <tbody id="sim-trend-tbody"></tbody>
         </table>
-        <p class="sim-note">行をタップすると、その月の計画を開きます。自由に使えるお金は使い切る前提で、残高が増えるのは貯金に回した分だけです。今月はすでに口座に入った・使った分を除いて計算しています。</p>
+        <p class="sim-note">行をタップすると、その月の計画を開きます。実線＝記録から計算した残高　点線＝これからの予想。給料・仕送り・予定支出は日付どおり、毎月の支出・この月だけの支出・自由に使えるお金は毎日少しずつ使う前提です（自由に使えるお金は使い切る前提なので、月末に増えているのは貯金の分）。今月で同じ金額の記録がもうあるものは数えません。</p>
       </div>
 
       <!-- モーダル: バイト -->
@@ -754,6 +784,17 @@
                 <input type="number" name="payDay" min="1" max="31" placeholder="15">
               </div>
               <div class="form-group">
+                <label>給料が入る口座</label>
+                <select name="account">
+                  <option value="deposit（銀行）">deposit（銀行）</option>
+                  <option value="cash（現金）">cash（現金・手渡し）</option>
+                  <option value="PayPay">PayPay</option>
+                  <option value="Rakuten Pay">Rakuten Pay</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
                 <label>源泉徴収</label>
                 <select name="withholding">
                   <option value="none">引かれない</option>
@@ -761,6 +802,7 @@
                   <option value="kou">甲欄（申告書を出している）</option>
                 </select>
               </div>
+              <div class="form-group sim-form-note">日払いは現金（手渡し）として数えます</div>
             </div>
             <div class="form-btns">
               <button type="button" class="btn-cancel" data-close="sim-job-modal">キャンセル</button>
@@ -769,6 +811,29 @@
             <button type="button" class="sim-delete-btn" id="btn-sim-del-job" hidden>このバイトを削除</button>
             <input type="hidden" name="id">
           </form>
+        </div>
+      </div>
+
+      <!-- モーダル: 予定支出（月別）。中身は予定支出タブの #sub-monthly を開くときに移してくる -->
+      <div id="sim-planned-modal" class="sim-modal" hidden>
+        <div class="form-card planned-modal-card sim-planned-card">
+          <div class="sim-planned-head">
+            <h3>📅 予定支出</h3>
+            <button type="button" class="btn-cancel sim-planned-close" id="btn-sim-planned-close">閉じる</button>
+          </div>
+          <div id="sim-planned-body"></div>
+        </div>
+      </div>
+
+      <!-- モーダル: この月に入るお金の明細 -->
+      <div id="sim-cash-modal" class="sim-modal" hidden>
+        <div class="form-card planned-modal-card">
+          <h3 id="sim-cash-title">この月に入るお金</h3>
+          <div id="sim-cash-list"></div>
+          <div class="sim-cash-total"><span>合計</span><span id="sim-cash-total">¥0</span></div>
+          <div class="form-btns">
+            <button type="button" class="btn-cancel" data-close="sim-cash-modal">閉じる</button>
+          </div>
         </div>
       </div>
 
@@ -784,6 +849,19 @@
             <div class="form-group">
               <label>金額 (¥)</label>
               <input type="number" name="amount" min="0" required>
+            </div>
+            <div class="form-group" id="sim-item-day-wrap">
+              <label>日にち（任意）</label>
+              <input type="number" name="day" min="1" max="31" placeholder="例: 25" inputmode="numeric">
+            </div>
+            <div class="form-group" id="sim-item-account-wrap" hidden>
+              <label>入る口座</label>
+              <select name="account">
+                <option value="deposit（銀行）">deposit（銀行）</option>
+                <option value="cash（現金）">cash（現金・手渡し）</option>
+                <option value="PayPay">PayPay</option>
+                <option value="Rakuten Pay">Rakuten Pay</option>
+              </select>
             </div>
             <div class="form-row" id="sim-item-when-wrap" hidden>
               <div class="form-group">
