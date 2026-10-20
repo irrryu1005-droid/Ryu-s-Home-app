@@ -609,7 +609,7 @@
             <div class="sim-card-sub" id="sim-income-sub"></div>
           </div>
           <div class="card profit-card">
-            <div class="card-label">差額</div>
+            <div class="card-label">余り</div>
             <div class="card-value" id="sim-diff">¥0</div>
           </div>
         </div>
@@ -623,8 +623,8 @@
           <div class="sim-hint" id="sim-hint"></div>
         </div>
 
-        <!-- 今月の実績（今月を開いているときだけ） -->
-        <div class="sim-actual-card" id="sim-actual" hidden></div>
+        <!-- 余りの使い道（貯金 / 自由に使えるお金） -->
+        <div class="sim-use-card" id="sim-use"></div>
 
         <div class="sim-section">
           <div class="sim-section-head">
@@ -673,11 +673,11 @@
         <div class="sim-trend-tax" id="sim-trend-tax" hidden></div>
         <table class="data-table sim-trend-table">
           <thead>
-            <tr><th>月</th><th>収入</th><th>支出</th><th>月末残高</th></tr>
+            <tr><th>月</th><th>自由に使える</th><th>貯金</th><th>月末残高</th></tr>
           </thead>
           <tbody id="sim-trend-tbody"></tbody>
         </table>
-        <p class="sim-note">行をタップすると、その月の計画を開きます。今月は「まだ入っていない収入」と「まだ使っていない支出」だけを足し引きしています。</p>
+        <p class="sim-note">行をタップすると、その月の計画を開きます。自由に使えるお金は使い切る前提で、残高が増えるのは貯金に回した分だけです。今月はすでに口座に入った・使った分を除いて計算しています。</p>
       </div>
 
       <!-- モーダル: バイト -->
@@ -784,6 +784,20 @@
             <div class="form-group">
               <label>金額 (¥)</label>
               <input type="number" name="amount" min="0" required>
+            </div>
+            <div class="form-row" id="sim-item-when-wrap" hidden>
+              <div class="form-group">
+                <label>受け取る時期</label>
+                <select name="payOffset">
+                  <option value="0">この月</option>
+                  <option value="1">翌月</option>
+                  <option value="2">翌々月</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>日にち（任意）</label>
+                <input type="number" name="payDay" min="1" max="31" placeholder="25">
+              </div>
             </div>
             <div class="form-group" id="sim-item-days-wrap" hidden>
               <label>働く日数（任意・休みの計算に入る）</label>

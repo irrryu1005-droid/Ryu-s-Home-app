@@ -1979,3 +1979,26 @@ h3.section-title {
 
 .sim-job-tax { display: flex; justify-content: space-between; font-size: 12px; color: var(--profit-neg); margin-top: 8px; }
 .sim-trend-tax { background: #FDECEC; border-radius: var(--radius); padding: 12px 16px; margin-bottom: 14px; font-size: 13px; line-height: 1.6; }
+
+/* 余りの使い道 */
+.sim-use-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 14px; }
+.sim-use-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.sim-use-formula { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+.sim-use-formula b { color: var(--text); }
+.sim-use-short { font-size: 16px; font-weight: 700; color: var(--profit-neg); margin-bottom: 4px; }
+.sim-use-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sim-use-box { border-radius: 12px; padding: 12px; text-align: center; }
+.sim-use-free { background: #FFF5E5; }
+.sim-use-save { background: #E8F7EE; }
+.sim-use-label { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.sim-use-value { font-size: 22px; font-weight: 800; margin: 4px 0 2px; }
+.sim-use-free .sim-use-value { color: var(--income); }
+.sim-use-save .sim-use-value { color: var(--profit-pos); }
+.sim-use-range { width: 100%; margin: 14px 0 8px; accent-color: var(--profit-pos); }
+.sim-use-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sim-free { color: var(--income); }
+.sim-save { color: var(--profit-pos); }
+.sim-use-actions .sim-stepper input { width: 96px; }
+
+.sim-badge-when { background: #EEF5FC; color: var(--expense); }
+.sim-row-from .sim-row-name, .sim-row-from .sim-row-amount { color: var(--text-muted); }

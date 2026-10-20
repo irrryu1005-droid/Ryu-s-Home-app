@@ -147,6 +147,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (tab === 'planned')  renderPlannedTab();
     if (tab === 'sim')      renderSim();
     if (tab === 'wishlist') initWishList();
+    saveViewState('tab', tab);
   });
 });
 
@@ -158,6 +159,7 @@ document.querySelectorAll('.data-sub-btn').forEach(btn => {
     btn.classList.add('active');
     const sub = btn.dataset.sub;
     document.getElementById(`data-sub-${sub}`).hidden = false;
+    saveViewState('dataSub', sub);
     if (sub === 'dashboard') renderDashboard();
     if (sub === 'pnl')       renderFinancePnl();
   });
@@ -1403,6 +1405,7 @@ function initPlannedSubTabs() {
       btn.classList.add('active');
       const sub = btn.dataset.sub;
       document.getElementById(`sub-${sub}`).hidden = false;
+      saveViewState('plannedSub', sub);
       if (sub === 'subscriptions') { await loadSubsF(); renderSubsF(); }
       if (sub === 'loans')         { await loadLoans(); renderLoans(); }
     });
@@ -2285,6 +2288,19 @@ function simPrevYm(ym) {
   const d = simYmToDate(ym); d.setMonth(d.getMonth() - 1);
   return ymKey(d);
 }
+function simShiftYm(ym, k) {
+  const d = simYmToDate(ym); d.setMonth(d.getMonth() + k);
+  return ymKey(d);
+}
+// 臨時収入を受け取る時期の表示（offset: 0=この月 / 1=翌月 / 2=翌々月）
+function simPayWhenLabel(ym, it) {
+  const off = Number(it.pay_offset) || 0;
+  if (!off && !it.pay_day) return '';
+  const m = simYmToDate(simShiftYm(ym, off)).getMonth() + 1;
+  return `${m}月${it.pay_day ? it.pay_day + '日' : ''}に受取`;
+}
+const SIM_PAY_OFFSET_MAX = 2;
+
 function simSignedYen(n) {
   return (n < 0 ? '−' : n > 0 ? '+' : '') + yen(n);
 }
@@ -2313,7 +2329,7 @@ async function loadSimData() {
 // その月の計画（保存していなければ前の月の出勤日数を引き継ぐ）
 function simMonthPlan(ym) {
   const saved = _simMonths[ym];
-  if (saved) return { items: saved.items || [], workDays: saved.work_days || {}, saved: true };
+  if (saved) return { items: saved.items || [], workDays: saved.work_days || {}, saving: saved.saving ?? null, saved: true };
   const prev = Object.keys(_simMonths).filter(k => k < ym).sort().pop();
   const workDays = prev ? { ..._simMonths[prev].work_days } : {};
   // 研修が途中で終わった月から引き継ぐときは、研修中＋研修後の合計を出勤日数にする
@@ -2327,6 +2343,7 @@ function simMonthPlan(ym) {
   return {
     items: [],
     workDays,
+    saving: prev ? (_simMonths[prev].saving ?? null) : null,  // 貯金に回す額も前の月を引き継ぐ
     saved: false,
     inheritedFrom: prev || null,
   };
@@ -2434,7 +2451,19 @@ function simCalc(ym) {
   const planned      = simPlannedTotal(y, m);
   const recurringExp = sum(_simRecurring.filter(r => r.kind === 'expense'));
   const monthExp     = sum(plan.items.filter(it => it.kind === 'expense'));
-  const otherIncome  = sum(_simRecurring.filter(r => r.kind === 'income')) + sum(plan.items.filter(it => it.kind === 'income'));
+  const recurringInc = sum(_simRecurring.filter(r => r.kind === 'income'));
+  // 臨時収入: 働いた（決まった）月で数える額と、実際に受け取る月で数える額を分ける
+  const oneOffEarned = sum(plan.items.filter(it => it.kind === 'income'));
+  const arriving = [];  // この月に受け取る臨時収入（前の月の分も含む）
+  for (let k = 0; k <= SIM_PAY_OFFSET_MAX; k++) {
+    const fromYm = simShiftYm(ym, -k);
+    const items = k === 0 ? plan.items : simMonthPlan(fromYm).items;
+    for (const it of items) {
+      if (it.kind === 'income' && (Number(it.pay_offset) || 0) === k) arriving.push({ ...it, fromYm });
+    }
+  }
+  const oneOffCash = sum(arriving);
+  const otherIncome = recurringInc + oneOffEarned;
 
   let workDays = 0, workIncome = 0, paidWage = 0, withheld = 0;
   const jobMonths = {};
@@ -2456,18 +2485,27 @@ function simCalc(ym) {
   workDays += plan.items.reduce((s, it) => s + (it.kind === 'income' ? (Number(it.days) || 0) : 0), 0);
 
   const need = planned + recurringExp + monthExp;
+  // 入るお金 − 必要な額 = 余り。余りを「貯金」と「自由に使えるお金」に分ける
+  // 貯金の額を決めていない月は、余りを全部貯金に回したことにする
+  const cashIncome = recurringInc + oneOffCash + paidWage;
+  const leftover = cashIncome - need;
+  const room = Math.max(0, leftover);
+  const saving = plan.saving == null ? room : Math.min(plan.saving, room);
+  const free = room - saving;
   return {
+    leftover, saving, free, savingSet: plan.saving != null,
     ym, plan, planned, need, jobMonths,
     otherIncome, workDays, workIncome,
     income: otherIncome + workIncome,          // 働いた月で数えた収入（計画用）
-    cashIncome: otherIncome + paidWage,        // 実際にこの月に入る収入（推移用・源泉徴収を引いた後）
+    cashIncome,                                // 実際にこの月に入る収入（推移用・源泉徴収を引いた後）
+    arriving,
     withheld,                                  // この月の支払いから引かれる源泉徴収
     daysInMonth: new Date(y, m + 1, 0).getDate(),
   };
 }
 
 async function simSaveMonth(ym, plan) {
-  const row = { year_month: ym, items: plan.items, work_days: plan.workDays, updated_at: new Date().toISOString() };
+  const row = { year_month: ym, items: plan.items, work_days: plan.workDays, saving: plan.saving ?? null, updated_at: new Date().toISOString() };
   _simMonths[ym] = row;
   const { error } = await db.from('sim_months').upsert(row);
   if (error) alert('保存に失敗しました: ' + error.message);
@@ -2531,25 +2569,70 @@ async function renderSimMonth() {
   renderSimJobs(c);
   renderSimItems(c);
 
-  // 今月なら実績も出す
-  const actualEl = document.getElementById('sim-actual');
-  if (ym === ymKey(new Date())) {
-    const act = await simActualThisMonth();
-    const pct = (a, b) => b > 0 ? Math.min(100, a / b * 100) : 0;
-    const left = c.need - act.expense;
-    actualEl.innerHTML = `
-      <div class="sim-actual-title">今月の実績</div>
-      <div class="sim-actual-row">
-        <span>収入 入った分</span><span><b>${yen(act.income)}</b> / 入る予定 ${yen(c.cashIncome)}</span>
+  renderSimUse(c);
+}
+
+// 余りの使い道（貯金に回す額 → 残りが自由に使えるお金）
+function renderSimUse(c) {
+  const el = document.getElementById('sim-use');
+  if (c.leftover < 0) {
+    el.innerHTML = `
+      <div class="sim-use-title">💡 余りの使い道</div>
+      <div class="sim-use-short">この月は ${yen(c.leftover)} 足りません</div>
+      <div class="sim-row-sub">貯金から出すか、上の「収入」を増やす必要があります。自由に使えるお金・貯金はどちらも ¥0 です。</div>`;
+    return;
+  }
+  const perDay = Math.floor(c.free / c.daysInMonth);
+  el.innerHTML = `
+    <div class="sim-use-title">💡 余りの使い道</div>
+    <div class="sim-use-formula">入るお金 ${yen(c.cashIncome)} − 必要な額 ${yen(c.need)} ＝ <b>余り ${yen(c.leftover)}</b></div>
+    <div class="sim-use-split">
+      <div class="sim-use-box sim-use-free">
+        <div class="sim-use-label">自由に使えるお金</div>
+        <div class="sim-use-value">${yen(c.free)}</div>
+        <div class="sim-row-sub">1日あたり ${yen(perDay)}</div>
       </div>
-      <div class="sim-bar"><div class="sim-bar-fill sim-bar-income" style="width:${pct(act.income, c.cashIncome)}%"></div></div>
-      <div class="sim-actual-row">
-        <span>支出 使った分</span><span><b>${yen(act.expense)}</b> / 必要な額 ${yen(c.need)}</span>
+      <div class="sim-use-box sim-use-save">
+        <div class="sim-use-label">貯金に回す</div>
+        <div class="sim-use-value">${yen(c.saving)}</div>
+        <div class="sim-row-sub">${c.savingSet ? `余りの ${c.leftover ? Math.round(c.saving / c.leftover * 100) : 0}%` : '未設定（余りを全部貯金）'}</div>
       </div>
-      <div class="sim-bar"><div class="sim-bar-fill ${left < 0 ? 'sim-bar-over' : 'sim-bar-expense'}" style="width:${pct(act.expense, c.need)}%"></div></div>
-      <div class="sim-row-sub">${left >= 0 ? `今月あと ${yen(left)} 使える計算です` : `必要な額を ${yen(left)} こえています`}（給料は実際に入る月で数えています）</div>`;
-    actualEl.hidden = false;
-  } else actualEl.hidden = true;
+    </div>
+    <input type="range" class="sim-use-range" id="sim-saving-range" min="0" max="${c.leftover}" step="1000" value="${c.saving}">
+    <div class="sim-use-actions">
+      <div class="sim-stepper">
+        <button data-saving-step="-5000">−</button>
+        <input type="number" id="sim-saving-input" min="0" max="${c.leftover}" step="1000" value="${c.saving}" inputmode="numeric">
+        <button data-saving-step="5000">＋</button>
+      </div>
+      <span class="sim-row-sub">貯金に回す額（5,000円ずつ）</span>
+    </div>`;
+
+  const range = document.getElementById('sim-saving-range');
+  // ドラッグ中は数字だけ書き換える（描き直すとつまみが離れてしまうため）。離したら保存
+  range.addEventListener('input', () => {
+    const save = Number(range.value), free = c.leftover - save;
+    el.querySelector('.sim-use-save .sim-use-value').textContent = yen(save);
+    el.querySelector('.sim-use-free .sim-use-value').textContent = yen(free);
+    el.querySelector('.sim-use-free .sim-row-sub').textContent = `1日あたり ${yen(Math.floor(free / c.daysInMonth))}`;
+    document.getElementById('sim-saving-input').value = save;
+  });
+  range.addEventListener('change', () => simSetSaving(Number(range.value), true));
+  document.getElementById('sim-saving-input').addEventListener('change', e => simSetSaving(Number(e.target.value) || 0, true));
+  el.querySelectorAll('[data-saving-step]').forEach(btn => {
+    btn.addEventListener('click', () => simSetSaving(c.saving + Number(btn.dataset.savingStep)));
+  });
+}
+
+function simSetSaving(val, saveNow = false) {
+  const ym = ymKey(_simMonth);
+  const plan = simMonthPlan(ym);
+  const max = Math.max(0, simCalc(ym).leftover);
+  plan.saving = Math.max(0, Math.min(max, val));
+  _simMonths[ym] = { year_month: ym, items: plan.items, work_days: plan.workDays, saving: plan.saving };
+  renderSimMonth();
+  clearTimeout(_simSaveTimers[ym]);
+  _simSaveTimers[ym] = setTimeout(() => simSaveMonth(ym, plan), saveNow ? 0 : 600);
 }
 
 function renderSimHint(c, diff, off) {
@@ -2698,16 +2781,16 @@ function simSetWork(key, val, saveNow = false) {
   const isKoma = key.includes(':k:') || key.includes(':c:');
   const max = isKoma ? 999 : simCalc(ym).daysInMonth;
   plan.workDays = { ...plan.workDays, [key]: Math.max(0, Math.min(max, val)) };
-  _simMonths[ym] = { year_month: ym, items: plan.items, work_days: plan.workDays }; // 先に画面に反映
+  _simMonths[ym] = { year_month: ym, items: plan.items, work_days: plan.workDays, saving: plan.saving ?? null }; // 先に画面に反映
   renderSimMonth();
   clearTimeout(_simSaveTimers[ym]);
   _simSaveTimers[ym] = setTimeout(() => simSaveMonth(ym, plan), saveNow ? 0 : 500);
 }
 
 function renderSimItems(c) {
-  const row = (name, amount, target, key, days) => `
+  const row = (name, amount, target, key, days, when) => `
     <div class="sim-row sim-row-tap" data-target="${target}" data-key="${key}">
-      <span class="sim-row-name">${escapeHtmlF(name)}${days ? `<span class="sim-badge">${days}日</span>` : ''}</span>
+      <span class="sim-row-name">${escapeHtmlF(name)}${days ? `<span class="sim-badge">${days}日</span>` : ''}${when ? `<span class="sim-badge sim-badge-when">${when}</span>` : ''}</span>
       <span class="sim-row-amount">${yen(Number(amount) || 0)}</span>
     </div>`;
   const empty = '<p class="sim-empty">なし</p>';
@@ -2716,7 +2799,13 @@ function renderSimItems(c) {
   fill('sim-recurring-expense', _simRecurring.filter(r => r.kind === 'expense').map(r => row(r.name, r.amount, 'recurring-expense', r.id)).join(''));
   fill('sim-recurring-income',  _simRecurring.filter(r => r.kind === 'income').map(r => row(r.name, r.amount, 'recurring-income', r.id)).join(''));
   fill('sim-month-expense', c.plan.items.map((it, i) => it.kind === 'expense' ? row(it.name, it.amount, 'month-expense', i) : '').join(''));
-  fill('sim-month-income',  c.plan.items.map((it, i) => it.kind === 'income'  ? row(it.name, it.amount, 'month-income', i, it.days)  : '').join(''));
+  // この月の臨時収入（受け取りが先の月なら、その時期を表示）＋ 前の月の分でこの月に受け取るもの
+  const fromPrev = c.arriving.filter(it => it.fromYm !== c.ym).map(it => `
+    <div class="sim-row sim-row-from">
+      <span class="sim-row-name">${escapeHtmlF(it.name)}<span class="sim-badge">${simYmToDate(it.fromYm).getMonth() + 1}月の分</span></span>
+      <span class="sim-row-amount">${yen(Number(it.amount) || 0)}</span>
+    </div>`).join('');
+  fill('sim-month-income', c.plan.items.map((it, i) => it.kind === 'income' ? row(it.name, it.amount, 'month-income', i, it.days, simPayWhenLabel(c.ym, it)) : '').join('') + fromPrev);
 
   document.querySelectorAll('#tab-sim .sim-row-tap').forEach(el => {
     el.addEventListener('click', () => openSimItemModal(el.dataset.target, el.dataset.key));
@@ -2812,8 +2901,18 @@ async function openSimItemModal(target, key = '') {
       ? _simRecurring.find(r => String(r.id) === String(key))
       : simMonthPlan(ymKey(_simMonth)).items[Number(key)];
   }
-  if (item) { f.elements.name.value = item.name; f.elements.amount.value = item.amount; f.elements.days.value = item.days || ''; }
+  if (item) {
+    f.elements.name.value = item.name; f.elements.amount.value = item.amount; f.elements.days.value = item.days || '';
+    f.elements.payOffset.value = item.pay_offset || 0; f.elements.payDay.value = item.pay_day || '';
+  }
   document.getElementById('sim-item-days-wrap').hidden = target !== 'month-income';
+  document.getElementById('sim-item-when-wrap').hidden = target !== 'month-income';
+  // 受け取る時期の選択肢に月の名前を出す（例: 11月（この月）/ 12月（翌月））
+  const offSel = f.elements.payOffset;
+  [...offSel.options].forEach(o => {
+    const m = simYmToDate(simShiftYm(ymKey(_simMonth), Number(o.value))).getMonth() + 1;
+    o.textContent = `${m}月（${['この月', '翌月', '翌々月'][Number(o.value)]}）`;
+  });
   const [title, ph] = SIM_ITEM_TITLES[target];
   const monthPrefix = target.startsWith('month') ? `${_simMonth.getMonth() + 1}月・` : '';
   document.getElementById('sim-item-title').textContent = monthPrefix + title + (item ? 'を編集' : 'を追加');
@@ -2853,7 +2952,11 @@ async function saveSimItem(e) {
     const plan = simMonthPlan(ym);
     const items = [...plan.items];
     const it = { kind, name, amount };
-    if (target === 'month-income' && Number(f.elements.days.value) > 0) it.days = Number(f.elements.days.value);
+    if (target === 'month-income') {
+      if (Number(f.elements.days.value) > 0)      it.days = Number(f.elements.days.value);
+      if (Number(f.elements.payOffset.value) > 0) it.pay_offset = Number(f.elements.payOffset.value);
+      if (Number(f.elements.payDay.value) > 0)    it.pay_day = Number(f.elements.payDay.value);
+    }
     if (key !== '') items[Number(key)] = it;
     else items.push(it);
     await simSaveMonth(ym, { ...plan, items });
@@ -2893,14 +2996,15 @@ async function renderSimTrend() {
   for (let i = 0; i < months; i++) {
     const ym = ymKey(d);
     const c = simCalc(ym);
-    let inc = c.cashIncome, exp = c.need;
+    // 自由に使えるお金は使い切る前提。残高が増えるのは貯金の分（足りない月は減る）
+    let inc = c.cashIncome, exp = c.need + c.free;
     if (i === 0) {
       // 今月は、もう口座に反映されている分を除いて「これからの分」だけ足し引きする
       inc = Math.max(0, c.cashIncome - act.income);
-      exp = Math.max(0, c.need - act.expense);
+      exp = Math.max(0, c.need + c.free - act.expense);
     }
     balance += inc - exp;
-    rows.push({ ym, label: `${d.getMonth() + 1}月`, year: d.getFullYear(), inc, exp, balance, workDays: c.workDays, isNow: i === 0, withheld: c.withheld });
+    rows.push({ ym, label: `${d.getMonth() + 1}月`, year: d.getFullYear(), free: c.free, saving: c.leftover < 0 ? c.leftover : c.saving, balance, workDays: c.workDays, isNow: i === 0, withheld: c.withheld });
     d.setMonth(d.getMonth() + 1);
   }
 
@@ -2912,8 +3016,8 @@ async function renderSimTrend() {
   document.getElementById('sim-trend-tbody').innerHTML = rows.map(r => `
     <tr class="sim-trend-row" data-ym="${r.ym}">
       <td>${r.label}${r.isNow ? '<span class="sim-badge">これから</span>' : ''}<div class="sim-row-sub">出勤${r.workDays}日</div></td>
-      <td class="sim-inc">${yen(r.inc)}</td>
-      <td class="sim-exp">${yen(r.exp)}</td>
+      <td class="sim-free">${yen(r.free)}</td>
+      <td class="${r.saving < 0 ? 'sim-neg' : 'sim-save'}">${r.saving < 0 ? '−' : ''}${yen(r.saving)}</td>
       <td class="${r.balance < 0 ? 'sim-neg' : ''}"><b>${r.balance < 0 ? '−' : ''}${yen(r.balance)}</b></td>
     </tr>`).join('');
   document.querySelectorAll('#sim-trend-tbody .sim-trend-row').forEach(tr => {
@@ -2955,6 +3059,7 @@ function initSim() {
       document.querySelectorAll('.sim-sub-content').forEach(c => { c.hidden = true; });
       btn.classList.add('active');
       document.getElementById(`sim-sub-${btn.dataset.sub}`).hidden = false;
+      saveViewState('simSub', btn.dataset.sub);
       if (btn.dataset.sub === 'trend') renderSimTrend();
       else                             renderSimMonth();
     });
@@ -2989,3 +3094,33 @@ function initSim() {
     m.addEventListener('click', e => { if (e.target === m) m.hidden = true; });
   });
 }
+
+// ============================================================
+// 見ていたタブを覚えておき、ページを更新しても同じ画面を開く
+// （この端末のブラウザにだけ保存。読めなくても入力タブで開くだけ）
+// ============================================================
+function loadViewState() {
+  try { return JSON.parse(localStorage.getItem('finance-view') || '{}'); } catch { return {}; }
+}
+function saveViewState(key, val) {
+  try {
+    const st = loadViewState();
+    st[key] = val;
+    localStorage.setItem('finance-view', JSON.stringify(st));
+  } catch { /* 保存できない環境では何もしない */ }
+}
+
+(function restoreView() {
+  const st = loadViewState();
+  // シミュのサブタブは、タブを開く前に選んでおく（renderSim が見るため）
+  if (st.simSub) {
+    const btn = document.querySelector(`.sim-sub-btn[data-sub="${st.simSub}"]`);
+    if (btn) {
+      document.querySelectorAll('.sim-sub-btn').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.sim-sub-content').forEach(c => { c.hidden = c.id !== `sim-sub-${st.simSub}`; });
+    }
+  }
+  if (st.tab && st.tab !== 'input') document.querySelector(`.nav-btn[data-tab="${st.tab}"]`)?.click();
+  if (st.tab === 'data' && st.dataSub)       document.querySelector(`.data-sub-btn[data-sub="${st.dataSub}"]`)?.click();
+  if (st.tab === 'planned' && st.plannedSub) document.querySelector(`.sub-nav-btn[data-sub="${st.plannedSub}"]`)?.click();
+})();
