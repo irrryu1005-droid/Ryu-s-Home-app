@@ -675,8 +675,10 @@
             </div>
             <span class="sim-row-amount" id="sim-planned-total">¥0</span>
           </div>
-          <div class="sim-group-title">毎月 <button class="sim-add-link" data-add="recurring-expense">＋ 追加</button></div>
+          <div class="sim-group-title">長期間（○月〜○月に定期的に払うもの） <button class="sim-add-link" data-add="recurring-expense">＋ 追加</button></div>
           <div id="sim-recurring-expense"></div>
+          <div class="sim-group-title">✈️ 旅行（事前に払うもの＋旅行中に使うもの） <button class="sim-add-link" id="btn-sim-add-trip">＋ 追加</button></div>
+          <div id="sim-trips"></div>
           <div class="sim-group-title">この月だけ <button class="sim-add-link" data-add="month-expense">＋ 追加</button></div>
           <div id="sim-month-expense"></div>
         </div>
@@ -696,6 +698,7 @@
             <option value="12">12ヶ月</option>
           </select>
         </div>
+        <div class="sim-goal-card" id="sim-goal"></div>
         <div class="chart-container">
           <canvas id="sim-trend-chart"></canvas>
         </div>
@@ -707,7 +710,7 @@
           </thead>
           <tbody id="sim-trend-tbody"></tbody>
         </table>
-        <p class="sim-note">行をタップすると、その月の計画を開きます。実線＝記録から計算した残高　点線＝これからの予想。給料・仕送り・予定支出は日付どおり、毎月の支出・この月だけの支出・自由に使えるお金は毎日少しずつ使う前提です（自由に使えるお金は使い切る前提なので、月末に増えているのは貯金の分）。今月で同じ金額の記録がもうあるものは数えません。</p>
+        <p class="sim-note">行をタップすると、その月の計画を開きます。実線＝記録から計算した残高　点線＝これからの予想　緑＝貯金（使っちゃいけないお金。残高との差が使っていいお金）。給料・仕送り・予定支出は日付どおり、毎月の支出・この月だけの支出・自由に使えるお金は毎日少しずつ使う前提です（自由に使えるお金は使い切る前提なので、月末に増えているのは貯金の分）。今月で同じ金額の記録がもうあるものは数えません。</p>
       </div>
 
       <!-- モーダル: バイト -->
@@ -837,6 +840,90 @@
         </div>
       </div>
 
+      <!-- モーダル: 貯金の目標 -->
+      <div id="sim-goal-modal" class="sim-modal" hidden>
+        <div class="form-card planned-modal-card">
+          <h3 id="sim-goal-title">🎯 目標を追加</h3>
+          <form id="sim-goal-form" novalidate>
+            <div class="sim-wl-pick">
+              <label>Wish List から選ぶ</label>
+              <select id="sim-goal-wl"><option value="">選ばない</option></select>
+            </div>
+            <div class="form-group">
+              <label>名前</label>
+              <input type="text" name="name" placeholder="貯金・旅行資金など">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>目標額 (¥)</label>
+                <input type="number" name="target" min="1" placeholder="300000" inputmode="numeric" required>
+              </div>
+              <div class="form-group">
+                <label>期限（任意）</label>
+                <input type="month" name="deadline">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>毎月積み立てる額 (¥・空なら自動)</label>
+                <input type="number" name="monthly" min="0" placeholder="10000" inputmode="numeric">
+              </div>
+              <div class="form-group">
+                <label>今たまっている額 (¥)</label>
+                <input type="number" name="saved" min="0" placeholder="0" inputmode="numeric">
+              </div>
+            </div>
+            <p class="sim-goal-pace" id="sim-goal-pace"></p>
+            <p class="sim-row-sub">毎月積み立てる額が、月末ごとに「今たまっている額」へ足されていく計算です（目標に届いたら止まります）。余りが足りない月は、上の目標から順に積み立てます。実際にたまった額が変わったら「今たまっている額」を直してください。</p>
+            <div class="form-btns">
+              <button type="button" class="btn-cancel" data-close="sim-goal-modal">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+            <button type="button" class="sim-delete-btn" id="btn-sim-del-goal" hidden>この目標を削除</button>
+            <input type="hidden" name="id">
+          </form>
+        </div>
+      </div>
+
+      <!-- モーダル: 旅行 -->
+      <div id="sim-trip-modal" class="sim-modal" hidden>
+        <div class="form-card planned-modal-card">
+          <h3 id="sim-trip-title">旅行を追加</h3>
+          <form id="sim-trip-form" novalidate>
+            <div class="form-group">
+              <label>旅行の名前</label>
+              <input type="text" name="name" placeholder="沖縄旅行など" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>行く日</label>
+                <input type="date" name="startDate" required>
+              </div>
+              <div class="form-group">
+                <label>帰る日</label>
+                <input type="date" name="endDate">
+              </div>
+            </div>
+            <div class="sim-trip-section">
+              <div class="sim-trip-head"><b>事前に払うもの</b><span class="sim-row-sub">払う日の月の支出になります（月をまたいでもOK）</span></div>
+              <div id="sim-trip-prepaid"></div>
+              <button type="button" class="sim-add-link" data-add-line="prepaid">＋ 行を追加</button>
+            </div>
+            <div class="sim-trip-section">
+              <div class="sim-trip-head"><b>旅行中に使うもの</b><span class="sim-row-sub">旅行の日数で割って、毎日少しずつ使う計算です</span></div>
+              <div id="sim-trip-onsite"></div>
+              <button type="button" class="sim-add-link" data-add-line="onsite">＋ 行を追加</button>
+            </div>
+            <div class="form-btns">
+              <button type="button" class="btn-cancel" data-close="sim-trip-modal">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+            <button type="button" class="sim-delete-btn" id="btn-sim-del-trip" hidden>この旅行を削除</button>
+            <input type="hidden" name="id">
+          </form>
+        </div>
+      </div>
+
       <!-- モーダル: 支出・収入の項目 -->
       <div id="sim-item-modal" class="sim-modal" hidden>
         <div class="form-card planned-modal-card">
@@ -849,6 +936,16 @@
             <div class="form-group">
               <label>金額 (¥)</label>
               <input type="number" name="amount" min="0" required>
+            </div>
+            <div class="form-row" id="sim-item-range-wrap" hidden>
+              <div class="form-group">
+                <label>何月から</label>
+                <input type="month" name="startYm">
+              </div>
+              <div class="form-group">
+                <label>何月まで（空なら終わりなし）</label>
+                <input type="month" name="endYm">
+              </div>
             </div>
             <div class="form-group" id="sim-item-day-wrap">
               <label>日にち（任意）</label>
