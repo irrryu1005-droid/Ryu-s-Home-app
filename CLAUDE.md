@@ -14,7 +14,7 @@
    - 「デプロイ: このメッセージの送信でgit pushが自動実行されます」（フックが「ありがとう」を検知して自動デプロイ）
    - 単語テストサイト（`../新単語テスト/`）も同じフックで、変更があれば `netlify deploy --prod` される（`.claude/hooks/thanks-deploy.sh`）
 
-**Obsidianのパス**: `/Users/ryu_i/Desktop/obsidian/`
+**Obsidianのパス**: `/Users/ryu_i/Library/Mobile Documents/com~apple~CloudDocs/For_Claude/Obsidian/`
 
 git push はフック（UserPromptSubmit hook）が自動で行うので、Claudeは実行しない。
 フックは「ありがとう」を含むメッセージが送信された時点で実行される（Claudeの返答前）。
@@ -23,6 +23,6 @@ git push はフック（UserPromptSubmit hook）が自動で行うので、Claud
 
 ## プロジェクト概要
 
-- **場所**: `/Users/ryu_i/Library/Mobile Documents/com~apple~CloudDocs/home-app/`
+- **場所**: `/Users/ryu_i/Library/Mobile Documents/com~apple~CloudDocs/For_Claude/home-app/`
 - **スタック**: Vanilla JS + Supabase + Netlify Functions
 - **デプロイ**: GitHub main → Netlify 自動デプロイ

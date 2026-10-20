@@ -54,6 +54,10 @@
         <span class="nav-icon">📅</span>
         <span class="nav-label">予定支出</span>
       </button>
+      <button class="nav-btn" data-tab="sim">
+        <span class="nav-icon">🧮</span>
+        <span class="nav-label">シミュ</span>
+      </button>
       <button class="nav-btn" data-tab="data">
         <span class="nav-icon">📊</span>
         <span class="nav-label">Data</span>
@@ -336,6 +340,23 @@
         </div>
       </div>
 
+      <!-- モーダル: その月の金額を確定 -->
+      <div id="amount-override-modal" hidden>
+        <div class="day-override-card">
+          <h3 id="amount-override-title">💴 金額を確定</h3>
+          <div>
+            <label id="amount-override-label"></label>
+            <div class="amount-override-planned" id="amount-override-planned"></div>
+            <input type="number" id="amount-override-input" min="0" inputmode="numeric">
+          </div>
+          <div class="day-override-actions">
+            <button id="btn-amount-override-clear" class="btn-day-override-clear" hidden>予定額に戻す</button>
+            <button id="btn-amount-override-cancel" class="planned-edit-btn" style="background:#f3f4f6;color:#555">キャンセル</button>
+            <button id="btn-amount-override-save" class="planned-edit-btn">確定</button>
+          </div>
+        </div>
+      </div>
+
       <!-- モーダル: その他予定支出 -->
       <div id="planned-modal" hidden>
         <div class="form-card planned-modal-card">
@@ -560,6 +581,231 @@
     </main>
 
     <!-- ======== Wish List タブ ======== -->
+    <!-- ======== シミュレーションタブ ======== -->
+    <main id="tab-sim" class="tab-content">
+
+      <div class="sub-nav">
+        <button class="sim-sub-btn active" data-sub="month">📆 月の計画</button>
+        <button class="sim-sub-btn" data-sub="trend">📈 貯金の推移</button>
+      </div>
+
+      <!-- ===== 月の計画 ===== -->
+      <div id="sim-sub-month" class="sim-sub-content">
+        <div class="month-nav">
+          <button id="sim-prev">＜</button>
+          <h2 id="sim-month-label"></h2>
+          <button id="sim-next">＞</button>
+        </div>
+        <p class="sim-inherit-note" id="sim-inherit-note" hidden></p>
+
+        <div class="summary-cards">
+          <div class="card expense-card">
+            <div class="card-label">必要な額</div>
+            <div class="card-value" id="sim-need">¥0</div>
+          </div>
+          <div class="card income-card">
+            <div class="card-label">この月に入るお金</div>
+            <div class="card-value" id="sim-income">¥0</div>
+            <div class="sim-card-sub" id="sim-income-sub"></div>
+          </div>
+          <div class="card profit-card">
+            <div class="card-label">差額</div>
+            <div class="card-value" id="sim-diff">¥0</div>
+          </div>
+        </div>
+
+        <div class="sim-days-card">
+          <div class="sim-days-row">
+            <div><span class="sim-days-num" id="sim-work-days">0</span><span class="sim-days-unit">日 出勤</span></div>
+            <div><span class="sim-days-num sim-off" id="sim-off-days">0</span><span class="sim-days-unit">日 休み</span></div>
+          </div>
+          <div class="sim-days-bar"><div class="sim-days-bar-fill" id="sim-days-fill"></div></div>
+          <div class="sim-hint" id="sim-hint"></div>
+        </div>
+
+        <!-- 今月の実績（今月を開いているときだけ） -->
+        <div class="sim-actual-card" id="sim-actual" hidden></div>
+
+        <div class="sim-section">
+          <div class="sim-section-head">
+            <h3>💰 収入</h3>
+            <button class="btn-primary-sm" id="btn-sim-add-job">＋ バイト</button>
+          </div>
+          <div id="sim-jobs"></div>
+          <div class="sim-group-title">毎月（仕送りなど） <button class="sim-add-link" data-add="recurring-income">＋ 追加</button></div>
+          <div id="sim-recurring-income"></div>
+          <div class="sim-group-title">臨時収入（短期バイト・臨時の仕送りなど） <button class="sim-add-link" data-add="month-income">＋ 追加</button></div>
+          <div id="sim-month-income"></div>
+        </div>
+
+        <div class="sim-section">
+          <div class="sim-section-head"><h3>💸 必要な支出</h3></div>
+          <div class="sim-row sim-row-auto">
+            <div>
+              <div class="sim-row-name">予定支出（サブスク・ローンなど）</div>
+              <div class="sim-row-sub" id="sim-planned-sub">予定支出タブから自動で計算</div>
+            </div>
+            <span class="sim-row-amount" id="sim-planned-total">¥0</span>
+          </div>
+          <div class="sim-group-title">毎月 <button class="sim-add-link" data-add="recurring-expense">＋ 追加</button></div>
+          <div id="sim-recurring-expense"></div>
+          <div class="sim-group-title">この月だけ <button class="sim-add-link" data-add="month-expense">＋ 追加</button></div>
+          <div id="sim-month-expense"></div>
+        </div>
+      </div>
+
+      <!-- ===== 貯金の推移 ===== -->
+      <div id="sim-sub-trend" class="sim-sub-content" hidden>
+        <div class="sim-trend-head">
+          <div>
+            <div class="sim-row-sub">スタート（今の口座残高の合計）</div>
+            <div class="sim-start-balance" id="sim-start-balance">¥0</div>
+          </div>
+          <select id="sim-trend-months">
+            <option value="3">3ヶ月</option>
+            <option value="6" selected>6ヶ月</option>
+            <option value="12">12ヶ月</option>
+          </select>
+        </div>
+        <div class="chart-container">
+          <canvas id="sim-trend-chart"></canvas>
+        </div>
+        <div class="sim-trend-tax" id="sim-trend-tax" hidden></div>
+        <table class="data-table sim-trend-table">
+          <thead>
+            <tr><th>月</th><th>収入</th><th>支出</th><th>月末残高</th></tr>
+          </thead>
+          <tbody id="sim-trend-tbody"></tbody>
+        </table>
+        <p class="sim-note">行をタップすると、その月の計画を開きます。今月は「まだ入っていない収入」と「まだ使っていない支出」だけを足し引きしています。</p>
+      </div>
+
+      <!-- モーダル: バイト -->
+      <div id="sim-job-modal" class="sim-modal" hidden>
+        <div class="form-card planned-modal-card">
+          <h3 id="sim-job-title">バイトを追加</h3>
+          <form id="sim-job-form" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label>名前</label>
+                <input type="text" name="name" placeholder="塾・黒服など" required>
+              </div>
+              <div class="form-group">
+                <label>給料の決まり方</label>
+                <select name="jobType" id="sim-job-type">
+                  <option value="hourly">時給 × 時間</option>
+                  <option value="koma">コマ（塾）</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 時給 × 時間 -->
+            <div data-job-type="hourly">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>時給 (¥)</label>
+                  <input type="number" name="hourlyWage" min="0" placeholder="1800">
+                </div>
+                <div class="form-group">
+                  <label>1日の時間</label>
+                  <input type="number" name="hoursPerDay" min="0" step="0.25" placeholder="6">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>研修中の時給（任意）</label>
+                  <input type="number" name="trainingWage" min="0" placeholder="1700">
+                </div>
+                <div class="form-group">
+                  <label>研修の最終日（任意）</label>
+                  <input type="date" name="trainingEnd">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>日払いでもらえる額（1日・希望制・任意）</label>
+                <input type="number" name="advancePerDay" min="0" placeholder="5000">
+              </div>
+            </div>
+
+            <!-- コマ（塾） -->
+            <div data-job-type="koma" hidden>
+              <div class="sim-koma-guide">
+                時給は <b>1,350円・1,850円・2,500円</b>、長さは <b>60分・90分・120分</b> で計算します。<br>
+                <b>コマ数は、保存したあと「収入」に出る表に月ごとに入れます。</b>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>交通費 (1日・任意)</label>
+                <input type="number" name="transportPerDay" min="0" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label>給料が入る月</label>
+                <select name="payTiming">
+                  <option value="next">働いた次の月</option>
+                  <option value="same">働いた月</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>給料日（任意）</label>
+                <input type="number" name="payDay" min="1" max="31" placeholder="15">
+              </div>
+              <div class="form-group">
+                <label>源泉徴収</label>
+                <select name="withholding">
+                  <option value="none">引かれない</option>
+                  <option value="otsu">乙欄（申告書を出していない）</option>
+                  <option value="kou">甲欄（申告書を出している）</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-btns">
+              <button type="button" class="btn-cancel" data-close="sim-job-modal">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+            <button type="button" class="sim-delete-btn" id="btn-sim-del-job" hidden>このバイトを削除</button>
+            <input type="hidden" name="id">
+          </form>
+        </div>
+      </div>
+
+      <!-- モーダル: 支出・収入の項目 -->
+      <div id="sim-item-modal" class="sim-modal" hidden>
+        <div class="form-card planned-modal-card">
+          <h3 id="sim-item-title">項目を追加</h3>
+          <form id="sim-item-form" novalidate>
+            <div class="form-group">
+              <label>名前</label>
+              <input type="text" name="name" required>
+            </div>
+            <div class="form-group">
+              <label>金額 (¥)</label>
+              <input type="number" name="amount" min="0" required>
+            </div>
+            <div class="form-group" id="sim-item-days-wrap" hidden>
+              <label>働く日数（任意・休みの計算に入る）</label>
+              <input type="number" name="days" min="0" placeholder="0">
+            </div>
+            <div class="sim-wl-pick" id="sim-wl-pick" hidden>
+              <label>Wish List から選ぶ</label>
+              <select id="sim-wl-select"><option value="">選ばない</option></select>
+            </div>
+            <div class="form-btns">
+              <button type="button" class="btn-cancel" data-close="sim-item-modal">キャンセル</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+            <button type="button" class="sim-delete-btn" id="btn-sim-del-item" hidden>この項目を削除</button>
+            <input type="hidden" name="target">
+            <input type="hidden" name="key">
+          </form>
+        </div>
+      </div>
+
+    </main>
+
     <main id="tab-wishlist" class="tab-content" hidden>
 
       <!-- ツールバー -->

@@ -626,13 +626,15 @@ h3.section-title {
   flex-shrink: 0;
 }
 .planned-day-override-btn:hover { opacity: 1; }
-#day-override-modal {
+#day-override-modal,
+#amount-override-modal {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.35);
   display: flex; align-items: center; justify-content: center;
   z-index: 1000;
 }
-#day-override-modal[hidden] { display: none; }
+#day-override-modal[hidden],
+#amount-override-modal[hidden] { display: none; }
 .day-override-card {
   background: #fff;
   border-radius: 14px;
@@ -1721,3 +1723,259 @@ h3.section-title {
 
   #tab-input #submit-btn   { padding: 10px; font-size: 14px; margin-top: 2px; }
 }
+
+/* ============================================================
+   シミュレーション
+============================================================ */
+.sim-sub-btn {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-bottom: -2px;
+}
+.sim-sub-btn.active { color: var(--expense); border-bottom-color: var(--expense); }
+
+.sim-inherit-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: #FFF8E6;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: -8px 0 14px;
+}
+#tab-sim .summary-cards .card-value { font-size: 16px; }
+
+.sim-days-card,
+.sim-actual-card,
+.sim-section,
+.sim-trend-head {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.sim-days-row { display: flex; justify-content: space-around; text-align: center; }
+.sim-days-num { font-size: 30px; font-weight: 800; color: var(--expense); }
+.sim-days-num.sim-off { color: var(--profit-pos); }
+.sim-days-unit { font-size: 13px; color: var(--text-muted); margin-left: 4px; font-weight: 600; }
+.sim-days-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: #DDF3E6;
+  margin: 12px 0;
+  overflow: hidden;
+}
+.sim-days-bar-fill { height: 100%; background: var(--expense); transition: width 0.2s; }
+
+.sim-hint { font-size: 13px; line-height: 1.6; }
+.sim-hint-head { font-weight: 700; margin-bottom: 4px; }
+.sim-hint-head.sim-short { color: var(--profit-neg); }
+.sim-hint-head.sim-ok    { color: var(--profit-pos); }
+.sim-hint-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+.sim-hint-btn {
+  flex-shrink: 0;
+  border: 1.5px solid var(--expense);
+  background: var(--white);
+  color: var(--expense);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sim-actual-title { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+.sim-actual-row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; margin-top: 8px; }
+.sim-bar { height: 8px; border-radius: 4px; background: var(--border); margin: 6px 0 4px; overflow: hidden; }
+.sim-bar-fill { height: 100%; }
+.sim-bar-income  { background: var(--income); }
+.sim-bar-expense { background: var(--expense); }
+.sim-bar-over    { background: var(--profit-neg); }
+
+.sim-section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.sim-section-head h3 { font-size: 15px; font-weight: 700; }
+.sim-group-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin: 14px 0 4px;
+}
+.sim-add-link {
+  background: none;
+  border: none;
+  color: var(--expense);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.sim-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.sim-row-tap { cursor: pointer; }
+.sim-row-tap:active { background: var(--bg); }
+.sim-row-name { font-size: 14px; font-weight: 600; }
+.sim-row-sub  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.sim-row-amount { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.sim-empty { font-size: 12px; color: var(--text-muted); padding: 6px 0; }
+.sim-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.sim-job { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.sim-job:last-child { border-bottom: none; }
+.sim-job-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
+.sim-step-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
+.sim-step-label { font-size: 13px; color: var(--text); }
+.sim-job-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sim-koma-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.sim-koma-table th { font-size: 11px; color: var(--text-muted); font-weight: 700; padding: 4px; text-align: center; }
+.sim-koma-table tbody th { text-align: left; white-space: nowrap; }
+.sim-koma-table td { padding: 3px; }
+.sim-koma-table input {
+  width: 100%;
+  height: 36px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+.sim-stepper { display: flex; align-items: center; gap: 6px; }
+.sim-stepper button {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+}
+.sim-stepper input {
+  width: 52px;
+  height: 36px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+}
+.sim-stepper span { font-size: 13px; color: var(--text-muted); }
+
+.sim-trend-head { display: flex; justify-content: space-between; align-items: center; }
+.sim-start-balance { font-size: 22px; font-weight: 800; }
+.sim-trend-head select { padding: 6px 10px; border-radius: 8px; border: 1.5px solid var(--border); font-size: 14px; }
+#tab-sim .chart-container { height: 220px; margin-bottom: 14px; }
+.sim-trend-table th, .sim-trend-table td { padding: 10px 8px; font-size: 13px; }
+.sim-trend-row { cursor: pointer; }
+.sim-inc { color: var(--income); }
+.sim-exp { color: var(--expense); }
+.sim-neg { color: var(--profit-neg); }
+.sim-note { font-size: 11px; color: var(--text-muted); margin-top: 10px; line-height: 1.6; }
+
+.sim-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0,0,0,0.45);
+}
+.sim-modal[hidden] { display: none; }
+.sim-wl-pick { margin-bottom: 14px; }
+.sim-wl-pick label { display: block; font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; }
+.sim-wl-pick select { width: 100%; padding: 10px; border-radius: 10px; border: 1.5px solid var(--border); font-size: 14px; }
+.sim-delete-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid #F5C6C6;
+  background: #FDECEC;
+  color: var(--profit-neg);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 予定支出: その月の金額を確定 */
+.planned-amount-btn {
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--text-muted);
+  padding: 0;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+.planned-amount-btn.is-confirmed { color: var(--profit-pos); border-bottom-color: var(--profit-pos); }
+.badge-amount-confirmed {
+  font-size: 9px;
+  background: #DCFCE7;
+  color: #15803D;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-weight: 700;
+  margin-left: 3px;
+  vertical-align: middle;
+}
+.amount-override-planned { font-size: 12px; color: var(--text-muted); margin: 2px 0 6px; }
+
+.sim-koma-guide {
+  font-size: 13px;
+  line-height: 1.7;
+  background: #EEF5FC;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.sim-card-sub { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+.sim-koma-cancel { margin-top: 8px; }
+.sim-koma-cancel summary { font-size: 12px; font-weight: 700; color: var(--text-muted); cursor: pointer; padding: 4px 0; }
+.sim-koma-cancel[open] summary { color: var(--text); }
+
+.sim-job-tax { display: flex; justify-content: space-between; font-size: 12px; color: var(--profit-neg); margin-top: 8px; }
+.sim-trend-tax { background: #FDECEC; border-radius: var(--radius); padding: 12px 16px; margin-bottom: 14px; font-size: 13px; line-height: 1.6; }
