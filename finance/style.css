@@ -177,7 +177,8 @@ h3.section-title {
   letter-spacing: 0.5px;
 }
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
   padding: 13px 14px;
   border: 1.5px solid var(--border);
@@ -190,9 +191,16 @@ h3.section-title {
   transition: border-color 0.15s;
 }
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
   border-color: var(--expense);
+}
+.form-group textarea {
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
 }
 
 .submit-btn {
@@ -2195,3 +2203,22 @@ h3.section-title {
 .bal-day-parts { font-size: 11px; color: var(--text-muted); padding: 2px 0 6px 12px; border-bottom: 1px solid var(--border); }
 .bal-day-parts > div { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; }
 .bal-day-parts > .bal-day-how { display: block; font-size: 10px; line-height: 1.5; padding: 0 0 4px 8px; color: var(--text-muted); }
+
+.sim-goal-handle { cursor: grab; color: var(--text-muted); font-size: 16px; padding: 0 6px 0 0; touch-action: none; user-select: none; }
+.sim-goal-rank { color: var(--profit-pos); font-weight: 800; margin-right: 4px; }
+.sim-goal-item.sortable-ghost { opacity: 0.4; }
+
+.sim-goal-btns { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.sim-goal-done-btn { border: 1.5px solid var(--profit-pos); background: var(--white); color: var(--profit-pos); border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.sim-goal-done-list { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.sim-goal-done-list summary { font-size: 12px; font-weight: 700; color: var(--text-muted); cursor: pointer; }
+.sim-goal-done-row { padding: 6px 0; opacity: 0.8; }
+
+/* 貯金の目標の折りたたみ */
+.sim-goal-toggle { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; background: none; border: none; padding: 4px 0; text-align: left; cursor: pointer; color: var(--text); font-size: 13px; }
+.sim-goal-caret { font-size: 10px; color: var(--text-muted); transition: transform 0.15s; display: inline-block; }
+.sim-goal-summary { display: none; font-size: 12px; color: var(--text-muted); }
+.sim-goal-card.collapsed .sim-goal-body { display: none; }
+.sim-goal-card.collapsed .sim-goal-caret { transform: rotate(-90deg); }
+.sim-goal-card.collapsed .sim-goal-summary { display: inline; }
+.sim-goal-summary > span { white-space: nowrap; }

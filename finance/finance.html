@@ -622,8 +622,8 @@
         <p class="sim-inherit-note" id="sim-inherit-note" hidden></p>
 
         <div class="summary-cards">
-          <div class="card expense-card">
-            <div class="card-label">必要な額</div>
+          <div class="card expense-card sim-card-tap" id="sim-need-card" title="明細を見る">
+            <div class="card-label">必要な額 ›</div>
             <div class="card-value" id="sim-need">¥0</div>
           </div>
           <div class="card income-card sim-card-tap" id="sim-income-card" title="明細を見る">
@@ -872,6 +872,10 @@
                 <label>今たまっている額 (¥)</label>
                 <input type="number" name="saved" min="0" placeholder="0" inputmode="numeric">
               </div>
+            </div>
+            <div class="form-group">
+              <label>達成日（任意・入れると「達成した目標」に移ります）</label>
+              <input type="date" name="achieved">
             </div>
             <p class="sim-goal-pace" id="sim-goal-pace"></p>
             <p class="sim-row-sub">毎月積み立てる額が、月末ごとに「今たまっている額」へ足されていく計算です（目標に届いたら止まります）。余りが足りない月は、上の目標から順に積み立てます。実際にたまった額が変わったら「今たまっている額」を直してください。</p>

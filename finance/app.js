@@ -2273,6 +2273,7 @@ let _simPlannedSrc = null;
 let _simAmountOverrides = {}; // { 'YYYY-MM': { 'source:id': 金額 } }
 let _simTrips = [];           // 旅行（事前に払うもの＋旅行中に使うもの）
 let _simGoals = [];           // 貯金の目標（複数）{ id, name, target_amount, deadline_ym, saved_amount, monthly_amount, sort_order }
+let _simGoalsDone = [];       // 達成した目標（達成日 achieved_at がある）
 let _simGoalCache = null;     // simGoalsPlan() の結果（データが変わったら null に戻す）
 const SIM_DAILY_LABEL = '日割り';
 let _simInited = false;
@@ -2323,7 +2324,8 @@ async function loadSimData() {
     db.from('sim_trips').select('*').order('start_date'),
     db.from('sim_goals').select('*').order('sort_order').order('id'),
   ]);
-  _simGoals = goalRes.data || [];
+  _simGoals = (goalRes.data || []).filter(g => !g.achieved_at);
+  _simGoalsDone = (goalRes.data || []).filter(g => g.achieved_at).sort((a, b) => b.achieved_at.localeCompare(a.achieved_at));
   _simGoalCache = null;
   _simTrips = tripRes.data || [];
   const byMonth = {};
@@ -2552,7 +2554,8 @@ function simGoalsPlan(maxMonths = 36) {
     let left = simCalc(ym, true).room;
     const per = {};
     for (const g of _simGoals) {
-      const want = Math.min(simGoalMonthly(g), Math.max(0, g.target_amount - saved[g.id]));
+      const pastDeadline = g.deadline_ym && ym > g.deadline_ym;  // 期限を過ぎた月は積み立てない
+      const want = pastDeadline ? 0 : Math.min(simGoalMonthly(g), Math.max(0, g.target_amount - saved[g.id]));
       const give = Math.min(want, left);
       per[g.id] = give; left -= give; saved[g.id] += give;
       if (!stats[g.id].reachYm && saved[g.id] >= g.target_amount) stats[g.id].reachYm = ym;
@@ -2818,13 +2821,14 @@ function renderSimUse(c) {
 // 余りの使い道に出す、目標ごとのこの月の積み立て
 function simGoalAllocHtml(c) {
   if (!c.goalAlloc) return '';
-  const rows = _simGoals.map(g => {
+  const rows = _simGoals.filter(g => !(g.deadline_ym && c.ym > g.deadline_ym)).map(g => {
     const amt = c.goalAlloc.per[g.id] || 0;
     const monthly = simGoalMonthly(g);
     const note = amt < Math.min(monthly, Math.max(0, g.target_amount - (simGoalsPlan().months.find(m => m.ym === simPrevYm(c.ym))?.per[g.id] ?? g.saved_amount ?? 0)))
       ? '<span class="sim-neg">（余りが足りない）</span>'
       : !amt && monthly ? '<span class="sim-save">（達成ずみ）</span>' : '';
-    return `<div class="sim-goal-alloc-row" data-goal-edit="${g.id}"><span>🎯 ${escapeHtmlF(g.name)}${note}</span><span>${yen(amt)}<span class="sim-row-sub"> / 毎月${yen(monthly)}${simGoalIsAuto(g) ? '（自動）' : ''}</span></span></div>`;
+    const rank = _simGoals.length > 1 ? ('①②③④⑤⑥⑦⑧⑨⑩'[_simGoals.indexOf(g)] || '') : '🎯';
+    return `<div class="sim-goal-alloc-row" data-goal-edit="${g.id}"><span>${rank} ${escapeHtmlF(g.name)}${note}</span><span>${yen(amt)}<span class="sim-row-sub"> / 毎月${yen(monthly)}${simGoalIsAuto(g) ? '（自動）' : ''}</span></span></div>`;
   }).join('');
   return `<div class="sim-goal-alloc">${rows}</div>`;
 }
@@ -2865,8 +2869,40 @@ async function closeSimPlannedModal() {
 // 「この月に入るお金」の明細（日にち順）
 function openSimCashModal() {
   const c = simCalc(ymKey(_simMonth));
-  const rows = [...c.cashRows].sort((a, b) => (a.day ?? 99) - (b.day ?? 99));
-  document.getElementById('sim-cash-title').textContent = `${_simMonth.getMonth() + 1}月に入るお金`;
+  simShowBreakdown(`${_simMonth.getMonth() + 1}月に入るお金`, c.cashRows, c.cashIncome, 'この月に入るお金はありません');
+}
+
+// 「必要な額」の明細: 予定支出（サブスク・ローンなど）・長期間・この月だけ・旅行
+function openSimNeedModal() {
+  const ym = ymKey(_simMonth), c = simCalc(ym);
+  const y = _simMonth.getFullYear(), m = _simMonth.getMonth();
+  const rows = [];
+  const { subItems, planItems, loanItems } = buildPlannedItems(_simPlannedSrc.subs, _simPlannedSrc.plans, _simPlannedSrc.loans, {}, _simAmountOverrides[ym] || {});
+  const srcLabel = { subscription: 'サブスク', loan: 'ローン', planned: '予定支出' };
+  for (const it of [...subItems, ...planItems, ...loanItems]) {
+    if (!isActiveInMonth(it, y, m)) continue;
+    rows.push({ name: it.name, note: `${srcLabel[it.source]}${it.amountConfirmed ? '・金額確定' : it.amountMax ? '・多いほうの額' : ''}`, day: it.billingDay || null, amount: it.amountMax || it.amount });
+  }
+  for (const r of _simRecurring) {
+    if (r.kind === 'expense' && simLongActive(r, ym)) rows.push({ name: r.name, note: `長期間（${simLongRangeLabel(r)}）${r.day ? '' : '・日割り'}`, day: r.day || null, amount: Number(r.amount) || 0 });
+  }
+  for (const it of c.plan.items) {
+    if (it.kind === 'expense') rows.push({ name: it.name, note: `この月だけ${it.day ? '' : '・日割り'}`, day: it.day || null, amount: Number(it.amount) || 0 });
+  }
+  for (const t of c.tripMonths) for (const e of t.events.filter(e => e.kind === 'prepaid')) {
+    rows.push({ name: e.label, note: '旅行・事前払い', day: Number(e.date.slice(8, 10)), amount: e.amount });
+  }
+  for (const t of c.tripMonths) {
+    const on = t.events.filter(e => e.kind === 'onsite');
+    if (on.length) rows.push({ name: `${t.trip.name}・旅行中`, note: `旅行中 ${on.length}日分（${Number(on[0].date.slice(8, 10))}日〜）`, day: Number(on[0].date.slice(8, 10)), amount: on.reduce((x, e) => x + e.amount, 0) });
+  }
+  simShowBreakdown(`${m + 1}月に必要な額`, rows.filter(r => r.amount), c.need, 'この月に必要な支出はありません');
+}
+
+// 明細のモーダル（日にち順。日にちのないものは最後）
+function simShowBreakdown(title, list, total, emptyMsg) {
+  const rows = [...list].sort((a, b) => (a.day ?? 99) - (b.day ?? 99));
+  document.getElementById('sim-cash-title').textContent = title;
   document.getElementById('sim-cash-list').innerHTML = rows.length ? rows.map(r => `
     <div class="sim-row">
       <div>
@@ -2874,8 +2910,8 @@ function openSimCashModal() {
         <div class="sim-row-sub">${r.day ? `${r.day}日 ・ ` : ''}${escapeHtmlF(r.note)}</div>
       </div>
       <span class="sim-row-amount">${yen(r.amount)}</span>
-    </div>`).join('') : '<p class="sim-empty">この月に入るお金はありません</p>';
-  document.getElementById('sim-cash-total').textContent = yen(c.cashIncome);
+    </div>`).join('') : `<p class="sim-empty">${emptyMsg}</p>`;
+  document.getElementById('sim-cash-total').textContent = yen(total);
   document.getElementById('sim-cash-modal').hidden = false;
 }
 
@@ -3506,8 +3542,16 @@ function renderSimGoal(plan, todayBalance) {
     const savedNow = plan.startTotal;
     const usable = todayBalance - savedNow;
     el.innerHTML = `
-      <div class="sim-goal-head"><b>🎯 貯金の目標</b><button class="btn-primary-sm" data-goal-add>＋ 追加</button></div>
-      ${_simGoals.map(g => {
+      <div class="sim-goal-head">
+        <button type="button" class="sim-goal-toggle" title="開く／閉じる">
+          <span class="sim-goal-caret">▼</span><b>🎯 貯金の目標</b>
+          <span class="sim-goal-summary"><span>${_simGoals.length}件</span>・<span>貯金 ${yen(savedNow)}</span>・<span>使っていいお金 ${usable < 0 ? '−' : ''}${yen(usable)}</span></span>
+        </button>
+        <button class="btn-primary-sm" data-goal-add>＋ 追加</button>
+      </div>
+      ${_simGoals.length > 1 ? '<div class="sim-row-sub">⠿ をつまんで動かすと優先順位を変えられます。余りが足りない月は、優先順位の高い目標から積み立てます</div>' : ''}
+      <div id="sim-goal-list">
+      ${_simGoals.map((g, gi) => {
         const st = plan.stats[g.id], saved = g.saved_amount || 0;
         const pct = Math.min(100, Math.round(saved / g.target_amount * 100));
         const reach = st.reachYm === 'now' ? 'もう達成しています 🎉' : st.reachYm ? `予想では <b>${simYmLabel(st.reachYm)}末</b> に達成` : (simGoalMonthly(g) ? '今の計画では3年以内に届きません' : '毎月の額か期限を入れると、たまっていきます');
@@ -3519,10 +3563,13 @@ function renderSimGoal(plan, todayBalance) {
                ${!simGoalIsAuto(g) && st.needPerMonth !== g.monthly_amount ? `<button class="sim-hint-btn" data-goal-need="${g.id}" data-amount="${st.needPerMonth}">毎月${yen(st.needPerMonth)}にする</button>` : ''}`;
         }
         return `
-          <div class="sim-goal-item">
+          <div class="sim-goal-item" data-id="${g.id}">
             <div class="sim-goal-row">
-              <span><b>${escapeHtmlF(g.name)}</b> ${yen(g.target_amount)}${g.deadline_ym ? `<span class="sim-badge">${simYmLabel(g.deadline_ym)}まで</span>` : ''}<span class="sim-badge sim-badge-when">毎月${yen(simGoalMonthly(g))}${simGoalIsAuto(g) ? '（自動）' : ''}</span></span>
-              <button class="planned-edit-btn" data-goal-edit="${g.id}">編集</button>
+              <span>${_simGoals.length > 1 ? `<span class="sim-goal-handle" title="つまんで動かす">⠿</span><span class="sim-goal-rank">${'①②③④⑤⑥⑦⑧⑨⑩'[gi] || gi + 1}</span>` : ''}<b>${escapeHtmlF(g.name)}</b> ${yen(g.target_amount)}${g.deadline_ym ? `<span class="sim-badge">${simYmLabel(g.deadline_ym)}まで</span>` : ''}<span class="sim-badge sim-badge-when">毎月${yen(simGoalMonthly(g))}${simGoalIsAuto(g) ? '（自動）' : ''}</span></span>
+              <span class="sim-goal-btns">
+                <button class="sim-goal-done-btn" data-goal-done="${g.id}" title="達成した（今日の日付で一覧から外す）">✓ 達成</button>
+                <button class="planned-edit-btn" data-goal-edit="${g.id}">編集</button>
+              </span>
             </div>
             <div class="sim-bar sim-goal-bar"><div class="sim-bar-fill sim-bar-save" style="width:${pct}%"></div></div>
             <div class="sim-goal-row"><span>今 <b>${yen(saved)}</b>（${pct}%）</span><span>あと ${yen(Math.max(0, g.target_amount - saved))}</span></div>
@@ -3530,11 +3577,64 @@ function renderSimGoal(plan, todayBalance) {
             ${deadline ? `<div class="sim-goal-row sim-goal-deadline">${deadline}</div>` : ''}
           </div>`;
       }).join('')}
+      </div>
       <div class="sim-goal-split">今日の残高 ${yen(todayBalance)} ＝ 貯金 <b class="sim-save">${yen(savedNow)}</b> ＋ 使っていいお金 <b class="${usable < 0 ? 'sim-neg' : ''}">${usable < 0 ? '−' : ''}${yen(usable)}</b></div>
       ${usable < 0 ? '<div class="sim-row-sub sim-neg">残高が貯金より少なくなっています（貯金に手をつけている状態）</div>' : ''}`;
   }
+  // 達成した目標（開くと見える。戻すと一覧に戻る）
+  if (_simGoalsDone.length) {
+    el.insertAdjacentHTML('beforeend', `
+      <details class="sim-goal-done-list">
+        <summary>✅ 達成した目標（${_simGoalsDone.length}）</summary>
+        ${_simGoalsDone.map(g => `
+          <div class="sim-goal-row sim-goal-done-row">
+            <span><b>${escapeHtmlF(g.name)}</b> ${yen(g.target_amount)}<span class="sim-badge">${g.achieved_at.replaceAll('-', '/')} 達成</span></span>
+            <span class="sim-goal-btns">
+              <button class="sim-hint-btn" data-goal-undo="${g.id}">戻す</button>
+              <button class="planned-edit-btn" data-goal-edit="${g.id}">編集</button>
+            </span>
+          </div>`).join('')}
+      </details>`);
+  }
+  // 折りたたみ: 見出しより下を .sim-goal-body にまとめ、見出しのタップで開閉（状態は覚えておく）
+  const head = el.querySelector('.sim-goal-head');
+  if (head) {
+    const body = document.createElement('div');
+    body.className = 'sim-goal-body';
+    while (head.nextSibling) body.appendChild(head.nextSibling);
+    el.appendChild(body);
+    el.classList.toggle('collapsed', !!loadViewState().goalsCollapsed);
+    head.querySelector('.sim-goal-toggle').addEventListener('click', () => {
+      const collapsed = !el.classList.contains('collapsed');
+      el.classList.toggle('collapsed', collapsed);
+      saveViewState('goalsCollapsed', collapsed);
+    });
+  } else el.classList.remove('collapsed');
   el.querySelectorAll('[data-goal-add]').forEach(b => b.addEventListener('click', () => openSimGoalModal()));
   el.querySelectorAll('[data-goal-edit]').forEach(b => b.addEventListener('click', () => openSimGoalModal(b.dataset.goalEdit)));
+  el.querySelectorAll('[data-goal-done]').forEach(b => b.addEventListener('click', async () => {
+    const g = _simGoals.find(x => String(x.id) === b.dataset.goalDone);
+    if (!(await showConfirm(`「${g.name}」を達成にしますか？（今日の日付で一覧から外れます）`))) return;
+    await db.from('sim_goals').update({ achieved_at: todayJST() }).eq('id', g.id);
+    await renderSim();
+  }));
+  el.querySelectorAll('[data-goal-undo]').forEach(b => b.addEventListener('click', async () => {
+    await db.from('sim_goals').update({ achieved_at: null }).eq('id', b.dataset.goalUndo);
+    await renderSim();
+  }));
+  // 優先順位をドラッグで変える（SortableJS。Wish List と同じもの）
+  const list = document.getElementById('sim-goal-list');
+  if (list && _simGoals.length > 1) {
+    Sortable.create(list, {
+      handle: '.sim-goal-handle',
+      animation: 150,
+      onEnd: async () => {
+        const ids = [...list.querySelectorAll('.sim-goal-item')].map(x => x.dataset.id);
+        await Promise.all(ids.map((id, i) => db.from('sim_goals').update({ sort_order: i + 1 }).eq('id', id)));
+        await renderSim();
+      },
+    });
+  }
   el.querySelectorAll('[data-goal-need]').forEach(b => b.addEventListener('click', async () => {
     await db.from('sim_goals').update({ monthly_amount: Number(b.dataset.amount) }).eq('id', b.dataset.goalNeed);
     await renderSim();
@@ -3543,7 +3643,7 @@ function renderSimGoal(plan, todayBalance) {
 
 function openSimGoalModal(id = null) {
   const f = document.getElementById('sim-goal-form');
-  const g = id ? _simGoals.find(x => String(x.id) === String(id)) : null;
+  const g = id ? [..._simGoals, ..._simGoalsDone].find(x => String(x.id) === String(id)) : null;
   f.reset();
   f.elements.id.value = g ? g.id : '';
   f.elements.name.value = g?.name || '';
@@ -3551,6 +3651,7 @@ function openSimGoalModal(id = null) {
   f.elements.deadline.value = g?.deadline_ym || '';
   f.elements.saved.value = g?.saved_amount ?? '';
   f.elements.monthly.value = g?.monthly_amount ?? '';
+  f.elements.achieved.value = g?.achieved_at || '';
   document.getElementById('sim-goal-title').textContent = g ? '🎯 目標を編集' : '🎯 目標を追加';
   simUpdateGoalPaceNote();
   // Wish List（未購入）から選べる。選ぶと名前と目標額（価格の上限）が入る
@@ -3590,6 +3691,7 @@ async function saveSimGoal(e) {
     saved_amount: Number(f.elements.saved.value) || 0,
     // 空欄なら null（期限までの割り算で自動）
     monthly_amount: f.elements.monthly.value === '' ? null : Number(f.elements.monthly.value) || 0,
+    achieved_at: f.elements.achieved.value || null,  // 入れると達成した目標として一覧から外れる
   };
   const id = f.elements.id.value;
   const { error } = id
@@ -3690,6 +3792,7 @@ function initSim() {
 
   document.getElementById('btn-sim-add-job').addEventListener('click', () => openSimJobModal());
   document.getElementById('sim-income-card').addEventListener('click', openSimCashModal);
+  document.getElementById('sim-need-card').addEventListener('click', openSimNeedModal);
   document.getElementById('sim-planned-row').addEventListener('click', openSimPlannedModal);
   document.getElementById('btn-sim-planned-close').addEventListener('click', closeSimPlannedModal);
   document.getElementById('sim-planned-modal').addEventListener('click', e => { if (e.target.id === 'sim-planned-modal') closeSimPlannedModal(); });
