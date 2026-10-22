@@ -258,6 +258,32 @@ body {
 }
 .todo-del:hover { color: var(--profit-neg); }
 
+/* 神大の課題（Notion・読み取り専用） */
+#notion-list { margin-bottom: 14px; }
+.notion-head {
+  font-size: 13px;
+  font-weight: 800;
+  margin: 4px 2px 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.notion-sub { font-size: 11px; font-weight: 400; color: var(--muted); }
+.notion-item { text-decoration: none; color: inherit; }
+.notion-status {
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--bg);
+}
+.notion-status-will  { color: #2980B9; }
+.notion-status-doing { color: #F39C12; }
+.notion-status-done  { color: #27AE60; }
+.notion-kind { font-size: 11px; color: var(--muted); }
+.notion-open { color: var(--muted); font-size: 14px; flex-shrink: 0; }
+
 .empty-msg {
   text-align: center;
   padding: 30px;

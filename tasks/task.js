@@ -283,6 +283,8 @@ async function loadTodos() {
       </div>`;
   }).join('') || '<div class="empty-msg">タスクがありません</div>';
 
+  renderNotionList();
+
   list.querySelectorAll('.status-select').forEach(sel => {
     sel.addEventListener('change', async () => {
       const newStatus = sel.value;
@@ -322,6 +324,85 @@ async function loadTodos() {
       renderTimeline();
     });
   });
+}
+
+// ============================================================
+// 神大の課題（Notion から読み取り専用で表示）
+// ============================================================
+let notionItems = null;   // null = 未取得 / 'error' = 取得失敗
+const NOTION_STATUS_LABEL = { will: '未着手', doing: '進行中', done: '提出済' };
+
+function escapeHtmlT(str) {
+  return String(str).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+async function loadNotionAssignments() {
+  try {
+    const res = await fetch('/.netlify/functions/notion-assignments');
+    if (!res.ok) throw new Error(await res.text());
+    notionItems = await res.json();
+  } catch (err) {
+    console.error('Notion 課題の取得に失敗:', err);
+    notionItems = 'error';
+  }
+  renderNotionList();
+}
+
+// 締切: 'YYYY-MM-DD'（終日）または ISO日時 → 表示用の文字列と期限切れ判定
+function notionDueInfo(due) {
+  if (!due) return { label: '', overdue: false };
+  if (!due.includes('T')) {
+    return { label: `📅 ${formatDate(due)}`, overdue: due < todayStr() };
+  }
+  const d    = new Date(due);
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return { label: `📅 ${formatDate(localDateStr(d))} ${time}`, overdue: d < new Date() };
+}
+
+function renderNotionList() {
+  const box = document.getElementById('notion-list');
+  if (currentCat !== 'all' && currentCat !== '神大') { box.innerHTML = ''; return; }
+
+  if (notionItems === null) {
+    box.innerHTML = '<div class="notion-head">📚 神大（Notion）<span class="notion-sub">読み込み中…</span></div>';
+    return;
+  }
+  if (notionItems === 'error') {
+    box.innerHTML = '<div class="notion-head">📚 神大（Notion）<span class="notion-sub">取得できませんでした</span></div>';
+    return;
+  }
+
+  const order = { will: 0, doing: 1, done: 2 };
+  const items = notionItems
+    .filter(n => currentStatus === 'all' || n.status === currentStatus)
+    .sort((a, b) => order[a.status] - order[b.status]);
+
+  const rows = items.map(n => {
+    const { label, overdue } = notionDueInfo(n.due);
+    const subject = n.subjects.length ? `<span class="cat-badge cat-神大">${escapeHtmlT(n.subjects.join('・'))}</span>` : '';
+    const kind    = n.kind ? `<span class="notion-kind">${escapeHtmlT(n.kind)}</span>` : '';
+    return `
+      <a class="todo-item notion-item status-${n.status}" href="${escapeHtmlT(n.url)}" target="_blank" rel="noopener">
+        <div class="todo-main">
+          <span class="notion-status notion-status-${n.status}">${NOTION_STATUS_LABEL[n.status]}</span>
+          <div class="todo-info">
+            <div class="todo-text ${n.status === 'done' ? 'done' : ''}">${escapeHtmlT(n.title)}</div>
+            <div class="todo-meta">
+              ${subject}
+              ${kind}
+              ${label ? `<span class="todo-due ${overdue && n.status !== 'done' ? 'overdue' : ''}">${label}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <span class="notion-open">↗</span>
+      </a>`;
+  }).join('');
+
+  box.innerHTML = `
+    <div class="notion-head">📚 神大（Notion）<span class="notion-sub">${items.length}件 ・ タップで Notion を開く</span></div>
+    ${rows || '<div class="empty-msg">該当する課題はありません</div>'}`;
 }
 
 document.getElementById('todo-form').addEventListener('submit', async (e) => {
@@ -1096,6 +1177,7 @@ async function loadHabitChart() {
 // 初期化
 // ============================================================
 loadTodos();
+loadNotionAssignments();
 renderTimeline();
 initGcal();
 
@@ -1103,7 +1185,7 @@ initGcal();
 document.getElementById('btn-refresh').addEventListener('click', async () => {
   const btn = document.getElementById('btn-refresh');
   btn.classList.add('spinning');
-  await loadTodos();
+  await Promise.all([loadTodos(), loadNotionAssignments()]);
   await renderTimeline();
   btn.classList.remove('spinning');
 });
