@@ -1105,6 +1105,21 @@ async function renderPlannedTab() {
     ? `¥${totalMin.toLocaleString()}〜¥${totalMax.toLocaleString()}`
     : `¥${totalMin.toLocaleString()}`;
 
+  // 今月を表示中のときだけ、支払日が明日以降（支払日なしも含む）の分を「残り」として出す
+  const now = new Date();
+  const isThisMonth = year === now.getFullYear() && month === now.getMonth();
+  document.getElementById('planned-remaining-card').hidden = !isThisMonth;
+  if (isThisMonth) {
+    const rest = all.filter(it => !it.billingDay || it.billingDay > now.getDate());
+    const restMin = rest.reduce((s, it) => s + it.amount, 0);
+    const restMax = rest.reduce((s, it) => s + (it.amountMax || it.amount), 0);
+    document.getElementById('planned-remaining').textContent = restMin !== restMax
+      ? `¥${restMin.toLocaleString()}〜¥${restMax.toLocaleString()}`
+      : `¥${restMin.toLocaleString()}`;
+    document.getElementById('planned-remaining-sub').textContent = `（明日以降・${rest.length}件）`;
+    document.getElementById('planned-remaining').onclick = () => openPlannedRemainingModal(rest);
+  }
+
   // カテゴリ別グループ
   const groups = {};
   for (const it of all) {
@@ -1184,6 +1199,38 @@ async function renderPlannedTab() {
       openPlannedRegisterModal({ name, amount: parseInt(amount), category, date: billingDate, paymentMethod: payment });
     });
   });
+}
+
+// 「今月の残りで必要な金額」の明細（支払日順）
+function openPlannedRemainingModal(rest) {
+  const modal = document.getElementById('planned-remaining-modal');
+  const body  = document.getElementById('planned-remaining-body');
+  const fmt = it => it.amountMax
+    ? `¥${it.amount.toLocaleString()}〜¥${it.amountMax.toLocaleString()}`
+    : `¥${it.amount.toLocaleString()}`;
+  const total = { amount: rest.reduce((s, it) => s + it.amount, 0), amountMax: null };
+  const totalMax = rest.reduce((s, it) => s + (it.amountMax || it.amount), 0);
+  if (totalMax !== total.amount) total.amountMax = totalMax;
+
+  body.innerHTML = rest.length === 0
+    ? `<p class="empty-msg">明日以降の予定支出はありません</p>`
+    : `<div class="pr-list">${rest.map(it => `
+        <div class="pr-row">
+          <span class="pr-day">${it.billingDay ? it.billingDay + '日' : '日付なし'}</span>
+          <span class="pr-name">${escapeHtmlF(it.name)}${it.amountConfirmed ? '<span class="badge-amount-confirmed">確定</span>' : ''}</span>
+          <span class="pr-amount">${fmt(it)}</span>
+        </div>`).join('')}
+        <div class="pr-row pr-total">
+          <span class="pr-day"></span>
+          <span class="pr-name">合計（${rest.length}件）</span>
+          <span class="pr-amount">${fmt(total)}</span>
+        </div>
+      </div>`;
+
+  modal.hidden = false;
+  const close = () => { modal.hidden = true; };
+  document.getElementById('btn-planned-remaining-close').onclick = close;
+  modal.onclick = e => { if (e.target === modal) close(); };
 }
 
 function openDayOverrideModal(subId, currentDay, isOverridden, yearMonth) {

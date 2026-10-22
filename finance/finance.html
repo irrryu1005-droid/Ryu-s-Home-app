@@ -280,6 +280,20 @@
           <span class="planned-total-label">今月の予定支出合計</span>
           <span class="planned-total-val" id="planned-total">¥0</span>
         </div>
+        <div class="planned-total-card planned-remaining-card" id="planned-remaining-card" hidden>
+          <span class="planned-total-label">今月の残りで必要な金額<span class="planned-remaining-sub" id="planned-remaining-sub"></span></span>
+          <button type="button" class="planned-total-val planned-remaining-btn" id="planned-remaining" title="明細を見る">¥0</button>
+        </div>
+        <!-- モーダル: 今月の残りで必要な金額の明細 -->
+        <div id="planned-remaining-modal" class="sim-modal" hidden>
+          <div class="form-card planned-modal-card sim-planned-card">
+            <div class="sim-planned-head">
+              <h3>残りで必要な金額</h3>
+              <button type="button" class="btn-cancel sim-planned-close" id="btn-planned-remaining-close">閉じる</button>
+            </div>
+            <div id="planned-remaining-body"></div>
+          </div>
+        </div>
         <div id="planned-list"></div>
       </div>
 

@@ -524,6 +524,24 @@ h3.section-title {
 }
 .planned-total-label { font-size: 13px; color: var(--text-muted); }
 .planned-total-val { font-size: 22px; font-weight: 800; color: var(--expense-color, #E74C3C); }
+.planned-total-card[hidden] { display: none !important; }
+.planned-remaining-card { margin-top: -8px; }
+.planned-remaining-sub { display: block; font-size: 11px; margin-top: 2px; }
+.planned-remaining-btn {
+  background: none;
+  border: none;
+  border-bottom: 1px dashed currentColor;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+.pr-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
+.pr-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.pr-day { flex: none; width: 56px; font-size: 12px; color: var(--text-muted); }
+.pr-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pr-amount { flex: none; font-weight: 700; white-space: nowrap; }
+.pr-total { border-bottom: none; font-weight: 800; }
+.pr-total .pr-amount { color: var(--expense-color, #E74C3C); }
 
 .planned-group { margin-bottom: 18px; }
 .planned-group-title {
