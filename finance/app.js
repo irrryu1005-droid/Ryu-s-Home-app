@@ -2603,15 +2603,18 @@ function simTripMonth(trip, ym) {
 //   その月の「貯金に回す」= 目標への積み立ての合計 ＋ 目標以外の貯金（月の計画の saving）
 //   → { alloc: { ym: { per: {id: 額}, goalsTotal, extra } }, months: [{ ym, end, per: {id: その月末の額}, total }], stats: { id: {...} } }
 // 目標の毎月の額。空（null）なら「目標まで残り ÷ 今月〜期限の月数」（100円単位で切り上げ）。期限もなければ0
-function simGoalMonthsLeft(g) {
+function simGoalMonthsLeft(g, fromYm = ymKey(new Date())) {
   if (!g.deadline_ym) return null;
-  const now = ymKey(new Date());
-  if (g.deadline_ym < now) return null;
-  return (Number(g.deadline_ym.slice(0, 4)) - Number(now.slice(0, 4))) * 12 + (Number(g.deadline_ym.slice(5, 7)) - Number(now.slice(5, 7))) + 1;
+  if (g.deadline_ym < fromYm) return null;
+  return (Number(g.deadline_ym.slice(0, 4)) - Number(fromYm.slice(0, 4))) * 12 + (Number(g.deadline_ym.slice(5, 7)) - Number(fromYm.slice(5, 7))) + 1;
+}
+// fromYm の月から期限まで、savedNow からの残りを割った毎月の額（前の月までの不足分も自然に上乗せされる）
+function simGoalPaceAt(g, fromYm, savedNow) {
+  const n = simGoalMonthsLeft(g, fromYm);
+  return n ? Math.max(0, Math.ceil((g.target_amount - savedNow) / n / 100) * 100) : null;
 }
 function simGoalPace(g) {
-  const n = simGoalMonthsLeft(g);
-  return n ? Math.max(0, Math.ceil((g.target_amount - (g.saved_amount || 0)) / n / 100) * 100) : null;
+  return simGoalPaceAt(g, ymKey(new Date()), g.saved_amount || 0);
 }
 function simGoalMonthly(g) {
   return g.monthly_amount != null ? g.monthly_amount : (simGoalPace(g) ?? 0);
@@ -2633,19 +2636,21 @@ function simGoalsPlan(maxMonths = 36) {
   for (let k = 0; k < maxMonths; k++) {
     const ym = ymKey(d);
     let left = simCalc(ym, true).room;
-    const per = {};
+    const per = {}, wants = {};
     for (const g of _simGoals) {
       const pastDeadline = g.deadline_ym && ym > g.deadline_ym;  // 期限を過ぎた月は積み立てない
-      const want = pastDeadline ? 0 : Math.min(simGoalMonthly(g), Math.max(0, g.target_amount - saved[g.id]));
+      // 自動の目標は月ごとに割り直す（足りなかった月の分を翌月以降に上乗せ）。毎月の額を決めた目標は固定
+      const monthly = simGoalIsAuto(g) ? (simGoalPaceAt(g, ym, saved[g.id]) ?? 0) : g.monthly_amount;
+      const want = pastDeadline ? 0 : Math.min(monthly, Math.max(0, g.target_amount - saved[g.id]));
       const give = Math.min(want, left);
-      per[g.id] = give; left -= give; saved[g.id] += give;
+      per[g.id] = give; wants[g.id] = want; left -= give; saved[g.id] += give;
       if (!stats[g.id].reachYm && saved[g.id] >= g.target_amount) stats[g.id].reachYm = ym;
       if (give < want) stats[g.id].shortYm ||= ym;   // 余りが足りず、毎月の額を積み立てられなかった最初の月
     }
     const extra = Math.min(simMonthPlan(ym).saving ?? 0, left);
     extraTotal += extra;
     const goalsTotal = Object.values(per).reduce((t, v) => t + v, 0);
-    alloc[ym] = { per, goalsTotal, extra };
+    alloc[ym] = { per, wants, goalsTotal, extra };
     months.push({ ym, end: dateStr(d.getFullYear(), d.getMonth(), new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()), per: { ...saved }, total: Object.values(saved).reduce((t, v) => t + v, 0) + extraTotal });
     d.setMonth(d.getMonth() + 1);
   }
@@ -2903,13 +2908,17 @@ function renderSimUse(c) {
 function simGoalAllocHtml(c) {
   if (!c.goalAlloc) return '';
   const rows = _simGoals.filter(g => !(g.deadline_ym && c.ym > g.deadline_ym)).map(g => {
-    const amt = c.goalAlloc.per[g.id] || 0;
-    const monthly = simGoalMonthly(g);
-    const note = amt < Math.min(monthly, Math.max(0, g.target_amount - (simGoalsPlan().months.find(m => m.ym === simPrevYm(c.ym))?.per[g.id] ?? g.saved_amount ?? 0)))
+    const amt  = c.goalAlloc.per[g.id] || 0;
+    const want = c.goalAlloc.wants?.[g.id] || 0;
+    const prevSaved = simGoalsPlan().months.find(m => m.ym === simPrevYm(c.ym))?.per[g.id] ?? g.saved_amount ?? 0;
+    const note = amt < want
       ? '<span class="sim-neg">（余りが足りない）</span>'
-      : !amt && monthly ? '<span class="sim-save">（達成ずみ）</span>' : '';
+      : prevSaved >= g.target_amount ? '<span class="sim-save">（達成ずみ）</span>' : '';
+    // 自動はこの月に割り直した額（前の月までの不足分を上乗せしていれば「上乗せ」と出す）
+    const monthly = simGoalIsAuto(g) ? want : simGoalMonthly(g);
+    const autoNote = !simGoalIsAuto(g) ? '' : want > (simGoalPace(g) ?? 0) ? '（自動・不足分を上乗せ）' : '（自動）';
     const rank = _simGoals.length > 1 ? ('①②③④⑤⑥⑦⑧⑨⑩'[_simGoals.indexOf(g)] || '') : '🎯';
-    return `<div class="sim-goal-alloc-row" data-goal-edit="${g.id}"><span>${rank} ${escapeHtmlF(g.name)}${note}</span><span>${yen(amt)}<span class="sim-row-sub"> / 毎月${yen(monthly)}${simGoalIsAuto(g) ? '（自動）' : ''}</span></span></div>`;
+    return `<div class="sim-goal-alloc-row" data-goal-edit="${g.id}"><span>${rank} ${escapeHtmlF(g.name)}${note}</span><span>${yen(amt)}<span class="sim-row-sub"> / 毎月${yen(monthly)}${autoNote}</span></span></div>`;
   }).join('');
   return `<div class="sim-goal-alloc">${rows}</div>`;
 }
@@ -3640,6 +3649,8 @@ function renderSimGoal(plan, todayBalance) {
         if (g.deadline_ym && st.needPerMonth != null) {
           deadline = st.deadlineOk
             ? `<span class="sim-save">期限（${simYmLabel(g.deadline_ym)}）に間に合います</span>`
+            : simGoalIsAuto(g)
+            ? `<span class="sim-neg">不足分を上乗せしても、余りが足りず期限（${simYmLabel(g.deadline_ym)}）に間に合いません</span>`
             : `<span class="sim-neg">期限（${simYmLabel(g.deadline_ym)}）に間に合うには毎月 <b>${yen(st.needPerMonth)}</b></span>
                ${!simGoalIsAuto(g) && st.needPerMonth !== g.monthly_amount ? `<button class="sim-hint-btn" data-goal-need="${g.id}" data-amount="${st.needPerMonth}">毎月${yen(st.needPerMonth)}にする</button>` : ''}`;
         }
@@ -4032,8 +4043,18 @@ function drawBalanceChart(canvas, oldChart, startD, end, today, startBalance, pa
         if (pts.length && detailEl) renderBalanceDayDetail(detailEl, dates[pts[0].index], byDate, pastData[pts[0].index] ?? futData[pts[0].index], today, savData[pts[0].index]);
       },
       scales: {
-        x: { ticks: { maxTicksLimit: 8, maxRotation: 0 } },
-        y: { ticks: { callback: v => '¥' + (v / 10000).toLocaleString() + '万' } },
+        // 目盛りは毎月の1日・15日・25日。期間が長くて混むとき（13個以上）は線だけ残して、文字は1日だけ
+        x: {
+          ticks: {
+            autoSkip: false,
+            maxRotation: 0,
+            callback: (v, i, ticks) => ticks.length > 12 && Number(dates[v]?.slice(8, 10)) !== 1 ? '' : labels[v],
+          },
+          afterBuildTicks: axis => {
+            axis.ticks = axis.ticks.filter(t => [1, 15, 25].includes(Number(dates[t.value]?.slice(8, 10))));
+          },
+        },
+        y: { min: 0, ticks: { callback: v => '¥' + (v / 10000).toLocaleString() + '万' } },  // 下限は常に0（マイナスは出さない）
       },
     },
   });
@@ -4090,36 +4111,58 @@ function acctProjectedEvents(account, today, end) {
   return events.filter(e => e.date > today && e.date <= end);
 }
 
+// 残高の推移で選んでいる口座（複数選ぶと足し算）。選び方は localStorage（finance-view の acctPick）に覚えておく
+function acctPickedAccounts() {
+  return [...document.querySelectorAll('#acct-history-accounts input:checked')].map(i => i.value);
+}
+
 async function renderAccountHistory() {
-  const sel = document.getElementById('acct-history-account');
+  const pickEl = document.getElementById('acct-history-accounts');
   const rangeSel = document.getElementById('acct-history-range');
   if (!_acctInited) {
     _acctInited = true;
-    sel.innerHTML = PAYMENT_METHODS.map(a => `<option value="${a}">${a}</option>`).join('');
-    sel.value = SIM_DEFAULT_ACCOUNT;
-    sel.addEventListener('change', renderAccountHistory);
+    const saved = (loadViewState().acctPick || []).filter(a => PAYMENT_METHODS.includes(a));
+    const picked = saved.length ? saved : [SIM_DEFAULT_ACCOUNT];
+    pickEl.innerHTML = PAYMENT_METHODS.map(a => `
+      <label class="acct-pick-chip"><input type="checkbox" value="${escapeHtmlF(a)}" ${picked.includes(a) ? 'checked' : ''}><span>${escapeHtmlF(a)}</span></label>`).join('');
+    pickEl.addEventListener('change', e => {
+      // 0個にはしない（最後の1つは外せない）
+      if (!acctPickedAccounts().length) { e.target.checked = true; return; }
+      saveViewState('acctPick', acctPickedAccounts());
+      renderAccountHistory();
+    });
     rangeSel.addEventListener('change', renderAccountHistory);
   }
-  const account = sel.value;
+  const accounts = acctPickedAccounts();
+  const multi = accounts.length > 1;
   const today = todayJST();
   const startD = new Date(); startD.setMonth(startD.getMonth() - Number(rangeSel.value));
   const start = dateStr(startD.getFullYear(), startD.getMonth(), startD.getDate());
   const endD = new Date(); endD.setDate(1); endD.setMonth(endD.getMonth() + 2); endD.setDate(0);
   const end = dateStr(endD.getFullYear(), endD.getMonth(), endD.getDate());
 
-  const [{ data: acc }, { data: txns }] = await Promise.all([
-    db.from('accounts').select('balance').eq('account_name', account).maybeSingle(),
-    db.from('transactions').select('id, date, type, amount, category, memo, created_at')
-      .eq('payment_method', account).gte('date', start).order('date').order('created_at'),
+  const [{ data: accs }, { data: rawTxns }] = await Promise.all([
+    db.from('accounts').select('account_name, balance').in('account_name', accounts),
+    db.from('transactions').select('id, date, type, amount, category, memo, payment_method, created_at')
+      .in('payment_method', accounts).gte('date', start).order('date').order('created_at'),
     loadSimData(),
   ]);
+  // 複数のときは、どの口座の動きか分かるようにメモの後ろに口座名をつける
+  const txns = (rawTxns || []).map(t => multi ? { ...t, memo: [t.memo, `［${t.payment_method}］`].filter(Boolean).join(' ') } : t);
+  const balanceOf = a => (accs || []).find(x => x.account_name === a)?.balance ?? 0;
 
-  const { list, past, startBalance, todayBalance } = acctReconstruct(acc?.balance ?? 0, txns, today);
+  // 残高は足し算なので、合計の残高と全部の取引でまとめてさかのぼれる
+  const { list, past, startBalance, todayBalance } = acctReconstruct(accounts.reduce((t, a) => t + balanceOf(a), 0), txns, today);
 
   // これから: 記録済みの未来の取引 ＋ 予想
   // 同じ月に同じ金額の記録がもうあれば、その予想は出さない（給料が予定より早く振り込まれた・✓で登録済み など）
+  // 予想の重複チェックは口座ごとに行う（ほかの口座の同じ金額で消さないように）
   const recordedFuture = list.filter(e => e.future).map(e => ({ ...e, label: e.label + '（記録済み）' }));
-  const projected = acctDedupe(acctProjectedEvents(account, today, end), list);
+  const projected = accounts.flatMap(a => {
+    const own = acctReconstruct(balanceOf(a), txns.filter(t => t.payment_method === a), today).list;
+    return acctDedupe(acctProjectedEvents(a, today, end), own)
+      .map(e => multi ? { ...e, label: `${e.label}［${a}］` } : e);
+  });
   const future = [...recordedFuture, ...projected].sort((a, b) => a.date.localeCompare(b.date));
   let fr = todayBalance;
   for (const e of future) { fr += e.delta; e.after = fr; }

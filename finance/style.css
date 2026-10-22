@@ -2061,6 +2061,20 @@ h3.section-title {
 .acct-history-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .acct-history-head h3 { font-size: 15px; font-weight: 700; }
 .acct-history-selects { display: flex; gap: 6px; }
+.acct-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.acct-pick-chip { cursor: pointer; }
+.acct-pick-chip input { display: none; }
+.acct-pick-chip span {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 99px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.acct-pick-chip input:checked + span { background: #4A90D9; border-color: #4A90D9; color: #fff; }
 .acct-history-selects select { padding: 6px 8px; border-radius: 8px; border: 1.5px solid var(--border); font-size: 13px; background: var(--white); }
 .acct-history-now { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
 .acct-history-now > div { background: var(--white); border-radius: 12px; box-shadow: var(--shadow); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
