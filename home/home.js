@@ -179,7 +179,7 @@ async function loadTodaySchedule() {
     const targets = gcCalendars.length > 0 ? gcCalendars : [{ id: 'primary', backgroundColor: '#4285f4' }];
     const results = await Promise.all(
       targets.map(cal =>
-        gcalFetchToday(cal.id, dateStr).then(evs => evs.map(ev => ({ ...ev, _color: cal.backgroundColor })))
+        gcalFetchToday(cal.id, dateStr).then(evs => evs.map(ev => ({ ...ev, _color: cal.backgroundColor, _calName: cal.summary })))
       )
     );
     const allEvents = results.flat().sort((a, b) => {
@@ -189,29 +189,148 @@ async function loadTodaySchedule() {
     });
 
     const noEvMsg = _schedDayOffset === 0 ? '今日の予定はありません' : 'この日の予定はありません';
-    const html = allEvents.length === 0
-      ? `<div class="schedule-empty">${noEvMsg}</div>`
-      : allEvents.map(ev => {
-          let timeStr = '終日';
-          if (ev.start?.dateTime) {
-            const s   = new Date(ev.start.dateTime);
-            const e   = new Date(ev.end.dateTime);
-            const fmt = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            timeStr = `${fmt(s)} – ${fmt(e)}`;
-          }
-          const dot = `<span class="schedule-dot" style="background:${ev._color || '#4285f4'}"></span>`;
-          return `<div class="schedule-item">
-            <div class="schedule-time">${timeStr}</div>
-            ${dot}
-            <div class="schedule-title">${ev.summary || '（タイトルなし）'}</div>
-          </div>`;
-        }).join('');
-
+    if (allEvents.length === 0) {
+      targets_el.forEach(el => el.innerHTML = `<div class="schedule-empty">${noEvMsg}</div>`);
+      return;
+    }
+    const html = buildScheduleGrid(allEvents, dateStr);
     targets_el.forEach(el => el.innerHTML = html);
   } catch (e) {
     targets_el.forEach(el => el.innerHTML = '<div class="schedule-empty">読み込みに失敗しました</div>');
   }
 }
+
+// ---- 1日の時間軸（Notion カレンダー風） ----
+// スクロールしなくていいように、予定のある時間帯だけを SCH_FIT_PX の高さに収める（1時間は22〜40px）
+const SCH_FIT_PX = 280;
+
+function schEscape(str) {
+  return String(str).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+let _schEvents = [];   // 表示中の予定（詳細を開くときに data-sch で引く）
+
+// 予定 → 時間軸のHTML。終日の予定は左に細い縦のバー、時間のある予定はブロック
+function buildScheduleGrid(events, dateStr) {
+  _schEvents = events;
+  const dayStart = new Date(dateStr + 'T00:00:00');
+  const toMin = d => Math.max(0, Math.min(24 * 60, (d - dayStart) / 60000));  // その日の0時からの分（日をまたぐ予定は切る）
+  const fmt   = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const title = ev => schEscape(ev.summary || '（タイトルなし）');
+
+  const allDay = events.filter(ev => !ev.start?.dateTime);
+  const timed  = events.filter(ev => ev.start?.dateTime).map(ev => {
+    const s = new Date(ev.start.dateTime), e = new Date(ev.end.dateTime);
+    return { ev, s, e, top: toMin(s), bottom: Math.max(toMin(e), toMin(s) + 20) };  // 短い予定も20分ぶんの高さは取る
+  }).sort((a, b) => a.top - b.top || b.bottom - a.bottom);
+
+  // 重なりは、先に始まって まだ終わっていない予定の数だけ右にずらす
+  timed.forEach((t, i) => {
+    t.level = timed.slice(0, i).filter(p => p.bottom > t.top).length;
+  });
+
+  // 表示する時間の範囲: 最初の予定の開始〜最後の予定の終わり（1時間単位）。終日だけの日は時刻の線を出さない
+  const firstH = timed.length ? Math.min(...timed.map(t => Math.floor(t.top / 60))) : 0;
+  const lastH  = timed.length ? Math.max(firstH + 1, ...timed.map(t => Math.ceil(t.bottom / 60))) : 0;
+  const hourPx = timed.length ? Math.max(22, Math.min(40, SCH_FIT_PX / (lastH - firstH))) : 0;
+  const y = min => (min / 60 - firstH) * hourPx;
+  const gridH = timed.length ? y(lastH * 60) + 8 : 120;
+
+  const hours = [];
+  for (let h = firstH; timed.length && h <= lastH; h++) {
+    hours.push(`<div class="sch-hour" style="top:${y(h * 60)}px"><span>${h}:00</span></div>`);
+  }
+
+  // 終日の予定: 上から下まで伸びる細いバー（縦書き）
+  const bars = allDay.map((ev, i) => `
+    <div class="sch-allday-bar" data-sch="${events.indexOf(ev)}" style="left:${i * 18}px;--c:${ev._color || '#4285f4'}">
+      <span>${title(ev)}</span>
+    </div>`).join('');
+  const eventsLeft = 40 + allDay.length * 18;
+
+  const blocks = timed.map(t => {
+    const h = y(t.bottom) - y(t.top);
+    return `
+      <div class="sch-event ${h < 34 ? 'short' : ''}" data-sch="${events.indexOf(t.ev)}" style="top:${y(t.top)}px;height:${h - 2}px;left:${t.level * 14}px;--c:${t.ev._color || '#4285f4'}">
+        <div class="sch-event-title">${title(t.ev)}</div>
+        <div class="sch-event-time">${fmt(t.s)}–${fmt(t.e)}</div>
+      </div>`;
+  }).join('');
+
+  // 今の時刻の赤い線（今日を見ているときだけ）
+  const nowMin = (new Date() - dayStart) / 60000;
+  const showNow = timed.length && nowMin >= firstH * 60 && nowMin <= lastH * 60 && nowMin < 24 * 60;
+  const nowLine = showNow ? `<div class="sch-now" style="top:${y(nowMin)}px"></div>` : '';
+
+  return `
+    <div class="sch-grid" style="height:${gridH}px">
+      ${hours.join('')}
+      <div class="sch-allday-col">${bars}</div>
+      <div class="sch-events" style="left:${eventsLeft}px">${blocks}${nowLine}</div>
+    </div>`;
+}
+
+// ---- 予定の詳細 ----
+function schEventWhen(ev) {
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const md = d => `${d.getMonth() + 1}/${d.getDate()}（${days[d.getDay()]}）`;
+  if (ev.start?.dateTime) {
+    const s = new Date(ev.start.dateTime), e = new Date(ev.end.dateTime);
+    const hm = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return s.toDateString() === e.toDateString()
+      ? `${md(s)} ${hm(s)} – ${hm(e)}`
+      : `${md(s)} ${hm(s)} – ${md(e)} ${hm(e)}`;
+  }
+  // 終日: end.date は「次の日」なので1日戻す
+  const s = new Date(ev.start.date + 'T00:00:00');
+  const e = new Date(ev.end.date + 'T00:00:00'); e.setDate(e.getDate() - 1);
+  return s.getTime() === e.getTime() ? `${md(s)} 終日` : `${md(s)} – ${md(e)} 終日`;
+}
+
+// Google の説明文は HTML のことがあるので、タグを外して文字だけにする
+function schPlainText(html) {
+  return schEscape(String(html)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&'));
+}
+
+function openScheduleDetail(ev) {
+  let overlay = document.getElementById('sch-detail-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'sch-detail-overlay';
+    overlay.className = 'sch-detail-overlay';
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay || e.target.closest('.sch-detail-close')) overlay.hidden = true;
+    });
+    document.body.appendChild(overlay);
+  }
+  const color = ev._color || '#4285f4';
+  overlay.innerHTML = `
+    <div class="sch-detail-card" style="--c:${color}">
+      <button class="sch-detail-close" aria-label="閉じる">✕</button>
+      <div class="sch-detail-title"><span class="sch-detail-dot"></span>${schEscape(ev.summary || '（タイトルなし）')}</div>
+      <div class="sch-detail-row">🕒 ${schEventWhen(ev)}</div>
+      ${ev._calName ? `<div class="sch-detail-row">📅 ${schEscape(ev._calName)}</div>` : ''}
+      ${ev.location ? `<div class="sch-detail-row">📍 <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.location)}" target="_blank" rel="noopener">${schEscape(ev.location)}</a></div>` : ''}
+      ${ev.description ? `<div class="sch-detail-desc">${schPlainText(ev.description)}</div>` : ''}
+      ${ev.htmlLink ? `<a class="sch-detail-link" href="${schEscape(ev.htmlLink)}" target="_blank" rel="noopener">Googleカレンダーで開く ↗</a>` : ''}
+    </div>`;
+  overlay.hidden = false;
+}
+
+// 予定のブロック・終日のバーを押したら詳細（PC・スマホの両方の一覧で）
+['schedule-list', 'm-schedule-list'].forEach(id => {
+  document.getElementById(id)?.addEventListener('click', e => {
+    const el = e.target.closest('[data-sch]');
+    if (el && _schEvents[el.dataset.sch]) openScheduleDetail(_schEvents[el.dataset.sch]);
+  });
+});
 
 let gcCalendars = [];
 

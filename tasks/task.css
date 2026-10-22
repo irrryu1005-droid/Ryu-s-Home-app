@@ -269,7 +269,22 @@ body {
   gap: 8px;
 }
 .notion-sub { font-size: 11px; font-weight: 400; color: var(--muted); }
-.notion-item { text-decoration: none; color: inherit; }
+.notion-open { text-decoration: none; }
+.ne-memo {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  margin-bottom: 10px;
+  resize: vertical;
+  outline: none;
+}
+.ne-memo:focus { border-color: var(--purple); }
+.tl-form-row label input[type="time"] { padding: 8px 10px; }
+.ne-error { font-size: 12px; color: var(--profit-neg); margin-bottom: 8px; }
+.ne-error[hidden] { display: none !important; }
 .notion-status {
   padding: 4px 6px;
   border-radius: 8px;
@@ -771,6 +786,44 @@ body {
 }
 
 /* タスクバー */
+/* Notion の課題の締切（その日のマスに目印） */
+.tl-notion-due {
+  position: absolute;
+  top: 6px;
+  height: 26px;
+  border-radius: 5px;
+  background: #2980B9;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  font-variant-numeric: tabular-nums;
+}
+.tl-notion-due.done { opacity: 0.4; }
+/* 準備開始〜締切のバー（予習・復習の期間）。準備開始がないときは締切のマスだけの見えない枠（左端をつまめる） */
+.tl-notion-prep {
+  position: absolute;
+  top: 6px;
+  height: 26px;
+  border-radius: 5px;
+  background: rgba(41, 128, 185, 0.18);
+  border: 1.5px dashed #2980B9;
+  z-index: 1;
+  cursor: pointer;
+}
+/* 準備開始がないとき: 透明な枠を締切の目印の上に重ねて、左端をつまめるようにする */
+.tl-notion-prep.empty { background: transparent; border-color: transparent; z-index: 3; }
+.tl-notion-prep.empty .tl-bar-handle { width: 8px; background: rgba(255,255,255,0.35); }
+.tl-notion-prep.done  { opacity: 0.4; }
+.tl-notion-prep .tl-bar-handle { z-index: 3; }
+.tl-label-notion { cursor: pointer; color: #2980B9; }
+.tl-label-notion.done { opacity: 0.5; text-decoration: line-through; }
+
 .tl-task-bar {
   position: absolute;
   top: 6px;

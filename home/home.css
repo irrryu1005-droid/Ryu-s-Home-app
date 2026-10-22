@@ -738,8 +738,6 @@ body {
 /* スケジュールリスト */
 .schedule-list {
   flex: 1;
-  overflow-y: auto;
-  max-height: 190px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -855,6 +853,158 @@ body {
   color: var(--text);
   line-height: 1.4;
 }
+/* 1日の時間軸（Notion カレンダー風） */
+.sch-grid { position: relative; flex-shrink: 0; }
+/* 終日の予定: 上から下まで伸びる細い縦のバー（縦書き） */
+.sch-allday-col { position: absolute; top: 0; bottom: 0; left: 40px; }
+.sch-allday-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--c) 18%, white);
+  border-top: 3px solid var(--c);
+  color: color-mix(in srgb, var(--c) 60%, black);
+  overflow: hidden;
+  cursor: pointer;
+}
+.sch-allday-bar span {
+  display: block;
+  writing-mode: vertical-rl;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  padding-top: 4px;
+  white-space: nowrap;
+}
+.sch-event { cursor: pointer; }
+.sch-event:hover, .sch-allday-bar:hover { filter: brightness(0.96); }
+
+/* 予定の詳細 */
+.sch-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.sch-detail-overlay[hidden] { display: none !important; }
+.sch-detail-card {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--white);
+  border-radius: 14px;
+  border-top: 4px solid var(--c);
+  padding: 16px 18px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+}
+.sch-detail-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sch-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  padding-right: 24px;
+  margin-bottom: 10px;
+}
+.sch-detail-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--c); flex-shrink: 0; }
+.sch-detail-row { font-size: 13px; margin-bottom: 6px; color: var(--text); }
+.sch-detail-row a { color: var(--expense); }
+.sch-detail-desc {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+}
+.sch-detail-link {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--expense);
+  text-decoration: none;
+}
+.sch-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border);
+}
+.sch-hour span {
+  position: absolute;
+  top: -7px;
+  left: 0;
+  width: 34px;
+  padding-right: 4px;
+  text-align: right;
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--white);
+  font-family: 'Outfit', sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.sch-events { position: absolute; top: 0; bottom: 0; left: 40px; right: 4px; }  /* left は終日のバーの数に合わせて JS で上書き */
+.sch-event {
+  position: absolute;
+  right: 0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--c);
+  background: color-mix(in srgb, var(--c) 16%, white);
+  color: color-mix(in srgb, var(--c) 60%, black);
+  box-shadow: 0 0 0 1px var(--white);
+  overflow: hidden;
+  line-height: 1.3;
+}
+.sch-event-title { font-size: 12px; font-weight: 600; }
+.sch-event-time {
+  font-size: 11px;
+  opacity: 0.85;
+  font-family: 'Outfit', sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+/* 短い予定はタイトルと時刻を1行に */
+.sch-event.short { display: flex; gap: 6px; align-items: baseline; padding-top: 1px; white-space: nowrap; }
+.sch-now {
+  position: absolute;
+  left: -4px;
+  right: 0;
+  border-top: 2px solid #E5534B;
+  z-index: 2;
+  pointer-events: none;
+}
+.sch-now::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #E5534B;
+}
+
 .schedule-empty,
 .schedule-loading {
   font-size: 13px;

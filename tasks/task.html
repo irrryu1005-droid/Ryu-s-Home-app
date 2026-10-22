@@ -233,6 +233,47 @@
       </div>
     </div>
 
+    <!-- Notion の課題を編集するモーダル -->
+    <div class="tl-overlay" id="notion-edit-overlay">
+      <div class="tl-modal">
+        <div class="tl-modal-title">✏️ 課題を編集 <span class="notion-sub">Notion に保存されます</span></div>
+        <form id="notion-edit-form" novalidate>
+          <input type="text" id="ne-title" placeholder="課題名" required>
+          <div class="tl-form-row">
+            <select id="ne-status">
+              <option value="Will">Will</option>
+              <option value="Doing">Doing</option>
+              <option value="Done">Done</option>
+            </select>
+            <select id="ne-kind">
+              <option value="">種類なし</option>
+              <option value="小テスト">小テスト</option>
+              <option value="レポート">レポート</option>
+              <option value="ミニレポート">ミニレポート</option>
+              <option value="アンケート">アンケート</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+          <div class="tl-form-row">
+            <label>準備開始（予習・復習） <input type="date" id="ne-prep"></label>
+            <span class="date-sep">〜</span>
+            <label>締切 <input type="date" id="ne-due-date"></label>
+          </div>
+          <div class="tl-form-row">
+            <label>締切の時刻（空欄＝終日） <input type="time" id="ne-due-time" class="time-input"></label>
+          </div>
+          <input type="text" id="ne-method" placeholder="提出方法（例: BEEF+のテスト）">
+          <input type="text" id="ne-points" placeholder="配点（例: 5%）">
+          <textarea id="ne-memo" class="ne-memo" rows="3" placeholder="メモ"></textarea>
+          <div class="ne-error" id="ne-error" hidden></div>
+          <div class="tl-modal-btns">
+            <button type="button" id="ne-cancel">キャンセル</button>
+            <button type="submit" class="tl-submit" id="ne-submit">保存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- ======== Routine タブ ======== -->
     <section id="tab-routine" class="tab-content">
 

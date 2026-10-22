@@ -334,7 +334,7 @@ async function loadTodos() {
 // 神大の課題（Notion から読み取り専用で表示）
 // ============================================================
 let notionItems = null;   // null = 未取得 / 'error' = 取得失敗
-const NOTION_STATUS_LABEL = { will: '未着手', doing: '進行中', done: '提出済' };
+const NOTION_STATUS_LABEL = { will: 'Will', doing: 'Doing', done: 'Done' };
 
 function escapeHtmlT(str) {
   return String(str).replace(/[&<>"']/g, c => (
@@ -342,9 +342,14 @@ function escapeHtmlT(str) {
   ));
 }
 
+// Live Server（127.0.0.1 / localhost）には Netlify Functions がないので、本番の Function を呼ぶ
+const FUNCTIONS_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
+  ? 'https://irr-home.netlify.app'
+  : '';
+
 async function loadNotionAssignments() {
   try {
-    const res = await fetch('/.netlify/functions/notion-assignments');
+    const res = await fetch(`${FUNCTIONS_BASE}/.netlify/functions/notion-assignments`);
     if (!res.ok) throw new Error(await res.text());
     notionItems = await res.json();
   } catch (err) {
@@ -352,6 +357,7 @@ async function loadNotionAssignments() {
     notionItems = 'error';
   }
   renderNotionList();
+  renderTimeline();   // タイムラインに締切を出すため
 }
 
 // 締切: 'YYYY-MM-DD'（終日）または ISO日時 → 表示用の文字列と期限切れ判定
@@ -388,7 +394,7 @@ function renderNotionList() {
     const subject = n.subjects.length ? `<span class="cat-badge cat-神大">${escapeHtmlT(n.subjects.join('・'))}</span>` : '';
     const kind    = n.kind ? `<span class="notion-kind">${escapeHtmlT(n.kind)}</span>` : '';
     return `
-      <a class="todo-item notion-item status-${n.status}" href="${escapeHtmlT(n.url)}" target="_blank" rel="noopener">
+      <div class="todo-item notion-item status-${n.status}">
         <div class="todo-main">
           <span class="notion-status notion-status-${n.status}">${NOTION_STATUS_LABEL[n.status]}</span>
           <div class="todo-info">
@@ -400,14 +406,118 @@ function renderNotionList() {
             </div>
           </div>
         </div>
-        <span class="notion-open">↗</span>
-      </a>`;
+        <div class="todo-actions">
+          <button class="todo-edit-btn notion-edit-btn" data-id="${n.id}">✏️</button>
+          <a class="notion-open" href="${escapeHtmlT(n.url)}" target="_blank" rel="noopener" title="Notion で開く">↗</a>
+        </div>
+      </div>`;
   }).join('');
 
   box.innerHTML = `
-    <div class="notion-head">📚 神大（Notion）<span class="notion-sub">${items.length}件 ・ タップで Notion を開く</span></div>
+    <div class="notion-head">📚 神大（Notion）<span class="notion-sub">${items.length}件 ・ ✏️で編集 ／ ↗で Notion を開く</span></div>
     ${rows || '<div class="empty-msg">該当する課題はありません</div>'}`;
+
+  box.querySelectorAll('.notion-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = notionItems.find(n => n.id === btn.dataset.id);
+      if (item) openNotionEdit(item);
+    });
+  });
 }
+
+// ---- Notion の課題を編集（notion-assignment-update に送る） ----
+let notionEditing = null;
+
+function openNotionEdit(n) {
+  notionEditing = n;
+  let date = '', time = '';
+  if (n.due) {
+    if (n.due.includes('T')) {
+      const d = new Date(n.due);
+      date = localDateStr(d);
+      time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    } else {
+      date = n.due;
+    }
+  }
+  document.getElementById('ne-title').value    = n.title;
+  document.getElementById('ne-status').value   = n.statusName;
+  document.getElementById('ne-kind').value     = n.kind || '';
+  document.getElementById('ne-due-date').value = date;
+  document.getElementById('ne-prep').value     = n.prep || '';
+  document.getElementById('ne-due-time').value = time;
+  document.getElementById('ne-method').value   = n.method || '';
+  document.getElementById('ne-points').value   = n.points || '';
+  document.getElementById('ne-memo').value     = n.memo || '';
+  document.getElementById('ne-error').hidden   = true;
+  document.getElementById('notion-edit-overlay').classList.add('active');
+}
+
+function closeNotionEdit() {
+  document.getElementById('notion-edit-overlay').classList.remove('active');
+  notionEditing = null;
+}
+
+// 'YYYY-MM-DD' + 'HH:mm' → この端末のタイムゾーンつきの日時（例: 2026-10-26T10:30:00+09:00）
+function withTzOffset(date, time) {
+  const off = -new Date(`${date}T${time}:00`).getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  const hh = String(Math.floor(Math.abs(off) / 60)).padStart(2, '0');
+  const mm = String(Math.abs(off) % 60).padStart(2, '0');
+  return `${date}T${time}:00${sign}${hh}:${mm}`;
+}
+
+document.getElementById('ne-cancel').addEventListener('click', closeNotionEdit);
+document.getElementById('notion-edit-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeNotionEdit();
+});
+
+document.getElementById('notion-edit-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!notionEditing) return;
+  const title = document.getElementById('ne-title').value.trim();
+  if (!title) return;
+  const date = document.getElementById('ne-due-date').value;
+  const time = document.getElementById('ne-due-time').value;
+  const prep = document.getElementById('ne-prep').value;
+  const submitBtn = document.getElementById('ne-submit');
+  const errEl     = document.getElementById('ne-error');
+  if (prep && date && prep > date) {
+    errEl.textContent = '準備開始は締切より前の日にしてください';
+    errEl.hidden = false;
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = '保存中…';
+  try {
+    const res = await fetch(`${FUNCTIONS_BASE}/.netlify/functions/notion-assignment-update`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id:     notionEditing.id,
+        title,
+        status: document.getElementById('ne-status').value,
+        kind:   document.getElementById('ne-kind').value,
+        due:    date ? (time ? withTzOffset(date, time) : date) : null,
+        prep:   prep || null,
+        method: document.getElementById('ne-method').value.trim(),
+        points: document.getElementById('ne-points').value.trim(),
+        memo:   document.getElementById('ne-memo').value.trim(),
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    closeNotionEdit();
+    await loadNotionAssignments();
+  } catch (err) {
+    console.error('Notion 課題の保存に失敗:', err);
+    errEl.textContent = `保存できませんでした: ${String(err.message).slice(0, 120)}`;
+    errEl.hidden = false;
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '保存';
+  }
+});
 
 document.getElementById('todo-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -538,10 +648,23 @@ async function renderTimeline() {
   const WEEK   = ['日', '月', '火', '水', '木', '金', '土'];
   tlDays = days;
 
+  // Notion の課題のうち、準備開始〜締切がこの月にかかるもの（締切の日に目印、準備開始からはバー）
+  const notionDues = (Array.isArray(notionItems) ? notionItems : [])
+    .filter(n => n.due)
+    .map(n => {
+      const date = n.due.includes('T') ? localDateStr(new Date(n.due)) : n.due;
+      return { n, date, start: n.prep && n.prep < date ? n.prep : date };
+    })
+    .filter(x => x.start <= lastStr && x.date >= firstStr)
+    .sort((a, b) => a.n.due.localeCompare(b.n.due));
+
   // ---- ラベル列（タスク名） ----
   const labelsEl = document.getElementById('tl-labels');
   labelsEl.innerHTML =
     `<div class="tl-label-header"></div>` +
+    notionDues.map(({ n }) =>
+      `<div class="tl-label-row tl-label-notion ${n.status === 'done' ? 'done' : ''}" data-notion="${n.id}" title="${escapeHtmlT(n.title)}"><span class="tl-label-name">📚 ${escapeHtmlT(n.title)}</span></div>`
+    ).join('') +
     tasks.map(t =>
       `<div class="tl-label-row" title="${t.text}"><span class="tl-label-name">${t.text}</span></div>`
     ).join('') +
@@ -549,6 +672,12 @@ async function renderTimeline() {
 
   labelsEl.querySelector('.tl-add-label')?.addEventListener('click', () => {
     openTlModal(todayStr(), todayStr());
+  });
+  labelsEl.querySelectorAll('.tl-label-notion').forEach(el => {
+    el.addEventListener('click', () => {
+      const item = notionItems.find(n => n.id === el.dataset.notion);
+      if (item) openNotionEdit(item);
+    });
   });
 
   // ---- ヘッダー（日付） ----
@@ -712,6 +841,50 @@ async function renderTimeline() {
   // ---- 描画 ----
   const rowsEl = document.getElementById('tl-task-rows');
   rowsEl.innerHTML = '';
+
+  // Notion の課題の行: 準備開始〜締切のバー ＋ 締切の日のマスに目印（時刻つきなら時刻、終日なら「締」）
+  // バーの左端（準備開始がなければ目印の左端）をドラッグすると準備開始を変えられる
+  const dayIdxOf = ds => parseInt(ds.split('-')[2]) - 1;
+  notionDues.forEach(({ n, date, start }) => {
+    const row     = buildRow(null, []);
+    const dueIn   = date <= lastStr;
+    const endIdx  = dueIn ? dayIdxOf(date) : days - 1;
+    const startIdx = start < firstStr ? 0 : dayIdxOf(start);
+    const { label } = notionDueInfo(n.due);
+
+    const range = document.createElement('div');
+    range.className = `tl-notion-prep ${n.status === 'done' ? 'done' : ''} ${start === date ? 'empty' : ''}`;
+    range.style.left  = `${startIdx * CELL_W + 2}px`;
+    range.style.width = `${(endIdx - startIdx + 1) * CELL_W - 4}px`;
+    range.title = n.prep ? `準備 ${formatDate(n.prep)} 〜 締切 ${formatDate(date)}` : '左端をドラッグして準備開始を決める';
+    range.addEventListener('mousedown', ev => ev.stopPropagation());
+    range.addEventListener('click', ev => { ev.stopPropagation(); openNotionEdit(n); });
+    // 左ハンドル（締切が今月にあるときだけ。準備開始がほかの月なら動かさない）
+    if (dueIn && start >= firstStr) {
+      const lh = document.createElement('div');
+      lh.className = 'tl-bar-handle left';
+      lh.addEventListener('mousedown', ev => {
+        ev.stopPropagation(); ev.preventDefault();
+        notionPrepDrag = { n, row, range, endIdx, idx: startIdx, ym: firstStr.slice(0, 8) };
+      });
+      range.appendChild(lh);
+    }
+    row.appendChild(range);
+
+    if (dueIn) {
+      const mark = document.createElement('div');
+      mark.className = `tl-notion-due ${n.status === 'done' ? 'done' : ''}`;
+      mark.style.left  = `${endIdx * CELL_W + 2}px`;
+      mark.style.width = `${CELL_W - 4}px`;
+      mark.textContent = n.due.includes('T') ? label.split(' ').pop() : '締';
+      mark.title = `${n.title}（${label.replace('📅 ', '')}・${n.statusName}）`;
+      mark.addEventListener('mousedown', ev => ev.stopPropagation());  // 空きマスのドラッグ作成を起こさない
+      mark.addEventListener('click', ev => { ev.stopPropagation(); openNotionEdit(n); });
+      row.appendChild(mark);
+    }
+    rowsEl.appendChild(row);
+  });
+
   tasks.forEach(task => rowsEl.appendChild(buildRow(task, schedulesMap[task.id] || [])));
 
   // 常に空行を最下段に追加
@@ -724,6 +897,41 @@ async function renderTimeline() {
     document.getElementById('tl-scroll').scrollLeft = Math.max(0, (todayDay - 4) * CELL_W);
   }
 }
+
+// ---- Notion の課題: 準備開始のドラッグ ----
+let notionPrepDrag = null;  // { n, row, range, endIdx, idx, ym: 'YYYY-MM-' }
+
+document.addEventListener('mousemove', (e) => {
+  if (!notionPrepDrag) return;
+  const d   = notionPrepDrag;
+  const x   = e.clientX - d.row.getBoundingClientRect().left;
+  d.idx     = Math.max(0, Math.min(d.endIdx, Math.floor(x / CELL_W)));
+  d.range.style.left  = `${d.idx * CELL_W + 2}px`;
+  d.range.style.width = `${(d.endIdx - d.idx + 1) * CELL_W - 4}px`;
+  d.range.classList.toggle('empty', d.idx === d.endIdx);
+});
+
+document.addEventListener('mouseup', async () => {
+  if (!notionPrepDrag) return;
+  const { n, endIdx, idx, ym } = notionPrepDrag;
+  notionPrepDrag = null;
+  const prep = idx === endIdx ? null : `${ym}${String(idx + 1).padStart(2, '0')}`;  // 締切の日まで戻したら準備開始なし
+  if (prep === (n.prep || null)) return;
+  n.prep = prep;  // 先に画面へ反映
+  renderTimeline();
+  try {
+    const res = await fetch(`${FUNCTIONS_BASE}/.netlify/functions/notion-assignment-update`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ id: n.id, prep }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+  } catch (err) {
+    console.error('準備開始の保存に失敗:', err);
+    alert('準備開始を Notion に保存できませんでした');
+    loadNotionAssignments();
+  }
+});
 
 // ---- ドラッグリサイズ＋新規作成ドラッグ ----
 document.addEventListener('mousemove', (e) => {
