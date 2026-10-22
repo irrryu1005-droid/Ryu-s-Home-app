@@ -85,6 +85,9 @@
                 <option value="doing">Doing</option>
                 <option value="done">Done</option>
               </select>
+              <select id="todo-goal" class="goal-select">
+                <option value="">🎯 目標なし</option>
+              </select>
             </div>
             <div class="form-row due-row">
               <input type="date" id="todo-start" placeholder="開始日">
@@ -200,6 +203,9 @@
               <option value="doing">Doing</option>
               <option value="done">Done</option>
             </select>
+            <select id="tl-edit-goal" class="goal-select">
+              <option value="">🎯 目標なし</option>
+            </select>
           </div>
           <div class="tl-form-row due-row">
             <label>開始 <input type="date" id="tl-edit-start"></label>
@@ -271,10 +277,49 @@
 
     <!-- ======== Plan タブ ======== -->
     <section id="tab-plan" class="tab-content">
-      <div class="coming-soon-card">
-        <div style="font-size:2rem">🗺️</div>
-        <p>準備中です</p>
+
+      <!-- ロードマップ（12か月） -->
+      <div class="plan-card">
+        <div class="plan-card-head">
+          <span class="plan-card-title">🗺️ ロードマップ</span>
+          <div class="plan-nav">
+            <button id="plan-prev">＜</button>
+            <span id="plan-range-label"></span>
+            <button id="plan-next">＞</button>
+          </div>
+        </div>
+        <div id="plan-roadmap" class="plan-roadmap"></div>
       </div>
+
+      <!-- 目標カード -->
+      <div id="plan-goals"></div>
+
+      <!-- 目標の追加・編集 -->
+      <div class="add-card">
+        <div class="add-card-title" id="goal-form-title">＋ 目標を追加</div>
+        <form id="goal-form" novalidate>
+          <input type="text" id="goal-title" placeholder="目標（例: IELTS 7.0）" required>
+          <div class="form-row due-row">
+            <input type="date" id="goal-start" required>
+            <span class="date-sep">〜</span>
+            <input type="date" id="goal-end" required>
+            <select id="goal-color">
+              <option value="#9B59B6">紫</option>
+              <option value="#2980B9">青</option>
+              <option value="#27AE60">緑</option>
+              <option value="#F39C12">オレンジ</option>
+              <option value="#E74C3C">赤</option>
+              <option value="#95A5A6">グレー</option>
+            </select>
+          </div>
+          <input type="text" id="goal-note" placeholder="メモ（任意）">
+          <div class="goal-form-btns">
+            <button type="button" id="goal-cancel" class="goal-cancel-btn" hidden>キャンセル</button>
+            <button type="submit" class="add-btn" id="goal-submit">追加する</button>
+          </div>
+        </form>
+      </div>
+
     </section>
 
   </div>

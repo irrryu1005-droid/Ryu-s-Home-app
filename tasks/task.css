@@ -969,6 +969,164 @@ body {
 .tl-modal-btns .tl-submit:hover { opacity: 0.88; }
 
 /* ============================================================
+   Plan（ロードマップ・目標カード）
+============================================================ */
+.plan-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.plan-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.plan-card-title { font-size: 14px; font-weight: 800; }
+.plan-nav { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.plan-nav button {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--muted);
+}
+.plan-nav button:hover { color: var(--text); border-color: var(--purple); }
+
+.rm-months {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+.rm-month { font-size: 10px; color: var(--muted); text-align: center; }
+.rm-month b { font-weight: 700; }
+.rm-body { position: relative; padding-top: 4px; }
+.rm-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1.5px dashed var(--profit-neg);
+  z-index: 2;
+  pointer-events: none;
+}
+.rm-row { margin-top: 6px; }
+.rm-label {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rm-track {
+  position: relative;
+  height: 14px;
+  background: var(--bg);
+  border-radius: 99px;
+}
+.rm-bar {
+  position: absolute;
+  top: 3px;
+  height: 8px;
+  border-radius: 99px;
+  opacity: 0.75;
+}
+.rm-mile {
+  position: absolute;
+  top: -1px;
+  transform: translateX(-50%);
+  font-size: 13px;
+  line-height: 14px;
+  text-shadow: 0 0 2px var(--white);
+  opacity: 0.45;
+}
+.rm-mile.done { opacity: 1; }
+
+.goal-card { border-left: 4px solid var(--purple); }
+.goal-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.goal-card-title { font-size: 15px; font-weight: 800; }
+.goal-card-period { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.goal-card-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.goal-progress { display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; }
+.goal-sub-title { font-size: 11px; font-weight: 700; color: var(--muted); margin: 10px 0 4px; }
+.goal-empty { font-size: 12px; color: var(--muted); }
+
+.goal-mile, .goal-todo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--bg);
+}
+.mile-check { accent-color: var(--purple); flex-shrink: 0; }
+.mile-diamond { font-size: 11px; flex-shrink: 0; }
+.mile-title, .goal-todo-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.goal-mile.done .mile-title,
+.goal-todo.done .goal-todo-text { text-decoration: line-through; color: var(--muted); }
+.mile-date { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.mile-date.overdue { color: var(--profit-neg); font-weight: 700; }
+.mile-del {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+}
+.mile-del:hover { color: var(--profit-neg); }
+.goal-todo-status { font-size: 10px; font-weight: 700; flex-shrink: 0; }
+.goal-todo-status.status-will  { color: #2980B9; }
+.goal-todo-status.status-doing { color: #F39C12; }
+.goal-todo-status.status-done  { color: #27AE60; }
+
+.mile-form { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.mile-input, .mile-date-input {
+  padding: 7px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--bg);
+}
+.mile-input { flex: 1; min-width: 140px; }
+
+.goal-badge { font-size: 11px; font-weight: 700; }
+
+#goal-title, #goal-note {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+#goal-note { margin: 8px 0 0; font-size: 13px; }
+.goal-form-btns { display: flex; gap: 8px; }
+.goal-cancel-btn {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  margin-top: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.goal-cancel-btn[hidden] { display: none !important; }
+
+/* ============================================================
    PC対応
 ============================================================ */
 @media (min-width: 768px) {

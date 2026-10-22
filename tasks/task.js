@@ -150,6 +150,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById(`tab-${tab}`).classList.add('active');
     if (tab === 'routine') initRoutine();
+    if (tab === 'plan')    loadPlan();
   });
 });
 
@@ -248,6 +249,8 @@ async function loadTodos() {
       : '';
     const catBadge  = t.category ? `<span class="cat-badge cat-${t.category}">${t.category}</span>` : '';
     const doneDate  = t.done_at  ? `<span class="done-date">✓ ${t.done_at}</span>` : '';
+    const goal      = t.goal_id  ? planGoals.find(g => g.id === t.goal_id) : null;
+    const goalBadge = goal ? `<span class="goal-badge" style="color:${goal.color}">🎯 ${escapeHtmlT(goal.title)}</span>` : '';
 
     // 実行予定日チップ
     const schedules = (t.task_schedules || [])
@@ -270,6 +273,7 @@ async function loadTodos() {
             <div class="todo-text ${t.status === 'done' ? 'done' : ''}">${t.text}</div>
             <div class="todo-meta">
               ${catBadge}
+              ${goalBadge}
               ${t.due_date ? `<span class="todo-due ${overdue ? 'overdue' : ''}">${dueLabel}</span>` : ''}
               ${doneDate}
             </div>
@@ -425,6 +429,7 @@ document.getElementById('todo-form').addEventListener('submit', async (e) => {
     due_time:   (!isAllDay && document.getElementById('todo-time').value) || null,
     is_all_day: isAllDay,
     done_at:    status === 'done' ? todayStr() : null,
+    goal_id:    document.getElementById('todo-goal').value || null,
   };
   if (!payload.text) return;
 
@@ -923,6 +928,7 @@ async function openTlEditModal(task) {
   document.getElementById('tl-edit-allday').checked = isAllDay;
   document.getElementById('tl-edit-time').value     = task.due_time   || '';
   document.getElementById('tl-edit-time').disabled  = isAllDay;
+  document.getElementById('tl-edit-goal').value     = task.goal_id    || '';
 
   const { data: scheds } = await db.from('task_schedules').select('*').eq('todo_id', task.id);
   tlEditSchedules = (scheds || []).map(s => ({ ...s, _new: false, _deleted: false }));
@@ -967,6 +973,7 @@ document.getElementById('tl-edit-form').addEventListener('submit', async (e) => 
     due_time:   (!isAllDay && document.getElementById('tl-edit-time').value) || null,
     is_all_day: isAllDay,
     done_at:    status === 'done' ? (tlEditTodo.done_at || todayStr()) : null,
+    goal_id:    document.getElementById('tl-edit-goal').value || null,
   }).eq('id', id);
 
   // 締切日が変わった場合はGCal更新
@@ -1174,9 +1181,262 @@ async function loadHabitChart() {
 }
 
 // ============================================================
+// Plan（中長期の目標・マイルストーン）
+// ============================================================
+const PLAN_MONTHS = 12;
+let planGoals      = [];   // plan_goals（plan_milestones を含む）
+let planStart      = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+let editingGoalId  = null;
+
+// 目標の一覧を取得して、ToDo の「目標」セレクトも更新する
+async function loadGoals() {
+  const { data, error } = await db.from('plan_goals')
+    .select('*, plan_milestones(*)')
+    .order('start_date');
+  if (error) console.error('plan_goals load error:', error);
+  planGoals = data || [];
+
+  ['todo-goal', 'tl-edit-goal'].forEach(id => {
+    const sel  = document.getElementById(id);
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">🎯 目標なし</option>' + planGoals.map(g =>
+      `<option value="${g.id}">🎯 ${escapeHtmlT(g.title)}</option>`
+    ).join('');
+    sel.value = prev;
+  });
+}
+
+async function loadPlan() {
+  await loadGoals();
+  const { data: todos } = await db.from('todos')
+    .select('id, text, status, due_date, goal_id')
+    .not('goal_id', 'is', null);
+  renderRoadmap();
+  renderGoalCards(todos || []);
+}
+
+// 日付 → ロードマップ上の位置（%）
+function planPct(dateStr) {
+  const start = planStart.getTime();
+  const end   = new Date(planStart.getFullYear(), planStart.getMonth() + PLAN_MONTHS, 1).getTime();
+  const t     = new Date(dateStr + 'T00:00:00').getTime();
+  return (t - start) / (end - start) * 100;
+}
+
+function renderRoadmap() {
+  const last = new Date(planStart.getFullYear(), planStart.getMonth() + PLAN_MONTHS - 1, 1);
+  document.getElementById('plan-range-label').textContent =
+    `${planStart.getFullYear()}/${planStart.getMonth() + 1} 〜 ${last.getFullYear()}/${last.getMonth() + 1}`;
+
+  const months = Array.from({ length: PLAN_MONTHS }, (_, i) => {
+    const d = new Date(planStart.getFullYear(), planStart.getMonth() + i, 1);
+    return `<div class="rm-month">${d.getMonth() === 0 ? `<b>${d.getFullYear() % 100}/</b>` : ''}${d.getMonth() + 1}</div>`;
+  }).join('');
+
+  const todayPct = planPct(todayStr());
+  const todayLine = (todayPct >= 0 && todayPct <= 100)
+    ? `<div class="rm-today" style="left:${todayPct}%"></div>` : '';
+
+  const rows = planGoals.map(g => {
+    const left  = Math.max(0, planPct(g.start_date));
+    const right = Math.min(100, planPct(g.end_date));
+    if (right <= 0 || left >= 100) return '';
+    const marks = (g.plan_milestones || [])
+      .filter(m => m.due_date)
+      .map(m => {
+        const p = planPct(m.due_date);
+        if (p < 0 || p > 100) return '';
+        return `<span class="rm-mile ${m.done ? 'done' : ''}" style="left:${p}%;color:${g.color}" title="${escapeHtmlT(m.title)}（${formatDate(m.due_date)}）">◆</span>`;
+      }).join('');
+    return `
+      <div class="rm-row">
+        <div class="rm-label">${escapeHtmlT(g.title)}</div>
+        <div class="rm-track">
+          <div class="rm-bar" style="left:${left}%;width:${Math.max(right - left, 1)}%;background:${g.color}"></div>
+          ${marks}
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('plan-roadmap').innerHTML = `
+    <div class="rm-months">${months}</div>
+    <div class="rm-body">
+      ${todayLine}
+      ${rows || '<div class="empty-msg">この期間の目標はありません</div>'}
+    </div>`;
+}
+
+function renderGoalCards(todos) {
+  const box   = document.getElementById('plan-goals');
+  const today = todayStr();
+  const statusLabel = { will: 'Will', doing: 'Doing', done: 'Done' };
+
+  box.innerHTML = planGoals.map(g => {
+    const miles = (g.plan_milestones || [])
+      .sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
+    const linked = todos.filter(t => t.goal_id === g.id);
+    const total  = miles.length + linked.length;
+    const done   = miles.filter(m => m.done).length + linked.filter(t => t.status === 'done').length;
+    const pct    = total ? Math.round(done / total * 100) : 0;
+    const daysLeft = Math.ceil((new Date(g.end_date + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
+    const leftLabel = daysLeft >= 0 ? `あと${daysLeft}日` : '期間終了';
+
+    const mileRows = miles.map(m => `
+      <div class="goal-mile ${m.done ? 'done' : ''}">
+        <input type="checkbox" class="mile-check" data-id="${m.id}" ${m.done ? 'checked' : ''}>
+        <span class="mile-diamond" style="color:${g.color}">◆</span>
+        <span class="mile-title">${escapeHtmlT(m.title)}</span>
+        <span class="mile-date ${!m.done && m.due_date && m.due_date < today ? 'overdue' : ''}">${m.due_date ? formatDate(m.due_date) : ''}</span>
+        <button class="mile-del" data-id="${m.id}">×</button>
+      </div>`).join('');
+
+    const todoRows = linked.map(t => `
+      <div class="goal-todo ${t.status === 'done' ? 'done' : ''}">
+        <span class="goal-todo-status status-${t.status}">${statusLabel[t.status] || t.status}</span>
+        <span class="goal-todo-text">${escapeHtmlT(t.text)}</span>
+        ${t.due_date ? `<span class="mile-date">${formatDate(t.due_date)}</span>` : ''}
+      </div>`).join('');
+
+    return `
+      <div class="plan-card goal-card" style="border-left-color:${g.color}">
+        <div class="goal-card-head">
+          <div>
+            <div class="goal-card-title">🎯 ${escapeHtmlT(g.title)}</div>
+            <div class="goal-card-period">${formatDate(g.start_date)} 〜 ${formatDate(g.end_date)} ・ ${leftLabel}</div>
+          </div>
+          <div class="todo-actions">
+            <button class="todo-edit-btn goal-edit" data-id="${g.id}">✏️</button>
+            <button class="todo-del goal-del" data-id="${g.id}">×</button>
+          </div>
+        </div>
+        ${g.note ? `<div class="goal-card-note">${escapeHtmlT(g.note)}</div>` : ''}
+        <div class="goal-progress">
+          <div class="progress-track"><div class="progress-fill" style="width:${pct}%;background:${g.color}"></div></div>
+          <span class="progress-count">${total ? `${done} / ${total}（${pct}%）` : '—'}</span>
+        </div>
+
+        <div class="goal-sub-title">マイルストーン</div>
+        ${mileRows || '<div class="goal-empty">まだありません</div>'}
+        <form class="mile-form" data-goal="${g.id}">
+          <input type="text" class="mile-input" placeholder="マイルストーン（例: 模試で6.5）">
+          <input type="date" class="mile-date-input">
+          <button type="submit" class="add-schedule-btn">＋追加</button>
+        </form>
+
+        ${linked.length ? `<div class="goal-sub-title">ひもづいた ToDo</div>${todoRows}` : ''}
+      </div>`;
+  }).join('') || '<div class="empty-msg">目標がありません。下のフォームから追加してください</div>';
+
+  box.querySelectorAll('.mile-check').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      await db.from('plan_milestones').update({ done: cb.checked }).eq('id', cb.dataset.id);
+      loadPlan();
+    });
+  });
+
+  box.querySelectorAll('.mile-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('このマイルストーンを削除しますか？')) return;
+      await db.from('plan_milestones').delete().eq('id', btn.dataset.id);
+      loadPlan();
+    });
+  });
+
+  box.querySelectorAll('.mile-form').forEach(form => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = form.querySelector('.mile-input').value.trim();
+      if (!title) return;
+      const { error } = await db.from('plan_milestones').insert([{
+        goal_id:  Number(form.dataset.goal),
+        title,
+        due_date: form.querySelector('.mile-date-input').value || null,
+      }]);
+      if (error) console.error('plan_milestones insert error:', error);
+      loadPlan();
+    });
+  });
+
+  box.querySelectorAll('.goal-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const g = planGoals.find(x => String(x.id) === btn.dataset.id);
+      if (g) startGoalEdit(g);
+    });
+  });
+
+  box.querySelectorAll('.goal-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('この目標を削除しますか？\nマイルストーンも一緒に消えます（ToDo は残ります）。')) return;
+      await db.from('plan_goals').delete().eq('id', btn.dataset.id);
+      loadPlan();
+      loadTodos();
+    });
+  });
+}
+
+function startGoalEdit(g) {
+  editingGoalId = g.id;
+  document.getElementById('goal-title').value = g.title;
+  document.getElementById('goal-start').value = g.start_date;
+  document.getElementById('goal-end').value   = g.end_date;
+  document.getElementById('goal-color').value = g.color || '#9B59B6';
+  document.getElementById('goal-note').value  = g.note || '';
+  document.getElementById('goal-form-title').textContent = '✏️ 目標を編集';
+  document.getElementById('goal-submit').textContent     = '保存';
+  document.getElementById('goal-cancel').hidden          = false;
+  document.getElementById('goal-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function resetGoalForm() {
+  editingGoalId = null;
+  document.getElementById('goal-form').reset();
+  document.getElementById('goal-form-title').textContent = '＋ 目標を追加';
+  document.getElementById('goal-submit').textContent     = '追加する';
+  document.getElementById('goal-cancel').hidden          = true;
+}
+
+document.getElementById('goal-cancel').addEventListener('click', resetGoalForm);
+
+document.getElementById('goal-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    title:      document.getElementById('goal-title').value.trim(),
+    start_date: document.getElementById('goal-start').value,
+    end_date:   document.getElementById('goal-end').value,
+    color:      document.getElementById('goal-color').value,
+    note:       document.getElementById('goal-note').value.trim() || null,
+  };
+  if (!payload.title || !payload.start_date || !payload.end_date) {
+    alert('目標・開始日・終了日を入力してください');
+    return;
+  }
+  if (payload.end_date < payload.start_date) {
+    alert('終了日は開始日より後にしてください');
+    return;
+  }
+
+  const { error } = editingGoalId
+    ? await db.from('plan_goals').update(payload).eq('id', editingGoalId)
+    : await db.from('plan_goals').insert([payload]);
+  if (error) console.error('plan_goals save error:', error);
+
+  resetGoalForm();
+  loadPlan();
+});
+
+document.getElementById('plan-prev').addEventListener('click', () => {
+  planStart = new Date(planStart.getFullYear(), planStart.getMonth() - 3, 1);
+  renderRoadmap();
+});
+document.getElementById('plan-next').addEventListener('click', () => {
+  planStart = new Date(planStart.getFullYear(), planStart.getMonth() + 3, 1);
+  renderRoadmap();
+});
+
+// ============================================================
 // 初期化
 // ============================================================
-loadTodos();
+loadGoals().then(loadTodos);
 loadNotionAssignments();
 renderTimeline();
 initGcal();
@@ -1185,7 +1445,8 @@ initGcal();
 document.getElementById('btn-refresh').addEventListener('click', async () => {
   const btn = document.getElementById('btn-refresh');
   btn.classList.add('spinning');
-  await Promise.all([loadTodos(), loadNotionAssignments()]);
+  await Promise.all([loadGoals().then(loadTodos), loadNotionAssignments()]);
+  if (document.getElementById('tab-plan').classList.contains('active')) await loadPlan();
   await renderTimeline();
   btn.classList.remove('spinning');
 });
