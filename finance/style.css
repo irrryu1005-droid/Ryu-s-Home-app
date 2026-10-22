@@ -2240,3 +2240,8 @@ h3.section-title {
 .sim-goal-card.collapsed .sim-goal-caret { transform: rotate(-90deg); }
 .sim-goal-card.collapsed .sim-goal-summary { display: inline; }
 .sim-goal-summary > span { white-space: nowrap; }
+
+/* 予定支出: 支払い済み */
+.planned-item-paid .planned-name, .planned-item-paid .planned-amount { color: var(--text-muted); }
+.planned-item-paid .planned-amount { text-decoration: line-through; }
+.planned-paid-badge { font-size: 12px; font-weight: 800; color: var(--white); background: var(--profit-pos); border: none; border-radius: 8px; padding: 4px 8px; cursor: pointer; }

@@ -1080,12 +1080,15 @@ async function renderPlannedTab() {
 
   // サブスク（Life）+ 予定支出 + ローン + 日付オーバーライド を並行取得
   const yearMonthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const [subRes, planRes, loanRes, overrideRes, amountRes] = await Promise.all([
+  const { start: mStart, end: mEnd } = monthRange(new Date(year, month, 1));
+  const [subRes, planRes, loanRes, overrideRes, amountRes, paidRes, txnRes] = await Promise.all([
     db.from('subscriptions').select('*').eq('status', 'active'),
     db.from('planned_expenses').select('*').order('billing_day'),
     db.from('loans').select('*'),
     db.from('subscription_billing_overrides').select('*').eq('year_month', yearMonthStr),
     db.from('planned_amount_overrides').select('*').eq('year_month', yearMonthStr),
+    db.from('planned_paid').select('*').eq('year_month', yearMonthStr),
+    db.from('transactions').select('memo, amount').eq('type', 'expense').gte('date', mStart).lte('date', mEnd),
   ]);
   const overrideMap = {};
   for (const ov of (overrideRes.data || [])) overrideMap[ov.subscription_id] = ov;
@@ -1099,6 +1102,15 @@ async function renderPlannedTab() {
   const all = [...subItems, ...planItems, ...loanItems].filter(it => isActiveInMonth(it, year, month));
   all.sort((a, b) => (a.billingDay || 99) - (b.billingDay || 99));
 
+  // 支払い済み: ✓で登録したもの（planned_paid）。前に✓で登録した分は「メモが同じ名前・同じ金額の支出」がこの月にあれば済みとみなす
+  const paidKeys = new Set((paidRes.data || []).map(r => `${r.source}:${r.item_id}`));
+  const txns = [...(txnRes.data || [])];
+  for (const it of all) {
+    if (paidKeys.has(`${it.source}:${it.id}`)) { it.paid = 'marked'; continue; }
+    const i = txns.findIndex(t => (t.memo || '').trim() === it.name && (t.amount === it.amount || t.amount === it.amountMax));
+    if (i !== -1) { it.paid = 'matched'; txns.splice(i, 1); }
+  }
+
   const totalMin = all.reduce((s, it) => s + it.amount, 0);
   const totalMax = all.reduce((s, it) => s + (it.amountMax || it.amount), 0);
   document.getElementById('planned-total').textContent = totalMin !== totalMax
@@ -1110,13 +1122,15 @@ async function renderPlannedTab() {
   const isThisMonth = year === now.getFullYear() && month === now.getMonth();
   document.getElementById('planned-remaining-card').hidden = !isThisMonth;
   if (isThisMonth) {
-    const rest = all.filter(it => !it.billingDay || it.billingDay > now.getDate());
+    // 支払い済み（✓で登録したもの）は残りから外す
+    const rest = all.filter(it => !it.paid && (!it.billingDay || it.billingDay > now.getDate()));
+    const paidCount = all.filter(it => it.paid).length;
     const restMin = rest.reduce((s, it) => s + it.amount, 0);
     const restMax = rest.reduce((s, it) => s + (it.amountMax || it.amount), 0);
     document.getElementById('planned-remaining').textContent = restMin !== restMax
       ? `¥${restMin.toLocaleString()}〜¥${restMax.toLocaleString()}`
       : `¥${restMin.toLocaleString()}`;
-    document.getElementById('planned-remaining-sub').textContent = `（明日以降・${rest.length}件）`;
+    document.getElementById('planned-remaining-sub').textContent = `（明日以降・${rest.length}件${paidCount ? `／支払い済み ${paidCount}件を除く` : ''}）`;
     document.getElementById('planned-remaining').onclick = () => openPlannedRemainingModal(rest);
   }
 
@@ -1146,7 +1160,7 @@ async function renderPlannedTab() {
         ? `<button class="planned-day-override-btn" data-id="${it.id}" data-current="${it.billingDay || ''}" data-overridden="${it.billingDayOverridden}" title="今月の支払日を変更">📅</button>`
         : '';
       return `
-        <div class="planned-item">
+        <div class="planned-item${it.paid ? ' planned-item-paid' : ''}">
           <div class="planned-item-left">
             <span class="planned-day">${dayLabel}${overrideMark}</span>
             ${dayOverrideBtn}
@@ -1161,7 +1175,9 @@ async function renderPlannedTab() {
                 ? `¥${it.amount.toLocaleString()}〜¥${it.amountMax.toLocaleString()}`
                 : `¥${it.amount.toLocaleString()}`}${it.amountConfirmed ? '<span class="badge-amount-confirmed">確定</span>' : ''}
             </button>
-            <button class="planned-register-btn" data-id="${it.id}" data-source="${it.source}" data-name="${escapeHtmlF(it.name)}" data-amount="${it.amount}" data-category="${it.category}" data-day="${it.billingDay || ''}" data-payment="${escapeHtmlF(it.paymentMethod)}" title="支出として登録">✓</button>
+            ${it.paid
+              ? `<button class="planned-paid-badge" data-id="${it.id}" data-source="${it.source}" data-kind="${it.paid}" title="${it.paid === 'marked' ? 'タップで支払い済みを取り消す' : '同じ名前・金額の支出が記録されています'}">済</button>`
+              : `<button class="planned-register-btn" data-id="${it.id}" data-source="${it.source}" data-name="${escapeHtmlF(it.name)}" data-amount="${it.amount}" data-category="${it.category}" data-day="${it.billingDay || ''}" data-payment="${escapeHtmlF(it.paymentMethod)}" title="支出として登録">✓</button>`}
             <button class="planned-edit-btn" data-id="${it.id}" data-source="${it.source}">編集</button>
           </div>
         </div>`;
@@ -1190,13 +1206,23 @@ async function renderPlannedTab() {
     btn.addEventListener('click', () => openDayOverrideModal(btn.dataset.id, btn.dataset.current, btn.dataset.overridden === 'true', yearMonthStr));
   });
 
+  // 「済」: ✓で付けた印は取り消せる（登録した支出の記録はそのまま）
+  list.querySelectorAll('.planned-paid-badge').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (btn.dataset.kind !== 'marked') { alert('この月に同じ名前・同じ金額の支出が記録されているので、支払い済みとして数えています。外したいときは一覧タブでその支出を消すか、メモを変えてください。'); return; }
+      if (!(await showConfirm('支払い済みの印を取り消しますか？（登録した支出の記録は消えません）'))) return;
+      await db.from('planned_paid').delete().eq('source', btn.dataset.source).eq('item_id', btn.dataset.id).eq('year_month', yearMonthStr);
+      renderPlannedTab();
+    });
+  });
+
   list.querySelectorAll('.planned-register-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const { name, amount, category, day, payment } = btn.dataset;
+      const { id, source, name, amount, category, day, payment } = btn.dataset;
       const billingDate = day
         ? `${yearMonthStr}-${String(day).padStart(2, '0')}`
         : todayJST();
-      openPlannedRegisterModal({ name, amount: parseInt(amount), category, date: billingDate, paymentMethod: payment });
+      openPlannedRegisterModal({ id, source, yearMonth: yearMonthStr, name, amount: parseInt(amount), category, date: billingDate, paymentMethod: payment });
     });
   });
 }
@@ -1307,7 +1333,7 @@ function openAmountOverrideModal({ id, source, name, amount, confirmed, planned,
   modal.onclick = (e) => { if (e.target === modal) close(); };
 }
 
-function openPlannedRegisterModal({ name, amount, category, date, paymentMethod }) {
+function openPlannedRegisterModal({ id, source, yearMonth, name, amount, category, date, paymentMethod }) {
   const modal = document.getElementById('planned-register-modal');
   const form  = document.getElementById('planned-register-form');
   form.elements.prName.value    = name;
@@ -1334,10 +1360,15 @@ function openPlannedRegisterModal({ name, amount, category, date, paymentMethod 
       memo:           form.elements.prMemo.value.trim(),
       location:       null,
     };
-    const { error } = await db.from('transactions').insert([payload]);
+    const { data: inserted, error } = await db.from('transactions').insert([payload]).select('id');
     if (error) { alert('登録エラー: ' + error.message); saveBtn.disabled = false; return; }
     await updateAccountBalance(payload.payment_method, 'expense', payload.amount);
+    // この月のこの予定支出を「支払い済み」に（残りで必要な金額・シミュの予想から外れる）
+    if (id && source && yearMonth) {
+      await db.from('planned_paid').upsert({ source, item_id: id, year_month: yearMonth, transaction_id: inserted?.[0]?.id || null, amount: payload.amount, paid_date: payload.date }, { onConflict: 'source,item_id,year_month' });
+    }
     close();
+    renderPlannedTab();
     saveBtn.disabled = false;
     const flash = document.getElementById('pr-flash');
     flash.textContent = `✓ ${name} を登録しました`;
@@ -2320,6 +2351,7 @@ let _simPlannedSrc = null;
 let _simAmountOverrides = {}; // { 'YYYY-MM': { 'source:id': 金額 } }
 let _simTrips = [];           // 旅行（事前に払うもの＋旅行中に使うもの）
 let _simGoals = [];           // 貯金の目標（複数）{ id, name, target_amount, deadline_ym, saved_amount, monthly_amount, sort_order }
+let _simPaid = new Set();     // 予定支出で✓（支払い済み）にしたもの 'YYYY-MM:source:id'
 let _simGoalsDone = [];       // 達成した目標（達成日 achieved_at がある）
 let _simGoalCache = null;     // simGoalsPlan() の結果（データが変わったら null に戻す）
 const SIM_DAILY_LABEL = '日割り';
@@ -2360,7 +2392,7 @@ function simSignedYen(n) {
 }
 
 async function loadSimData() {
-  const [jobRes, recRes, monRes, subRes, planRes, loanRes, amountRes, tripRes, goalRes] = await Promise.all([
+  const [jobRes, recRes, monRes, subRes, planRes, loanRes, amountRes, tripRes, goalRes, paidRes] = await Promise.all([
     db.from('sim_jobs').select('*').order('sort_order').order('id'),
     db.from('sim_recurring').select('*').order('sort_order').order('id'),
     db.from('sim_months').select('*'),
@@ -2370,7 +2402,9 @@ async function loadSimData() {
     db.from('planned_amount_overrides').select('*'),
     db.from('sim_trips').select('*').order('start_date'),
     db.from('sim_goals').select('*').order('sort_order').order('id'),
+    db.from('planned_paid').select('source, item_id, year_month'),
   ]);
+  _simPaid = new Set((paidRes.data || []).map(r => `${r.year_month}:${r.source}:${r.item_id}`));
   _simGoals = (goalRes.data || []).filter(g => !g.achieved_at);
   _simGoalsDone = (goalRes.data || []).filter(g => g.achieved_at).sort((a, b) => b.achieved_at.localeCompare(a.achieved_at));
   _simGoalCache = null;
@@ -2928,7 +2962,7 @@ function openSimNeedModal() {
   const srcLabel = { subscription: 'サブスク', loan: 'ローン', planned: '予定支出' };
   for (const it of [...subItems, ...planItems, ...loanItems]) {
     if (!isActiveInMonth(it, y, m)) continue;
-    rows.push({ name: it.name, note: `${srcLabel[it.source]}${it.amountConfirmed ? '・金額確定' : it.amountMax ? '・多いほうの額' : ''}`, day: it.billingDay || null, amount: it.amountMax || it.amount });
+    rows.push({ name: it.name, note: `${srcLabel[it.source]}${it.amountConfirmed ? '・金額確定' : it.amountMax ? '・多いほうの額' : ''}${_simPaid.has(`${ym}:${it.source}:${it.id}`) ? '・✓支払い済み' : ''}`, day: it.billingDay || null, amount: it.amountMax || it.amount });
   }
   for (const r of _simRecurring) {
     if (r.kind === 'expense' && simLongActive(r, ym)) rows.push({ name: r.name, note: `長期間（${simLongRangeLabel(r)}）${r.day ? '' : '・日割り'}`, day: r.day || null, amount: Number(r.amount) || 0 });
@@ -3550,7 +3584,7 @@ function simTrendEvents(today, months) {
     for (const r of c.cashRows) events.push({ date: dayStr(r.day), label: `${r.name}（${r.note}）`, delta: r.amount, projected: true });
     const { subItems, planItems, loanItems } = buildPlannedItems(_simPlannedSrc.subs, _simPlannedSrc.plans, _simPlannedSrc.loans, {}, _simAmountOverrides[ym] || {});
     for (const it of [...subItems, ...planItems, ...loanItems]) {
-      if (isActiveInMonth(it, y, m)) events.push({ date: dayStr(it.billingDay), label: `${it.name}（予定支出）`, delta: -(it.amountMax || it.amount), projected: true });
+      if (isActiveInMonth(it, y, m) && !_simPaid.has(`${ym}:${it.source}:${it.id}`)) events.push({ date: dayStr(it.billingDay), label: `${it.name}（予定支出）`, delta: -(it.amountMax || it.amount), projected: true });
     }
     // 日にちを決めた支出（毎月の支出・この月だけの支出）はその日に
     let dated = 0;
@@ -4046,7 +4080,7 @@ function acctProjectedEvents(account, today, end) {
     // 引き落とし（予定支出。サブスクは登録した支払方法、それ以外は銀行から）
     const { subItems, planItems, loanItems } = buildPlannedItems(_simPlannedSrc.subs, _simPlannedSrc.plans, _simPlannedSrc.loans, {}, _simAmountOverrides[ym] || {});
     for (const it of [...subItems, ...planItems, ...loanItems]) {
-      if (!isActiveInMonth(it, y, m)) continue;
+      if (!isActiveInMonth(it, y, m) || _simPaid.has(`${ym}:${it.source}:${it.id}`)) continue;
       const acc = it.source === 'subscription' && it.paymentMethod ? it.paymentMethod : SIM_DEFAULT_ACCOUNT;
       if (acc !== account) continue;
       events.push({ date: dayStr(it.billingDay), label: `${it.name}（予定支出）`, delta: -(it.amountMax || it.amount), projected: true, undated: !it.billingDay });
