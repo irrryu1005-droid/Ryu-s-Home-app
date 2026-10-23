@@ -860,7 +860,8 @@ async function loadPcTodos() {
   if (!list) return;
 
   const today = todayStr();
-  list.innerHTML = (todos || []).map(t => {
+  // リストは直近1週間に期限があるものだけ（タイムラインには全部渡す）
+  list.innerHTML = (todos || []).filter(t => inNextWeek(t.due_date, t.status === 'done')).map(t => {
     const overdue    = t.due_date && t.due_date < today && t.status !== 'done';
     const catBadge   = t.category ? `<span class="cat-badge cat-${t.category}">${t.category}</span>` : '';
     const schedules  = (t.task_schedules || []).sort((a, b) => a.schedule_date.localeCompare(b.schedule_date));
@@ -888,7 +889,14 @@ async function loadPcTodos() {
           <button class="todo-del" data-id="${t.id}">×</button>
         </div>
       </div>`;
-  }).join('') || '<div style="font-size:13px;color:var(--muted);padding:8px 0">タスクがありません</div>';
+  }).join('') || '<div style="font-size:13px;color:var(--muted);padding:8px 0">この1週間に期限のあるタスクはありません</div>';
+  list.insertAdjacentHTML('afterbegin', homeNotionListHtml());
+  list.querySelectorAll('[data-notion]').forEach(el => {
+    el.addEventListener('click', () => {
+      const n = homeNotionItems.find(x => x.id === el.dataset.notion);
+      if (n) openHomeNotionEdit(n);
+    });
+  });
 
   list.querySelectorAll('.status-select').forEach(sel => {
     sel.addEventListener('change', async () => {
@@ -954,49 +962,233 @@ document.getElementById('pc-todo-form')?.addEventListener('submit', async (e) =>
   pendingHomeSchedules = [];
   renderHomeScheduleChips();
   e.target.reset();
+  closePcTodoModal();
   loadPcTodos();
+});
+
+// 「＋ 追加」でモーダルを開く（カードの縦幅をすっきりさせるため、入力欄はモーダルの中）
+function closePcTodoModal() {
+  document.getElementById('pc-todo-overlay')?.classList.remove('active');
+}
+document.getElementById('pc-todo-open')?.addEventListener('click', () => {
+  document.getElementById('pc-todo-overlay').classList.add('active');
+  document.getElementById('pc-todo-input').focus();
+});
+document.getElementById('pc-todo-cancel')?.addEventListener('click', closePcTodoModal);
+document.getElementById('pc-todo-overlay')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closePcTodoModal();
+});
+
+// ============================================================
+// 神大の課題（Notion「課題・締切」。Tasks と同じ Netlify Function を使う）
+// ============================================================
+// Live Server（127.0.0.1 / localhost）には Netlify Functions がないので、本番の Function を呼ぶ
+const FUNCTIONS_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
+  ? 'https://irr-home.netlify.app'
+  : '';
+let homeNotionItems = [];
+let homeNotionEditing = null;
+
+async function loadHomeNotion() {
+  try {
+    const res = await fetch(`${FUNCTIONS_BASE}/.netlify/functions/notion-assignments`);
+    if (!res.ok) throw new Error(await res.text());
+    homeNotionItems = await res.json();
+  } catch (err) {
+    console.error('Notion 課題の取得に失敗:', err);
+    homeNotionItems = [];
+  }
+  loadPcTodos();
+}
+
+// 締切 → { date: 'YYYY-MM-DD', label: '10/26（月） 10:30', time: '10:30' | '' }
+function homeNotionDue(due) {
+  if (!due.includes('T')) return { date: due, label: formatHomeDate(due), time: '' };
+  const d = new Date(due);
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return { date: localDateStr(d), label: `${formatHomeDate(localDateStr(d))} ${time}`, time };
+}
+
+// リスト: まだ終わっていない課題を締切の近い順に
+function homeNotionListHtml() {
+  const open = homeNotionItems.filter(n => n.status !== 'done' && n.due && inNextWeek(homeNotionDue(n.due).date, false))
+    .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
+  if (!open.length) return '';
+  const now = new Date();
+  return `<div class="home-notion-head">📚 神大（Notion）<span class="home-notion-sub">この1週間 ${open.length}件</span></div>` +
+    open.map(n => {
+      const due = n.due ? homeNotionDue(n.due) : null;
+      const overdue = n.due && new Date(n.due.includes('T') ? n.due : n.due + 'T23:59:59') < now;
+      return `
+        <div class="todo-item home-notion-item status-${n.status}" data-notion="${n.id}">
+          <div class="todo-main">
+            <span class="home-notion-status status-${n.status}">${schEscape(n.statusName)}</span>
+            <div class="todo-info">
+              <div class="todo-text">${schEscape(n.title)}</div>
+              <div class="todo-meta">
+                ${n.subjects.length ? `<span class="cat-badge cat-神大">${schEscape(n.subjects.join('・'))}</span>` : ''}
+                ${due ? `<span class="todo-due ${overdue ? 'overdue' : ''}">📅 ${due.label}</span>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }).join('') +
+    '<div class="home-notion-sep"></div>';
+}
+
+function openHomeNotionEdit(n) {
+  homeNotionEditing = n;
+  const due = n.due ? homeNotionDue(n.due) : { date: '', time: '' };
+  document.getElementById('home-ne-title').value  = n.title;
+  document.getElementById('home-ne-status').value = n.statusName;
+  document.getElementById('home-ne-kind').value   = n.kind || '';
+  document.getElementById('home-ne-prep').value   = n.prep || '';
+  document.getElementById('home-ne-due').value    = due.date;
+  document.getElementById('home-ne-time').value   = due.time;
+  document.getElementById('home-ne-method').value = n.method || '';
+  document.getElementById('home-ne-points').value = n.points || '';
+  document.getElementById('home-ne-memo').value   = n.memo || '';
+  document.getElementById('home-ne-error').hidden = true;
+  document.getElementById('home-ne-overlay').classList.add('active');
+}
+
+function closeHomeNotionEdit() {
+  document.getElementById('home-ne-overlay').classList.remove('active');
+  homeNotionEditing = null;
+}
+
+// 'YYYY-MM-DD' + 'HH:mm' → この端末のタイムゾーンつきの日時（例: 2026-10-26T10:30:00+09:00）
+function withTzOffset(date, time) {
+  const off  = -new Date(`${date}T${time}:00`).getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  return `${date}T${time}:00${sign}${pad(Math.floor(Math.abs(off) / 60))}:${pad(Math.abs(off) % 60)}`;
+}
+
+document.getElementById('home-ne-cancel')?.addEventListener('click', closeHomeNotionEdit);
+document.getElementById('home-ne-overlay')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeHomeNotionEdit();
+});
+
+document.getElementById('home-ne-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!homeNotionEditing) return;
+  const title = document.getElementById('home-ne-title').value.trim();
+  const date  = document.getElementById('home-ne-due').value;
+  const time  = document.getElementById('home-ne-time').value;
+  const prep  = document.getElementById('home-ne-prep').value;
+  const errEl = document.getElementById('home-ne-error');
+  const btn   = document.getElementById('home-ne-save');
+  if (!title) return;
+  if (prep && date && prep > date) {
+    errEl.textContent = '準備開始は締切より前の日にしてください';
+    errEl.hidden = false;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+  try {
+    const res = await fetch(`${FUNCTIONS_BASE}/.netlify/functions/notion-assignment-update`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id:     homeNotionEditing.id,
+        title,
+        status: document.getElementById('home-ne-status').value,
+        kind:   document.getElementById('home-ne-kind').value,
+        due:    date ? (time ? withTzOffset(date, time) : date) : null,
+        prep:   prep || null,
+        method: document.getElementById('home-ne-method').value.trim(),
+        points: document.getElementById('home-ne-points').value.trim(),
+        memo:   document.getElementById('home-ne-memo').value.trim(),
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    closeHomeNotionEdit();
+    await loadHomeNotion();
+  } catch (err) {
+    console.error('Notion 課題の保存に失敗:', err);
+    errEl.textContent = `保存できませんでした: ${String(err.message).slice(0, 120)}`;
+    errEl.hidden = false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存';
+  }
 });
 
 // ============================================================
 // ガントタイムライン（PC版）
 // ============================================================
-const HOME_CELL_W = 28;
-let homeTlMonth   = new Date();
+const HOME_CELL_W  = 44;   // 1日の幅（7日分をカードに収める）
+const HOME_TL_DAYS = 7;
+let homeTlStart   = null;  // タイムラインの最初の日（'YYYY-MM-DD'。null なら今日）
 let ganttEditTodo = null;
 
+function addDaysStr(ds, n) {
+  const d = new Date(ds + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return localDateStr(d);
+}
+
+// 直近1週間（今日〜6日後）に締切があるか。期限切れでまだ終わっていないものも入れる
+function inNextWeek(dateStr, done) {
+  if (!dateStr) return false;
+  const today = todayStr();
+  return dateStr <= addDaysStr(today, HOME_TL_DAYS - 1) && (dateStr >= today || !done);
+}
+
 function buildGanttTimeline(todos) {
-  const year     = homeTlMonth.getFullYear();
-  const month    = homeTlMonth.getMonth();
-  const first    = new Date(year, month, 1);
-  const last     = new Date(year, month + 1, 0);
-  const days     = last.getDate();
-  const firstStr = localDateStr(first);
-  const lastStr  = localDateStr(last);
   const today    = todayStr();
+  const firstStr = homeTlStart || today;
+  const lastStr  = addDaysStr(firstStr, HOME_TL_DAYS - 1);
+  const days     = HOME_TL_DAYS;
   const WEEK     = ['日', '月', '火', '水', '木', '金', '土'];
   const totalW   = days * HOME_CELL_W;
+  const dateAt   = i => addDaysStr(firstStr, i);
+  const dayIdx   = ds => Math.round((new Date(ds + 'T00:00:00') - new Date(firstStr + 'T00:00:00')) / 86400000);
 
   const monthEl = document.getElementById('home-tl-month');
-  if (monthEl) monthEl.textContent = `${year}年${month + 1}月`;
+  if (monthEl) monthEl.textContent = `${formatHomeDate(firstStr)} 〜 ${formatHomeDate(lastStr)}`;
 
-  const dated = (todos || []).filter(t => t.start_date || t.due_date);
+  // ToDo: 開始〜期限がこの7日にかかるもの
+  const dated = (todos || []).filter(t => {
+    let s = t.start_date || t.due_date, e = t.due_date || t.start_date;
+    if (!s) return false;
+    if (s > e) [s, e] = [e, s];
+    return s <= lastStr && e >= firstStr;
+  });
+
+  // Notion の課題: 準備開始〜締切がこの7日にかかるもの
+  const notionRows = homeNotionItems.filter(n => n.due).map(n => {
+    const due = homeNotionDue(n.due);
+    return { n, due, start: n.prep && n.prep < due.date ? n.prep : due.date };
+  }).filter(x => x.start <= lastStr && x.due.date >= firstStr)
+    .sort((a, b) => a.n.due.localeCompare(b.n.due));
 
   // ラベル列
   const labelsEl = document.getElementById('home-tl-labels');
   if (!labelsEl) return;
   labelsEl.innerHTML =
     `<div class="home-tl-label-header"></div>` +
+    notionRows.map(({ n }) => `<div class="home-tl-label-row home-tl-label-notion" data-notion="${n.id}"><span class="home-tl-label-name ${n.status === 'done' ? 'done' : ''}" title="${schEscape(n.title)}">📚 ${schEscape(n.title)}</span></div>`).join('') +
     dated.map(t => `<div class="home-tl-label-row"><span class="home-tl-label-name ${t.status === 'done' ? 'done' : ''}" title="${t.text}">${t.text}</span></div>`).join('') +
-    (dated.length === 0 ? '<div class="home-tl-empty">日付のあるタスクがありません</div>' : '');
+    (dated.length + notionRows.length === 0 ? '<div class="home-tl-empty">この1週間の予定はありません</div>' : '');
+  labelsEl.querySelectorAll('[data-notion]').forEach(el => {
+    el.addEventListener('click', () => {
+      const n = homeNotionItems.find(x => x.id === el.dataset.notion);
+      if (n) openHomeNotionEdit(n);
+    });
+  });
 
   // ヘッダー（日付）
   const headerEl = document.getElementById('home-tl-header');
   headerEl.style.width = totalW + 'px';
   headerEl.innerHTML = Array.from({ length: days }, (_, i) => {
-    const d   = new Date(year, month, i + 1);
+    const ds  = dateAt(i);
+    const d   = new Date(ds + 'T00:00:00');
     const dow = d.getDay();
-    return `<div class="home-tl-day-header ${dow === 0 || dow === 6 ? 'we' : ''}" style="left:${i * HOME_CELL_W}px;width:${HOME_CELL_W}px">
-      <div class="home-tl-day-num">${i + 1}</div>
+    return `<div class="home-tl-day-header ${dow === 0 || dow === 6 ? 'we' : ''} ${ds === today ? 'is-today' : ''}" style="left:${i * HOME_CELL_W}px;width:${HOME_CELL_W}px">
+      <div class="home-tl-day-num">${d.getMonth() + 1}/${d.getDate()}</div>
       <div class="home-tl-day-name">${WEEK[dow]}</div>
     </div>`;
   }).join('');
@@ -1005,17 +1197,17 @@ function buildGanttTimeline(todos) {
   const rowsEl = document.getElementById('home-tl-rows');
   rowsEl.innerHTML = '';
 
-  dated.forEach(task => {
+  // 背景のマスと今日の線だけの行
+  function emptyRow() {
     const row = document.createElement('div');
     row.className  = 'home-tl-row';
     row.style.width = totalW + 'px';
 
     Array.from({ length: days }, (_, i) => {
-      const d    = new Date(year, month, i + 1);
-      const dStr = localDateStr(d);
-      const dow  = d.getDay();
+      const ds   = dateAt(i);
+      const dow  = new Date(ds + 'T00:00:00').getDay();
       const cell = document.createElement('div');
-      cell.className = `home-tl-cell ${dow === 0 || dow === 6 ? 'we' : ''} ${dStr === today ? 'today' : ''}`;
+      cell.className = `home-tl-cell ${dow === 0 || dow === 6 ? 'we' : ''} ${ds === today ? 'today' : ''}`;
       cell.style.cssText = `left:${i * HOME_CELL_W}px;width:${HOME_CELL_W}px`;
       row.appendChild(cell);
     });
@@ -1023,39 +1215,61 @@ function buildGanttTimeline(todos) {
     if (today >= firstStr && today <= lastStr) {
       const marker = document.createElement('div');
       marker.className = 'home-tl-today-line';
-      marker.style.left = `${(parseInt(today.split('-')[2]) - 0.5) * HOME_CELL_W}px`;
+      marker.style.left = `${(dayIdx(today) + 0.5) * HOME_CELL_W}px`;
       row.appendChild(marker);
     }
+    return row;
+  }
+
+  // Notion の課題: 準備開始〜締切のバー ＋ 締切の日の目印（時刻つきなら時刻、終日なら「締」）
+  notionRows.forEach(({ n, due, start }) => {
+    const row    = emptyRow();
+    const dueIn  = due.date <= lastStr;
+    const endIdx = dueIn ? dayIdx(due.date) : days - 1;
+    const sIdx   = start < firstStr ? 0 : dayIdx(start);
+    const done   = n.status === 'done' ? 'done' : '';
+    if (start !== due.date) {
+      const range = document.createElement('div');
+      range.className = `home-tl-notion-prep ${done}`;
+      range.style.cssText = `left:${sIdx * HOME_CELL_W + 2}px;width:${(endIdx - sIdx + 1) * HOME_CELL_W - 4}px`;
+      range.title = `準備 ${formatHomeDate(n.prep)} 〜 締切 ${due.label}`;
+      range.addEventListener('click', () => openHomeNotionEdit(n));
+      row.appendChild(range);
+    }
+    if (dueIn) {
+      const mark = document.createElement('div');
+      mark.className = `home-tl-notion-due ${done}`;
+      mark.style.cssText = `left:${endIdx * HOME_CELL_W + 2}px;width:${HOME_CELL_W - 4}px`;
+      mark.textContent = due.time || '締';
+      mark.title = `${n.title}（${due.label}・${n.statusName}）`;
+      mark.addEventListener('click', () => openHomeNotionEdit(n));
+      row.appendChild(mark);
+    }
+    rowsEl.appendChild(row);
+  });
+
+  dated.forEach(task => {
+    const row = emptyRow();
 
     let startStr = task.start_date || task.due_date;
     let endStr   = task.due_date || task.start_date;
     if (startStr > endStr) [startStr, endStr] = [endStr, startStr];
 
-    const cs = startStr < firstStr ? firstStr : startStr;
-    const ce = endStr   > lastStr  ? lastStr  : endStr;
-
-    if (cs <= lastStr && ce >= firstStr) {
-      const s       = parseInt(cs.split('-')[2]) - 1;
-      const e       = parseInt(ce.split('-')[2]) - 1;
-      const bar     = document.createElement('div');
-      bar.className = 'home-tl-bar';
-      const barColor = HOME_CAT_COLORS[task.category] || '#4A90D9';
-      bar.style.cssText = `left:${s * HOME_CELL_W + 2}px;width:${(e - s + 1) * HOME_CELL_W - 4}px;opacity:${task.status === 'done' ? 0.4 : 1};background:${barColor}`;
-      const span = document.createElement('span');
-      span.className   = 'home-tl-bar-text';
-      span.textContent = task.text;
-      bar.appendChild(span);
-      bar.addEventListener('click', (ev) => { ev.stopPropagation(); openGanttModal(task); });
-      row.appendChild(bar);
-    }
+    const s   = dayIdx(startStr < firstStr ? firstStr : startStr);
+    const e   = dayIdx(endStr   > lastStr  ? lastStr  : endStr);
+    const bar = document.createElement('div');
+    bar.className = 'home-tl-bar';
+    const barColor = HOME_CAT_COLORS[task.category] || '#4A90D9';
+    bar.style.cssText = `left:${s * HOME_CELL_W + 2}px;width:${(e - s + 1) * HOME_CELL_W - 4}px;opacity:${task.status === 'done' ? 0.4 : 1};background:${barColor}`;
+    const span = document.createElement('span');
+    span.className   = 'home-tl-bar-text';
+    span.textContent = task.text;
+    bar.appendChild(span);
+    bar.addEventListener('click', (ev) => { ev.stopPropagation(); openGanttModal(task); });
+    row.appendChild(bar);
 
     rowsEl.appendChild(row);
   });
-
-  if (today >= firstStr && today <= lastStr) {
-    const scrollEl = document.getElementById('home-tl-scroll');
-    if (scrollEl) scrollEl.scrollLeft = Math.max(0, (parseInt(today.split('-')[2]) - 4) * HOME_CELL_W);
-  }
 }
 
 function openGanttModal(todo) {
@@ -1102,11 +1316,11 @@ document.getElementById('home-tl-edit-save')?.addEventListener('click', async ()
 });
 
 document.getElementById('home-tl-prev')?.addEventListener('click', () => {
-  homeTlMonth = new Date(homeTlMonth.getFullYear(), homeTlMonth.getMonth() - 1, 1);
+  homeTlStart = addDaysStr(homeTlStart || todayStr(), -HOME_TL_DAYS);
   loadPcTodos();
 });
 document.getElementById('home-tl-next')?.addEventListener('click', () => {
-  homeTlMonth = new Date(homeTlMonth.getFullYear(), homeTlMonth.getMonth() + 1, 1);
+  homeTlStart = addDaysStr(homeTlStart || todayStr(), HOME_TL_DAYS);
   loadPcTodos();
 });
 
@@ -1374,6 +1588,7 @@ document.getElementById('mobile-finance-form')?.addEventListener('submit', async
 startClock();
 loadFinanceSummary();
 loadPcTodos();
+loadHomeNotion();
 loadMobileTodos();
 loadRoutine();
 loadHabitChart();
@@ -1392,7 +1607,7 @@ document.getElementById('btn-refresh')?.addEventListener('click', async () => {
   btn.classList.add('spinning');
   await Promise.all([
     loadFinanceSummary(),
-    loadPcTodos(),
+    loadHomeNotion(),   // 読み終わったら loadPcTodos() も呼ぶ
     loadMobileTodos(),
     loadRoutine(),
     loadHabitChart(),

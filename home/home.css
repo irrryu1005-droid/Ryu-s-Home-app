@@ -280,6 +280,8 @@ body {
 .home-tl-day-name { font-size: 9px; color: var(--muted); }
 .home-tl-day-header.we { background: #FEF9E7; }
 .home-tl-day-header.we .home-tl-day-num { color: var(--profit-neg); }
+.home-tl-day-header.is-today { background: rgba(74,144,217,0.12); }
+.home-tl-day-header.is-today .home-tl-day-num { color: var(--expense); }
 .home-tl-rows { position: relative; }
 .home-tl-row {
   position: relative;
@@ -326,6 +328,72 @@ body {
   text-overflow: ellipsis;
   pointer-events: none;
 }
+
+/* 神大の課題（Notion） */
+.home-notion-head { font-size: 12px; font-weight: 800; margin: 2px 0 6px; display: flex; gap: 8px; align-items: baseline; }
+.home-notion-sub { font-size: 11px; font-weight: 400; color: var(--muted); }
+.home-notion-item { cursor: pointer; }
+.home-notion-status {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: var(--bg);
+  flex-shrink: 0;
+}
+.home-notion-status.status-will  { color: #2980B9; }
+.home-notion-status.status-doing { color: #F39C12; }
+.home-notion-sep { border-top: 1px dashed var(--border); margin: 8px 0; }
+.home-tl-label-notion { cursor: pointer; color: #2980B9; }
+.home-tl-notion-prep {
+  position: absolute;
+  top: 5px;
+  height: 22px;
+  border-radius: 5px;
+  background: rgba(41, 128, 185, 0.18);
+  border: 1.5px dashed #2980B9;
+  z-index: 3;
+  cursor: pointer;
+}
+.home-tl-notion-due {
+  position: absolute;
+  top: 5px;
+  height: 22px;
+  border-radius: 5px;
+  background: #2980B9;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.home-tl-notion-prep.done, .home-tl-notion-due.done { opacity: 0.4; }
+
+/* Notion の課題の編集モーダル */
+.home-ne { width: min(400px, 92vw); max-height: 90vh; overflow-y: auto; }
+.home-ne select, .home-ne input[type="time"] {
+  padding: 6px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--white);
+}
+.home-ne textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+.home-ne-error { font-size: 12px; color: var(--profit-neg); }
+.home-ne-error[hidden] { display: none !important; }
+#home-ne-save { background: var(--expense); color: #fff; border-color: var(--expense); }
 
 /* ガント編集モーダル */
 .home-tl-overlay {
@@ -479,6 +547,21 @@ body {
   gap: 6px;
   margin-top: 12px;
 }
+/* ToDo の見出し行（右に「＋ 追加」）と、追加のモーダル */
+.card-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.card-title-row .card-title { margin-bottom: 0; }
+.todo-add-open-btn {
+  padding: 5px 12px;
+  border: 1.5px solid var(--expense);
+  border-radius: 99px;
+  background: var(--white);
+  color: var(--expense);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.todo-add-open-btn:hover { background: var(--expense); color: var(--white); }
+.todo-add-modal { width: min(400px, 92vw); margin-top: 0; gap: 10px; }
 .todo-form-row {
   display: flex;
   gap: 8px;

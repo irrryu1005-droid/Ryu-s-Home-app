@@ -76,15 +76,37 @@
 
       <!-- ToDo -->
       <div class="pc-card todo-card">
-        <div class="card-title">✅ ToDo</div>
+        <div class="card-title-row">
+          <div class="card-title">✅ ToDo</div>
+          <button type="button" class="todo-add-open-btn" id="pc-todo-open">＋ 追加</button>
+        </div>
         <div class="todo-inner">
           <div class="todo-left">
             <div id="pc-todo-list"></div>
-            <form id="pc-todo-form" class="todo-add-form">
-              <div class="todo-form-row">
-                <input type="text" id="pc-todo-input" placeholder="タスクを追加..." required>
-                <button type="submit">追加</button>
+          </div>
+          <div class="todo-right">
+            <div class="home-tl-controls">
+              <button id="home-tl-prev">＜</button>
+              <span id="home-tl-month"></span>
+              <button id="home-tl-next">＞</button>
+            </div>
+            <div class="home-tl-wrap">
+              <div class="home-tl-labels" id="home-tl-labels"></div>
+              <div class="home-tl-scroll" id="home-tl-scroll">
+                <div class="home-tl-header" id="home-tl-header"></div>
+                <div class="home-tl-rows"   id="home-tl-rows"></div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <!-- ガント編集モーダル -->
+    <!-- ToDo を追加するモーダル（「＋ 追加」で開く） -->
+    <div class="home-tl-overlay" id="pc-todo-overlay">
+            <form id="pc-todo-form" class="todo-add-form home-tl-modal todo-add-modal">
+              <div class="home-tl-modal-title">✅ タスクを追加</div>
+              <input type="text" id="pc-todo-input" placeholder="タスク名" required>
               <div class="todo-form-row">
                 <select id="pc-todo-category">
                   <option value="">カテゴリなし</option>
@@ -112,26 +134,53 @@
                 </div>
                 <div id="pc-todo-schedule-chips" class="schedule-chips"></div>
               </div>
-            </form>
-          </div>
-          <div class="todo-right">
-            <div class="home-tl-controls">
-              <button id="home-tl-prev">＜</button>
-              <span id="home-tl-month"></span>
-              <button id="home-tl-next">＞</button>
-            </div>
-            <div class="home-tl-wrap">
-              <div class="home-tl-labels" id="home-tl-labels"></div>
-              <div class="home-tl-scroll" id="home-tl-scroll">
-                <div class="home-tl-header" id="home-tl-header"></div>
-                <div class="home-tl-rows"   id="home-tl-rows"></div>
+              <div class="home-tl-modal-btns">
+                <button type="button" id="pc-todo-cancel">キャンセル</button>
+                <button type="submit" id="pc-todo-submit">追加</button>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </form>
+    </div>
 
-    <!-- ガント編集モーダル -->
+    <!-- Notion の課題を編集（Tasks と同じ項目。Notion に保存） -->
+    <div class="home-tl-overlay" id="home-ne-overlay">
+      <form class="home-tl-modal home-ne" id="home-ne-form" novalidate>
+        <div class="home-tl-modal-title">✏️ 課題を編集 <span class="home-notion-sub">Notion に保存されます</span></div>
+        <input type="text" id="home-ne-title" placeholder="課題名" required>
+        <div class="home-tl-form-row">
+          <label>状態
+            <select id="home-ne-status">
+              <option value="Will">Will</option>
+              <option value="Doing">Doing</option>
+              <option value="Done">Done</option>
+            </select>
+          </label>
+          <label>種類
+            <select id="home-ne-kind">
+              <option value="">種類なし</option>
+              <option value="小テスト">小テスト</option>
+              <option value="レポート">レポート</option>
+              <option value="ミニレポート">ミニレポート</option>
+              <option value="アンケート">アンケート</option>
+              <option value="その他">その他</option>
+            </select>
+          </label>
+        </div>
+        <div class="home-tl-form-row">
+          <label>準備開始（予習・復習）<input type="date" id="home-ne-prep"></label>
+          <label>締切<input type="date" id="home-ne-due"></label>
+          <label>締切の時刻（空欄＝終日）<input type="time" id="home-ne-time"></label>
+        </div>
+        <input type="text" id="home-ne-method" placeholder="提出方法">
+        <input type="text" id="home-ne-points" placeholder="配点">
+        <textarea id="home-ne-memo" rows="3" placeholder="メモ"></textarea>
+        <div class="home-ne-error" id="home-ne-error" hidden></div>
+        <div class="home-tl-modal-btns">
+          <button type="button" id="home-ne-cancel">キャンセル</button>
+          <button type="submit" id="home-ne-save">保存</button>
+        </div>
+      </form>
+    </div>
+
     <div class="home-tl-overlay" id="home-tl-overlay">
       <div class="home-tl-modal">
         <div class="home-tl-modal-title">✏️ タスクを編集</div>
