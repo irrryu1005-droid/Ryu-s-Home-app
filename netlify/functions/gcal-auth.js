@@ -11,7 +11,9 @@ async function secretRpc(fn, args) {
     body: JSON.stringify({ p_secret: process.env.GCAL_FN_SECRET, ...args }),
   });
   if (!res.ok) throw new Error(`supabase ${fn}: ${res.status} ${await res.text()}`);
-  return res.json();
+  // 戻り値のない関数（gcal_secret_set）は 204 で中身が空なので、JSON として読まない
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 function page(msg) {
