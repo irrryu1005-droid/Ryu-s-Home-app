@@ -29,62 +29,22 @@ function daysAgoStr(n) {
 // ============================================================
 // Google Calendar 連携
 // ============================================================
-const GC_CLIENT_ID            = '1053779234925-qc97npjce6q3avsssjkfl3jvldjv4sj1.apps.googleusercontent.com';
-const GC_SCOPE                = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
-const GCAL_TOKEN_KEY_HOME     = 'gcal_shared_token';
-const GCAL_AUTOLOGIN_KEY_HOME = 'gcal_autologin';
+let gcalToken = null;
 
-let gcTokenClient = null;
-let gcalToken     = null;
-
-function gcalTokenSaveHome(token) {
-  gcalToken = token;
-  sessionStorage.setItem(GCAL_TOKEN_KEY_HOME, JSON.stringify({ token, exp: Date.now() + 3500 * 1000 }));
-}
-function gcalTokenRestoreHome() {
-  try {
-    const s = JSON.parse(sessionStorage.getItem(GCAL_TOKEN_KEY_HOME));
-    if (s && s.exp > Date.now()) { gcalToken = s.token; return true; }
-  } catch {}
-  return false;
-}
 function gcalTokenClearHome() {
   gcalToken = null;
-  sessionStorage.removeItem(GCAL_TOKEN_KEY_HOME);
 }
 
+// 鍵はサーバーからもらう（../shared/gcal.js）。最初にもらえたらカレンダー一覧と今日の予定を読む
 function initGcalHome() {
-  if (typeof google === 'undefined' || !google.accounts) {
-    setTimeout(initGcalHome, 300);
-    return;
-  }
-
-  // セッション内にトークンが残っていれば即復元
-  if (gcalTokenRestoreHome()) {
-    gcalFetchCalendars().then(cals => { gcCalendars = cals; populateCalendarSelect(cals); loadTodaySchedule(); });
-    // バックグラウンドで token client も初期化（期限切れ対応）
-  }
-
-  gcTokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: GC_CLIENT_ID,
-    scope:     GC_SCOPE,
-    callback:  (resp) => {
-      if (resp.error) { if (!gcalToken) loadTodaySchedule(); return; }
-      gcalTokenSaveHome(resp.access_token);
-      localStorage.setItem(GCAL_AUTOLOGIN_KEY_HOME, '1');
-      gcalFetchCalendars().then(cals => { gcCalendars = cals; populateCalendarSelect(cals); loadTodaySchedule(); });
-    },
-    error_callback: () => { if (!gcalToken) loadTodaySchedule(); },
+  gcalAutoToken(token => {
+    const first = !gcalToken && token;
+    gcalToken = token;
+    if (first) gcalFetchCalendars().then(cals => { gcCalendars = cals; populateCalendarSelect(cals); loadTodaySchedule(); });
+    else if (!token) loadTodaySchedule();
   });
-
-  if (!gcalToken && localStorage.getItem(GCAL_AUTOLOGIN_KEY_HOME)) {
-    gcTokenClient.requestAccessToken({ prompt: '' });
-  } else if (!gcalToken) {
-    loadTodaySchedule();
-  }
 }
-
-window.onGoogleLibraryLoad = initGcalHome;
+initGcalHome();
 
 async function gcalCreate(summary, date, colorId) {
   if (!gcalToken) return null;
@@ -163,12 +123,10 @@ async function loadTodaySchedule() {
 
   if (!gcalToken) {
     const loginHTML = `<div class="schedule-empty">
-      <button class="gcal-login-btn" id="gcal-schedule-login">Googleでログイン</button>
+      <button class="gcal-login-btn" id="gcal-schedule-login">Googleカレンダーに接続（最初の1回だけ）</button>
     </div>`;
     targets_el.forEach(el => el.innerHTML = loginHTML);
-    document.getElementById('gcal-schedule-login')?.addEventListener('click', () => {
-      gcTokenClient.requestAccessToken({ prompt: 'consent' });
-    });
+    document.getElementById('gcal-schedule-login')?.addEventListener('click', gcalConnect);
     return;
   }
 

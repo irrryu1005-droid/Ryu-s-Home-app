@@ -40,34 +40,14 @@ const CAT_COLORS = {
 // ============================================================
 // Google Calendar 連携
 // ============================================================
-const GCAL_CLIENT_ID = '1053779234925-qc97npjce6q3avsssjkfl3jvldjv4sj1.apps.googleusercontent.com';
-const GCAL_SCOPE     = 'https://www.googleapis.com/auth/calendar.events';
+let gcalToken = null;
 
-let gcalToken   = null;
-let tokenClient = null;
-
+// 鍵はサーバーからもらう（../shared/gcal.js）。まだ接続していなければヘッダーに接続ボタン
 function initGcal() {
-  if (typeof google === 'undefined' || !google.accounts) {
-    setTimeout(initGcal, 300);
-    return;
-  }
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: GCAL_CLIENT_ID,
-    scope:     GCAL_SCOPE,
-    callback:  (resp) => {
-      if (resp.error) {
-        // サイレント認証が失敗したらヘッダーに手動認証ボタンを表示
-        showGcalAuthBtn();
-        return;
-      }
-      gcalToken = resp.access_token;
-      hideGcalAuthBtn();
-    },
+  gcalAutoToken(token => {
+    gcalToken = token;
+    if (token) hideGcalAuthBtn(); else showGcalAuthBtn();
   });
-  // 過去に認証済みならポップアップなしで自動取得
-  tokenClient.requestAccessToken({ prompt: 'none' });
-  // callback が呼ばれない場合のフォールバック（2秒後にトークン未取得なら認証ボタンを表示）
-  setTimeout(() => { if (!gcalToken) showGcalAuthBtn(); }, 2000);
 }
 
 function showGcalAuthBtn() {
@@ -76,9 +56,7 @@ function showGcalAuthBtn() {
   btn.id        = 'gcal-auth-btn';
   btn.className = 'gcal-auth-btn';
   btn.textContent = '📅 GCal 認証';
-  btn.addEventListener('click', () => {
-    if (tokenClient) tokenClient.requestAccessToken();
-  });
+  btn.addEventListener('click', gcalConnect);
   document.querySelector('.header').appendChild(btn);
 }
 
@@ -101,7 +79,7 @@ async function gcalCreate(summary, date, colorId) {
       colorId: String(colorId),
     }),
   });
-  if (res.status === 401) { gcalToken = null; updateGcalBtn(); return null; }
+  if (res.status === 401) { gcalToken = null; showGcalAuthBtn(); return null; }
   if (!res.ok) return null;
   return (await res.json()).id;
 }
@@ -113,7 +91,7 @@ async function gcalDelete(eventId) {
     `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
     { method: 'DELETE', headers: { 'Authorization': `Bearer ${gcalToken}` } }
   );
-  if (res.status === 401) { gcalToken = null; updateGcalBtn(); }
+  if (res.status === 401) { gcalToken = null; showGcalAuthBtn(); }
 }
 
 // ============================================================
