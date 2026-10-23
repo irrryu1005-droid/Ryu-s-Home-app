@@ -2350,7 +2350,7 @@ let _simMonths = {};
 let _simPlannedSrc = null;
 let _simAmountOverrides = {}; // { 'YYYY-MM': { 'source:id': 金額 } }
 let _simTrips = [];           // 旅行（事前に払うもの＋旅行中に使うもの）
-let _simGoals = [];           // 貯金の目標（複数）{ id, name, target_amount, deadline_ym, saved_amount, monthly_amount, sort_order }
+let _simGoals = [];           // 貯金の目標（複数）{ id, name, target_amount, start_ym, deadline_ym, saved_amount, monthly_amount, sort_order }
 let _simPaid = new Set();     // 予定支出で✓（支払い済み）にしたもの 'YYYY-MM:source:id'
 let _simGoalsDone = [];       // 達成した目標（達成日 achieved_at がある）
 let _simGoalCache = null;     // simGoalsPlan() の結果（データが変わったら null に戻す）
@@ -2602,9 +2602,10 @@ function simTripMonth(trip, ym) {
 // 貯金の目標（複数）: 目標ごとに「毎月の額」を積み立てる。届いたらその目標は止まる。余りが足りない月は上の目標から順に
 //   その月の「貯金に回す」= 目標への積み立ての合計 ＋ 目標以外の貯金（月の計画の saving）
 //   → { alloc: { ym: { per: {id: 額}, goalsTotal, extra } }, months: [{ ym, end, per: {id: その月末の額}, total }], stats: { id: {...} } }
-// 目標の毎月の額。空（null）なら「目標まで残り ÷ 今月〜期限の月数」（100円単位で切り上げ）。期限もなければ0
+// 目標の毎月の額。空（null）なら「目標まで残り ÷ 今月（開始月が先ならその月）〜期限の月数」（100円単位で切り上げ）。期限もなければ0
 function simGoalMonthsLeft(g, fromYm = ymKey(new Date())) {
   if (!g.deadline_ym) return null;
+  if (g.start_ym && g.start_ym > fromYm) fromYm = g.start_ym;  // 開始月より前は数えない
   if (g.deadline_ym < fromYm) return null;
   return (Number(g.deadline_ym.slice(0, 4)) - Number(fromYm.slice(0, 4))) * 12 + (Number(g.deadline_ym.slice(5, 7)) - Number(fromYm.slice(5, 7))) + 1;
 }
@@ -2639,9 +2640,10 @@ function simGoalsPlan(maxMonths = 36) {
     const per = {}, wants = {};
     for (const g of _simGoals) {
       const pastDeadline = g.deadline_ym && ym > g.deadline_ym;  // 期限を過ぎた月は積み立てない
+      const notStarted = g.start_ym && ym < g.start_ym;          // 開始月より前も積み立てない
       // 自動の目標は月ごとに割り直す（足りなかった月の分を翌月以降に上乗せ）。毎月の額を決めた目標は固定
       const monthly = simGoalIsAuto(g) ? (simGoalPaceAt(g, ym, saved[g.id]) ?? 0) : g.monthly_amount;
-      const want = pastDeadline ? 0 : Math.min(monthly, Math.max(0, g.target_amount - saved[g.id]));
+      const want = pastDeadline || notStarted ? 0 : Math.min(monthly, Math.max(0, g.target_amount - saved[g.id]));
       const give = Math.min(want, left);
       per[g.id] = give; wants[g.id] = want; left -= give; saved[g.id] += give;
       if (!stats[g.id].reachYm && saved[g.id] >= g.target_amount) stats[g.id].reachYm = ym;
@@ -2907,7 +2909,7 @@ function renderSimUse(c) {
 // 余りの使い道に出す、目標ごとのこの月の積み立て
 function simGoalAllocHtml(c) {
   if (!c.goalAlloc) return '';
-  const rows = _simGoals.filter(g => !(g.deadline_ym && c.ym > g.deadline_ym)).map(g => {
+  const rows = _simGoals.filter(g => !(g.deadline_ym && c.ym > g.deadline_ym) && !(g.start_ym && c.ym < g.start_ym)).map(g => {
     const amt  = c.goalAlloc.per[g.id] || 0;
     const want = c.goalAlloc.wants?.[g.id] || 0;
     const prevSaved = simGoalsPlan().months.find(m => m.ym === simPrevYm(c.ym))?.per[g.id] ?? g.saved_amount ?? 0;
@@ -3657,7 +3659,7 @@ function renderSimGoal(plan, todayBalance) {
         return `
           <div class="sim-goal-item" data-id="${g.id}">
             <div class="sim-goal-row">
-              <span>${_simGoals.length > 1 ? `<span class="sim-goal-handle" title="つまんで動かす">⠿</span><span class="sim-goal-rank">${'①②③④⑤⑥⑦⑧⑨⑩'[gi] || gi + 1}</span>` : ''}<b>${escapeHtmlF(g.name)}</b> ${yen(g.target_amount)}${g.deadline_ym ? `<span class="sim-badge">${simYmLabel(g.deadline_ym)}まで</span>` : ''}<span class="sim-badge sim-badge-when">毎月${yen(simGoalMonthly(g))}${simGoalIsAuto(g) ? '（自動）' : ''}</span></span>
+              <span>${_simGoals.length > 1 ? `<span class="sim-goal-handle" title="つまんで動かす">⠿</span><span class="sim-goal-rank">${'①②③④⑤⑥⑦⑧⑨⑩'[gi] || gi + 1}</span>` : ''}<b>${escapeHtmlF(g.name)}</b> ${yen(g.target_amount)}${g.start_ym && g.start_ym > ymKey(new Date()) ? `<span class="sim-badge">${simYmLabel(g.start_ym)}から</span>` : ''}${g.deadline_ym ? `<span class="sim-badge">${simYmLabel(g.deadline_ym)}まで</span>` : ''}<span class="sim-badge sim-badge-when">毎月${yen(simGoalMonthly(g))}${simGoalIsAuto(g) ? '（自動）' : ''}</span></span>
               <span class="sim-goal-btns">
                 <button class="sim-goal-done-btn" data-goal-done="${g.id}" title="達成した（今日の日付で一覧から外す）">✓ 達成</button>
                 <button class="planned-edit-btn" data-goal-edit="${g.id}">編集</button>
@@ -3741,6 +3743,7 @@ function openSimGoalModal(id = null) {
   f.elements.name.value = g?.name || '';
   f.elements.target.value = g?.target_amount || '';
   f.elements.deadline.value = g?.deadline_ym || '';
+  f.elements.start.value = g?.start_ym || '';
   f.elements.saved.value = g?.saved_amount ?? '';
   f.elements.monthly.value = g?.monthly_amount ?? '';
   f.elements.achieved.value = g?.achieved_at || '';
@@ -3763,11 +3766,11 @@ function openSimGoalModal(id = null) {
 // 毎月の額が空のときの「自動ならいくらか」を表示
 function simUpdateGoalPaceNote() {
   const f = document.getElementById('sim-goal-form');
-  const g = { target_amount: Number(f.elements.target.value) || 0, saved_amount: Number(f.elements.saved.value) || 0, deadline_ym: f.elements.deadline.value || null };
+  const g = { target_amount: Number(f.elements.target.value) || 0, saved_amount: Number(f.elements.saved.value) || 0, deadline_ym: f.elements.deadline.value || null, start_ym: f.elements.start.value || null };
   const pace = g.target_amount ? simGoalPace(g) : null;
   f.elements.monthly.placeholder = pace != null ? `空なら自動 ${pace.toLocaleString()}` : '期限があれば空でOK';
   document.getElementById('sim-goal-pace').textContent = f.elements.monthly.value === ''
-    ? (pace != null ? `空欄なので、期限までの割り算で毎月 ${yen(pace)}（${simGoalMonthsLeft(g)}か月）` : '空欄で期限もないので、毎月 ¥0 です')
+    ? (pace != null ? `空欄なので、期限までの割り算で毎月 ${yen(pace)}（${g.start_ym && g.start_ym > ymKey(new Date()) ? simYmLabel(g.start_ym) + 'から' : ''}${simGoalMonthsLeft(g)}か月）` : '空欄で期限もないので、毎月 ¥0 です')
     : '';
 }
 
@@ -3776,10 +3779,14 @@ async function saveSimGoal(e) {
   const f = e.target;
   const target = Number(f.elements.target.value) || 0;
   if (!target) { f.elements.target.focus(); return; }
+  if (f.elements.start.value && f.elements.deadline.value && f.elements.start.value > f.elements.deadline.value) {
+    alert('開始月が期限より後になっています'); f.elements.start.focus(); return;
+  }
   const row = {
     name: f.elements.name.value.trim() || '貯金',
     target_amount: target,
     deadline_ym: f.elements.deadline.value || null,
+    start_ym: f.elements.start.value || null,  // 空なら今月から
     saved_amount: Number(f.elements.saved.value) || 0,
     // 空欄なら null（期限までの割り算で自動）
     monthly_amount: f.elements.monthly.value === '' ? null : Number(f.elements.monthly.value) || 0,
@@ -3898,7 +3905,7 @@ function initSim() {
   document.getElementById('sim-item-form').addEventListener('submit', saveSimItem);
   document.getElementById('btn-sim-add-trip').addEventListener('click', () => openSimTripModal());
   document.getElementById('sim-goal-form').addEventListener('submit', saveSimGoal);
-  ['target', 'saved', 'deadline', 'monthly'].forEach(n => document.getElementById('sim-goal-form').elements[n].addEventListener('input', simUpdateGoalPaceNote));
+  ['target', 'saved', 'deadline', 'start', 'monthly'].forEach(n => document.getElementById('sim-goal-form').elements[n].addEventListener('input', simUpdateGoalPaceNote));
   document.getElementById('sim-goal-wl').addEventListener('change', e => {
     const opt = e.target.selectedOptions[0];
     const f = document.getElementById('sim-goal-form');

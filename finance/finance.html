@@ -867,10 +867,14 @@
               <label>名前</label>
               <input type="text" name="name" placeholder="貯金・旅行資金など">
             </div>
+            <div class="form-group">
+              <label>目標額 (¥)</label>
+              <input type="number" name="target" min="1" placeholder="300000" inputmode="numeric" required>
+            </div>
             <div class="form-row">
               <div class="form-group">
-                <label>目標額 (¥)</label>
-                <input type="number" name="target" min="1" placeholder="300000" inputmode="numeric" required>
+                <label>貯金を始める月（任意・空なら今月）</label>
+                <input type="month" name="start">
               </div>
               <div class="form-group">
                 <label>期限（任意）</label>
