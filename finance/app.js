@@ -2601,11 +2601,31 @@ function simTripMonth(trip, ym) {
 //   その月の「貯金に回す」= 目標への積み立ての合計 ＋ 目標以外の貯金（月の計画の saving）
 //   → { alloc: { ym: { per: {id: 額}, goalsTotal, extra } }, months: [{ ym, end, per: {id: その月末の額}, total }], stats: { id: {...} } }
 // 目標の毎月の額。空（null）なら「目標まで残り ÷ 今月（開始月が先ならその月）〜期限の月数」（100円単位で切り上げ）。期限もなければ0
+// 期限の月のうち積み立てに数える割合。日にち（deadline_date）があれば 日にち ÷ その月の日数、なければ月末まで（1）
+function simGoalDeadlineFrac(g) {
+  if (!g.deadline_date) return 1;
+  const y = Number(g.deadline_date.slice(0, 4)), m = Number(g.deadline_date.slice(5, 7));
+  return Number(g.deadline_date.slice(8, 10)) / new Date(y, m, 0).getDate();
+}
+// 期限の表示: 日にちがあれば「1月10日」、なければ「1月」
+function simGoalDeadlineLabel(g) {
+  return g.deadline_date ? `${simYmLabel(g.deadline_ym)}${Number(g.deadline_date.slice(8, 10))}日` : simYmLabel(g.deadline_ym);
+}
+// 期限までの月数。期限の月は日割り（1月10日なら 10/31 か月）なので小数になることがある
 function simGoalMonthsLeft(g, fromYm = ymKey(new Date())) {
   if (!g.deadline_ym) return null;
   if (g.start_ym && g.start_ym > fromYm) fromYm = g.start_ym;  // 開始月より前は数えない
   if (g.deadline_ym < fromYm) return null;
-  return (Number(g.deadline_ym.slice(0, 4)) - Number(fromYm.slice(0, 4))) * 12 + (Number(g.deadline_ym.slice(5, 7)) - Number(fromYm.slice(5, 7))) + 1;
+  return (Number(g.deadline_ym.slice(0, 4)) - Number(fromYm.slice(0, 4))) * 12 + (Number(g.deadline_ym.slice(5, 7)) - Number(fromYm.slice(5, 7))) + simGoalDeadlineFrac(g);
+}
+// 「3か月」「2か月と10日」の形
+function simGoalMonthsLeftLabel(g) {
+  const n = simGoalMonthsLeft(g);
+  if (n == null) return '';
+  const full = Math.floor(n + 1e-9);
+  if (n - full < 1e-9) return `${full}か月`;
+  const day = Number(g.deadline_date.slice(8, 10));
+  return full ? `${full}か月と${day}日` : `${day}日`;
 }
 // fromYm の月から期限まで、savedNow からの残りを割った毎月の額（前の月までの不足分も自然に上乗せされる）
 function simGoalPaceAt(g, fromYm, savedNow) {
@@ -2641,7 +2661,9 @@ function simGoalsPlan(maxMonths = 36) {
       const notStarted = g.start_ym && ym < g.start_ym;          // 開始月より前も積み立てない
       // 自動の目標は月ごとに割り直す（足りなかった月の分を翌月以降に上乗せ）。毎月の額を決めた目標は固定
       const monthly = simGoalIsAuto(g) ? (simGoalPaceAt(g, ym, saved[g.id]) ?? 0) : g.monthly_amount;
-      const want = pastDeadline || notStarted ? 0 : Math.min(monthly, Math.max(0, g.target_amount - saved[g.id]));
+      // 期限の月は日割り（1月10日が期限なら、その月の額の 10/31）
+      const share = ym === g.deadline_ym ? Math.round(monthly * simGoalDeadlineFrac(g)) : monthly;
+      const want = pastDeadline || notStarted ? 0 : Math.min(share, Math.max(0, g.target_amount - saved[g.id]));
       const give = Math.min(want, left);
       per[g.id] = give; wants[g.id] = want; left -= give; saved[g.id] += give;
       if (!stats[g.id].reachYm && saved[g.id] >= g.target_amount) stats[g.id].reachYm = ym;
@@ -3796,16 +3818,16 @@ function renderSimGoal(plan, todayBalance) {
         let deadline = '';
         if (g.deadline_ym && st.needPerMonth != null) {
           deadline = st.deadlineOk
-            ? `<span class="sim-save">期限（${simYmLabel(g.deadline_ym)}）に間に合います</span>`
+            ? `<span class="sim-save">期限（${simGoalDeadlineLabel(g)}）に間に合います</span>`
             : simGoalIsAuto(g)
-            ? `<span class="sim-neg">不足分を上乗せしても、余りが足りず期限（${simYmLabel(g.deadline_ym)}）に間に合いません</span>`
-            : `<span class="sim-neg">期限（${simYmLabel(g.deadline_ym)}）に間に合うには毎月 <b>${yen(st.needPerMonth)}</b></span>
+            ? `<span class="sim-neg">不足分を上乗せしても、余りが足りず期限（${simGoalDeadlineLabel(g)}）に間に合いません</span>`
+            : `<span class="sim-neg">期限（${simGoalDeadlineLabel(g)}）に間に合うには毎月 <b>${yen(st.needPerMonth)}</b></span>
                ${!simGoalIsAuto(g) && st.needPerMonth !== g.monthly_amount ? `<button class="sim-hint-btn" data-goal-need="${g.id}" data-amount="${st.needPerMonth}">毎月${yen(st.needPerMonth)}にする</button>` : ''}`;
         }
         return `
           <div class="sim-goal-item" data-id="${g.id}">
             <div class="sim-goal-row">
-              <span>${_simGoals.length > 1 ? `<span class="sim-goal-handle" title="つまんで動かす">⠿</span><span class="sim-goal-rank">${'①②③④⑤⑥⑦⑧⑨⑩'[gi] || gi + 1}</span>` : ''}<b>${escapeHtmlF(g.name)}</b> ${yen(g.target_amount)}${g.start_ym && g.start_ym > ymKey(new Date()) ? `<span class="sim-badge">${simYmLabel(g.start_ym)}から</span>` : ''}${g.deadline_ym ? `<span class="sim-badge">${simYmLabel(g.deadline_ym)}まで</span>` : ''}<span class="sim-badge sim-badge-when">毎月${yen(simGoalMonthly(g))}${simGoalIsAuto(g) ? '（自動）' : ''}</span></span>
+              <span>${_simGoals.length > 1 ? `<span class="sim-goal-handle" title="つまんで動かす">⠿</span><span class="sim-goal-rank">${'①②③④⑤⑥⑦⑧⑨⑩'[gi] || gi + 1}</span>` : ''}<b>${escapeHtmlF(g.name)}</b> ${yen(g.target_amount)}${g.start_ym && g.start_ym > ymKey(new Date()) ? `<span class="sim-badge">${simYmLabel(g.start_ym)}から</span>` : ''}${g.deadline_ym ? `<span class="sim-badge">${simGoalDeadlineLabel(g)}まで</span>` : ''}<span class="sim-badge sim-badge-when">毎月${yen(simGoalMonthly(g))}${simGoalIsAuto(g) ? '（自動）' : ''}</span></span>
               <span class="sim-goal-btns">
                 <button class="sim-goal-done-btn" data-goal-done="${g.id}" title="達成した（今日の日付で一覧から外す）">✓ 達成</button>
                 <button class="planned-edit-btn" data-goal-edit="${g.id}">編集</button>
@@ -3888,7 +3910,8 @@ function openSimGoalModal(id = null) {
   f.elements.id.value = g ? g.id : '';
   f.elements.name.value = g?.name || '';
   f.elements.target.value = g?.target_amount || '';
-  f.elements.deadline.value = g?.deadline_ym || '';
+  // 日にちのない前の目標は、その月の末日を入れておく
+  f.elements.deadline.value = g?.deadline_date || (g?.deadline_ym ? dateStr(Number(g.deadline_ym.slice(0, 4)), Number(g.deadline_ym.slice(5, 7)) - 1, new Date(Number(g.deadline_ym.slice(0, 4)), Number(g.deadline_ym.slice(5, 7)), 0).getDate()) : '');
   f.elements.start.value = g?.start_ym || '';
   f.elements.saved.value = g?.saved_amount ?? '';
   f.elements.monthly.value = g?.monthly_amount ?? '';
@@ -3912,11 +3935,11 @@ function openSimGoalModal(id = null) {
 // 毎月の額が空のときの「自動ならいくらか」を表示
 function simUpdateGoalPaceNote() {
   const f = document.getElementById('sim-goal-form');
-  const g = { target_amount: Number(f.elements.target.value) || 0, saved_amount: Number(f.elements.saved.value) || 0, deadline_ym: f.elements.deadline.value || null, start_ym: f.elements.start.value || null };
+  const g = { target_amount: Number(f.elements.target.value) || 0, saved_amount: Number(f.elements.saved.value) || 0, deadline_date: f.elements.deadline.value || null, deadline_ym: f.elements.deadline.value.slice(0, 7) || null, start_ym: f.elements.start.value || null };
   const pace = g.target_amount ? simGoalPace(g) : null;
   f.elements.monthly.placeholder = pace != null ? `空なら自動 ${pace.toLocaleString()}` : '期限があれば空でOK';
   document.getElementById('sim-goal-pace').textContent = f.elements.monthly.value === ''
-    ? (pace != null ? `空欄なので、期限までの割り算で毎月 ${yen(pace)}（${g.start_ym && g.start_ym > ymKey(new Date()) ? simYmLabel(g.start_ym) + 'から' : ''}${simGoalMonthsLeft(g)}か月）` : '空欄で期限もないので、毎月 ¥0 です')
+    ? (pace != null ? `空欄なので、期限までの割り算で毎月 ${yen(pace)}（${g.start_ym && g.start_ym > ymKey(new Date()) ? simYmLabel(g.start_ym) + 'から' : ''}${simGoalMonthsLeftLabel(g)}）` : '空欄で期限もないので、毎月 ¥0 です')
     : '';
 }
 
@@ -3925,13 +3948,14 @@ async function saveSimGoal(e) {
   const f = e.target;
   const target = Number(f.elements.target.value) || 0;
   if (!target) { f.elements.target.focus(); return; }
-  if (f.elements.start.value && f.elements.deadline.value && f.elements.start.value > f.elements.deadline.value) {
+  if (f.elements.start.value && f.elements.deadline.value && f.elements.start.value > f.elements.deadline.value.slice(0, 7)) {
     alert('開始月が期限より後になっています'); f.elements.start.focus(); return;
   }
   const row = {
     name: f.elements.name.value.trim() || '貯金',
     target_amount: target,
-    deadline_ym: f.elements.deadline.value || null,
+    deadline_date: f.elements.deadline.value || null,
+    deadline_ym: f.elements.deadline.value.slice(0, 7) || null,  // 月の判定（期限を過ぎた月など）はこちらを使う
     start_ym: f.elements.start.value || null,  // 空なら今月から
     saved_amount: Number(f.elements.saved.value) || 0,
     // 空欄なら null（期限までの割り算で自動）
