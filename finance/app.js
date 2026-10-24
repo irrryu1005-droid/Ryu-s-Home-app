@@ -144,7 +144,6 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (tab === 'data')     { renderFinancePnl(); }
     if (tab === 'list')     renderList();
     if (tab === 'accounts') { renderAccounts(); renderAccountHistory(); }
-    if (tab === 'planned')  renderPlannedTab();
     if (tab === 'sim')      renderSim();
     if (tab === 'wishlist') initWishList();
     saveViewState('tab', tab);
@@ -2329,7 +2328,6 @@ document.getElementById('btn-refresh').addEventListener('click', async () => {
   if      (tab === 'data')     await renderFinancePnl();
   else if (tab === 'list')     await renderList();
   else if (tab === 'accounts') { await renderAccounts(); await renderAccountHistory(); }
-  else if (tab === 'planned')  await renderPlannedTab();
   else if (tab === 'sim')      await renderSim();
   else if (tab === 'wishlist') await initWishList();
   else                         await renderDashboard();
@@ -2790,8 +2788,9 @@ async function renderSim() {
   if (!_simInited) { initSim(); _simInited = true; }
   await loadSimData();
   const sub = document.querySelector('.sim-sub-btn.active')?.dataset.sub;
-  if (sub === 'trend') await renderSimTrend();
-  else                 await renderSimMonth();
+  if (sub === 'trend')        await renderSimTrend();
+  else if (sub === 'planned') await renderPlannedTab();
+  else                        await renderSimMonth();
 }
 
 // 月の切り替え（＜ ○月 ＞）を、上のタブの下に固定する。上に固定されている部品の高さを測って位置を決める
@@ -2831,8 +2830,8 @@ async function renderSimMonth() {
   document.getElementById('sim-planned-total').textContent = yen(c.planned);
   const confirmedCount = Object.keys(_simAmountOverrides[ym] || {}).length;
   document.getElementById('sim-planned-sub').textContent = confirmedCount
-    ? `予定支出タブから自動で計算（${confirmedCount}件は金額確定済み）`
-    : '予定支出タブから自動で計算';
+    ? `予定支出から自動で計算（${confirmedCount}件は金額確定済み）`
+    : '予定支出から自動で計算';
 
   // 出勤日・休み
   const off = Math.max(0, c.daysInMonth - c.workDays);
@@ -3076,17 +3075,20 @@ function renderSimJobs(c) {
     if (j.job_type === 'koma') {
       const rates = simKomaRates(j), lens = simKomaLengths(j);
       detail = `コマ制${j.transport_per_day ? `・交通費 1日${yen(j.transport_per_day)}` : ''}`;
+      // 時給をタップ → 生徒ごとのコマ数。生徒が入っているマスは生徒の合計になるので直接は打てない
       const komaTable = (kind, payFn) => `
         <table class="sim-koma-table">
           <thead><tr><th></th>${lens.map(l => `<th>${l}分</th>`).join('')}</tr></thead>
-          <tbody>${rates.map(r => `<tr><th>${r.toLocaleString()}円</th>${lens.map(l => {
+          <tbody>${rates.map(r => `<tr><th><button type="button" class="sim-koma-rate" data-job="${j.id}" data-kind="${kind}" data-rate="${r}">${r.toLocaleString()}円</button></th>${lens.map(l => {
             const key = `${j.id}:${kind}:${r}-${l}`;
-            return `<td><input type="number" min="0" value="${Number(wd[key]) || 0}" data-key="${key}" inputmode="numeric" title="1コマ ${yen(payFn(r, l))}"></td>`;
+            const byStudent = simKomaStudentSum(wd, j.id, kind, r, l) > 0;
+            return `<td><input type="number" min="0" value="${Number(wd[key]) || 0}" data-key="${key}" inputmode="numeric" title="1コマ ${yen(payFn(r, l))}"${byStudent ? ` readonly class="sim-koma-by-student" data-job="${j.id}" data-kind="${kind}" data-rate="${r}"` : ''}></td>`;
           }).join('')}</tr>`).join('')}</tbody>
         </table>`;
+      const perStudent = simKomaStudentTotals(j, wd, 'k');
       body = `
         ${komaTable('k', simKomaPay)}
-        <div class="sim-row-sub">合計 ${jm.komaCount}コマ</div>
+        <div class="sim-row-sub">合計 ${jm.komaCount}コマ${perStudent.length ? `（${perStudent.map(s => `${escapeHtmlF(s.name)} ${s.count}`).join('・')}）` : ''}</div>
         <details class="sim-koma-cancel"${jm.cancelCount ? ' open' : ''}>
           <summary>当日キャンセル（0.6倍）${jm.cancelCount ? ` ${jm.cancelCount}コマ・${yen(jm.cancelPay)}` : ''}</summary>
           ${komaTable('c', simKomaCancelPay)}
@@ -3118,12 +3120,155 @@ function renderSimJobs(c) {
       </div>`;
   }).join('');
 
-  wrap.querySelectorAll('input[data-key]').forEach(inp => {
+  wrap.querySelectorAll('input[data-key]:not([readonly])').forEach(inp => {
     inp.addEventListener('change', () => simSetWork(inp.dataset.key, Number(inp.value) || 0, true));
+  });
+  wrap.querySelectorAll('.sim-koma-rate, .sim-koma-by-student').forEach(el => {
+    el.addEventListener('click', () => openSimKomaStudentModal(Number(el.dataset.job), el.dataset.kind, Number(el.dataset.rate)));
   });
   wrap.querySelectorAll('.sim-job-edit').forEach(btn => {
     btn.addEventListener('click', () => openSimJobModal(btn.dataset.id));
   });
+}
+
+// ---------- 塾（コマ制）: 生徒ごとのコマ数 ----------
+// 生徒の一覧は sim_jobs.settings.students（[{id, name}]）
+// 月ごとの数は work_days の `${id}:ks:${時給}`（キャンセルは `${id}:cs:${時給}`）に { 生徒id: { 分: コマ数 } }
+// マスの数（`${id}:k:${時給}-${分}`）は 生徒の合計 ＋ 生徒を選ばない分。給料の計算はマスの数を使う
+function simKomaStudents(job) { return job.settings?.students || []; }
+function simKomaStudentMap(wd, jobId, kind, rate) { return wd[`${jobId}:${kind}s:${rate}`] || {}; }
+function simKomaStudentSum(wd, jobId, kind, rate, len) {
+  return Object.values(simKomaStudentMap(wd, jobId, kind, rate)).reduce((s, c) => s + (Number(c[len]) || 0), 0);
+}
+// その月の生徒ごとの合計コマ数（多い順）
+function simKomaStudentTotals(job, wd, kind) {
+  const totals = {};
+  for (const r of simKomaRates(job)) {
+    for (const [sid, c] of Object.entries(simKomaStudentMap(wd, job.id, kind, r))) {
+      totals[sid] = (totals[sid] || 0) + Object.values(c).reduce((s, n) => s + (Number(n) || 0), 0);
+    }
+  }
+  return simKomaStudents(job).filter(s => totals[s.id] > 0)
+    .map(s => ({ name: s.name, count: totals[s.id] }))
+    .sort((a, b) => b.count - a.count);
+}
+
+let _simKomaEdit = null;  // 生徒ごとのコマ数モーダルで編集中の内容
+
+function openSimKomaStudentModal(jobId, kind, rate) {
+  const job = _simJobs.find(j => String(j.id) === String(jobId));
+  if (!job) return;
+  const wd = simMonthPlan(ymKey(_simMonth)).workDays;
+  const map = simKomaStudentMap(wd, jobId, kind, rate);
+  const lens = simKomaLengths(job);
+  const rows = simKomaStudents(job).filter(s => map[s.id])
+    .map(s => ({ sid: s.id, name: s.name, counts: { ...map[s.id] } }));
+  const other = {};
+  for (const l of lens) other[l] = Math.max(0, (Number(wd[`${jobId}:${kind}:${rate}-${l}`]) || 0) - simKomaStudentSum(wd, jobId, kind, rate, l));
+  _simKomaEdit = { job, kind, rate, lens, rows, other, newStudents: [] };
+  document.getElementById('sim-koma-student-title').textContent =
+    `${kind === 'c' ? '当日キャンセル ' : ''}${rate.toLocaleString()}円のコマ（生徒ごと）`;
+  renderSimKomaStudentModal();
+  document.getElementById('sim-koma-student-modal').hidden = false;
+}
+
+function renderSimKomaStudentModal() {
+  const { job, kind, rate, lens, rows, other, newStudents } = _simKomaEdit;
+  const payFn = kind === 'c' ? simKomaCancelPay : simKomaPay;
+  const cell = (row, l) => `<td><input type="number" min="0" inputmode="numeric" value="${Number(row === 'other' ? other[l] : row.counts[l]) || 0}" data-row="${row === 'other' ? 'other' : row.sid}" data-len="${l}"></td>`;
+  document.getElementById('sim-koma-student-body').innerHTML = `
+    <table class="sim-koma-table sim-koma-student-table">
+      <thead><tr><th></th>${lens.map(l => `<th>${l}分<br><span>${yen(payFn(rate, l))}</span></th>`).join('')}<th></th></tr></thead>
+      <tbody>
+        ${rows.map(r => `<tr><th>${escapeHtmlF(r.name)}</th>${lens.map(l => cell(r, l)).join('')}<td><button type="button" class="sim-koma-student-del" data-sid="${r.sid}" aria-label="外す">×</button></td></tr>`).join('')}
+        <tr class="sim-koma-other"><th>生徒を<br>選ばない分</th>${lens.map(l => cell('other', l)).join('')}<td></td></tr>
+      </tbody>
+      <tfoot><tr><th>合計</th>${lens.map(l => `<td id="sim-koma-student-total-${l}"></td>`).join('')}<td></td></tr></tfoot>
+    </table>
+    <div class="sim-koma-student-sum" id="sim-koma-student-sum"></div>`;
+  // 追加の候補: 登録済みでこの表にまだいない生徒
+  const inTable = new Set(rows.map(r => r.sid));
+  document.getElementById('sim-koma-student-list').innerHTML = [...simKomaStudents(job), ...newStudents]
+    .filter(s => !inTable.has(s.id)).map(s => `<option value="${escapeHtmlF(s.name)}">`).join('');
+  updateSimKomaStudentTotals();
+
+  const body = document.getElementById('sim-koma-student-body');
+  body.querySelectorAll('input[data-row]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const n = Math.max(0, Math.min(999, Number(inp.value) || 0));
+      if (inp.dataset.row === 'other') other[inp.dataset.len] = n;
+      else rows.find(r => r.sid === inp.dataset.row).counts[inp.dataset.len] = n;
+      updateSimKomaStudentTotals();
+    });
+  });
+  body.querySelectorAll('.sim-koma-student-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _simKomaEdit.rows = rows.filter(r => r.sid !== btn.dataset.sid);
+      renderSimKomaStudentModal();
+    });
+  });
+}
+
+function updateSimKomaStudentTotals() {
+  const { kind, rate, lens, rows, other } = _simKomaEdit;
+  const payFn = kind === 'c' ? simKomaCancelPay : simKomaPay;
+  let count = 0, pay = 0;
+  for (const l of lens) {
+    const n = rows.reduce((s, r) => s + (Number(r.counts[l]) || 0), 0) + (Number(other[l]) || 0);
+    document.getElementById(`sim-koma-student-total-${l}`).textContent = n;
+    count += n;
+    pay += n * payFn(rate, l);
+  }
+  document.getElementById('sim-koma-student-sum').textContent = `合計 ${count}コマ・${yen(pay)}`;
+}
+
+// 名前を入れて「追加」: 登録済みの生徒ならその生徒、なければ新しい生徒（保存のときに登録）
+function addSimKomaStudentRow() {
+  const inp = document.getElementById('sim-koma-student-name');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  const ed = _simKomaEdit;
+  let s = [...simKomaStudents(ed.job), ...ed.newStudents].find(x => x.name === name);
+  if (!s) {
+    s = { id: 's' + Date.now().toString(36), name };
+    ed.newStudents.push(s);
+  }
+  if (!ed.rows.some(r => r.sid === s.id)) ed.rows.push({ sid: s.id, name: s.name, counts: {} });
+  inp.value = '';
+  renderSimKomaStudentModal();
+}
+
+async function saveSimKomaStudents() {
+  const { job, kind, rate, lens, rows, other, newStudents } = _simKomaEdit;
+  // 新しい生徒は、表に残っているものだけバイトに登録する
+  const added = newStudents.filter(s => rows.some(r => r.sid === s.id));
+  if (added.length) {
+    const settings = { ...(job.settings || {}), students: [...simKomaStudents(job), ...added] };
+    const { error } = await db.from('sim_jobs').update({ settings }).eq('id', job.id);
+    if (error) { alert('生徒の登録に失敗しました: ' + error.message); return; }
+    job.settings = settings;
+  }
+  const ym = ymKey(_simMonth);
+  const plan = simMonthPlan(ym);
+  const wd = { ...plan.workDays };
+  const map = {};
+  for (const r of rows) {
+    const c = {};
+    for (const l of lens) if (Number(r.counts[l]) > 0) c[l] = Number(r.counts[l]);
+    if (Object.keys(c).length) map[r.sid] = c;
+  }
+  const mapKey = `${job.id}:${kind}s:${rate}`;
+  if (Object.keys(map).length) wd[mapKey] = map; else delete wd[mapKey];
+  for (const l of lens) {
+    wd[`${job.id}:${kind}:${rate}-${l}`] = rows.reduce((s, r) => s + (Number(r.counts[l]) || 0), 0) + (Number(other[l]) || 0);
+  }
+  plan.workDays = wd;
+  _simMonths[ym] = { year_month: ym, items: plan.items, work_days: wd, saving: plan.saving ?? null };
+  _simGoalCache = null;
+  document.getElementById('sim-koma-student-modal').hidden = true;
+  renderSimMonth();
+  clearTimeout(_simSaveTimers[ym]);
+  await simSaveMonth(ym, plan);
 }
 
 // 出勤日のカレンダー。タップで 休み → 出勤 →（日払いがあるバイトは）出勤＋日払い → 休み と切り替わる
@@ -3351,8 +3496,9 @@ async function saveSimJob(e) {
   if (!f.elements.name.value.trim()) { f.elements.name.focus(); return; }
   const num = name => Number(f.elements[name].value) || 0;
   const type = f.elements.jobType.value;
+  const oldSettings = _simJobs.find(j => String(j.id) === f.elements.id.value)?.settings || {};
   const settings = type === 'koma'
-    ? {}  // コマの時給・長さは simKomaRates / simKomaLengths の決まった3種類
+    ? { students: oldSettings.students || [] }  // コマの時給・長さは simKomaRates / simKomaLengths の決まった3種類。生徒の一覧は残す
     : { training_wage: num('trainingWage') || null, training_end: f.elements.trainingEnd.value || null,
         advance_per_day: num('advancePerDay') || null };
   settings.withholding = f.elements.withholding.value;
@@ -3881,6 +4027,7 @@ function initSim() {
       document.getElementById(`sim-sub-${btn.dataset.sub}`).hidden = false;
       saveViewState('simSub', btn.dataset.sub);
       if (btn.dataset.sub === 'trend') renderSimTrend();
+      else if (btn.dataset.sub === 'planned') { _plannedMonth = new Date(_simMonth); renderPlannedTab(); }  // 月の計画で見ていた月を開く
       else                             renderSimMonth();
     });
   });
@@ -3898,6 +4045,11 @@ function initSim() {
   document.getElementById('sim-job-form').addEventListener('submit', saveSimJob);
   document.getElementById('sim-job-type').addEventListener('change', e => simToggleJobType(e.target.value));
   document.getElementById('btn-sim-del-job').addEventListener('click', deleteSimJob);
+  document.getElementById('btn-sim-koma-student-add').addEventListener('click', addSimKomaStudentRow);
+  document.getElementById('sim-koma-student-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addSimKomaStudentRow(); }
+  });
+  document.getElementById('btn-sim-koma-student-save').addEventListener('click', saveSimKomaStudents);
 
   document.querySelectorAll('#tab-sim .sim-add-link[data-add]').forEach(btn => {
     btn.addEventListener('click', () => openSimItemModal(btn.dataset.add));
@@ -4213,6 +4365,8 @@ async function renderAccountHistory() {
 
 (function restoreView() {
   const st = loadViewState();
+  // 予定支出はナビのタブ → シミュのサブタブに移した（2026-10-24）。前の保存は読み替える
+  if (st.tab === 'planned') { st.tab = 'sim'; st.simSub = 'planned'; }
   // シミュのサブタブは、タブを開く前に選んでおく（renderSim が見るため）
   if (st.simSub) {
     const btn = document.querySelector(`.sim-sub-btn[data-sub="${st.simSub}"]`);
@@ -4223,5 +4377,5 @@ async function renderAccountHistory() {
   }
   if (st.tab && st.tab !== 'input') document.querySelector(`.nav-btn[data-tab="${st.tab}"]`)?.click();
   if (st.tab === 'data' && st.dataSub)       document.querySelector(`.data-sub-btn[data-sub="${st.dataSub}"]`)?.click();
-  if (st.tab === 'planned' && st.plannedSub) document.querySelector(`.sub-nav-btn[data-sub="${st.plannedSub}"]`)?.click();
+  if (st.tab === 'sim' && st.simSub === 'planned' && st.plannedSub) document.querySelector(`.sub-nav-btn[data-sub="${st.plannedSub}"]`)?.click();
 })();

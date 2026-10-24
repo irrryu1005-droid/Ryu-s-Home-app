@@ -40,23 +40,19 @@
     <nav class="nav">
       <button class="nav-btn active" data-tab="input">
         <span class="nav-icon">✏️</span>
-        <span class="nav-label">入力</span>
+        <span class="nav-label">Input</span>
       </button>
       <button class="nav-btn" data-tab="list">
         <span class="nav-icon">📋</span>
-        <span class="nav-label">一覧</span>
+        <span class="nav-label">List</span>
       </button>
       <button class="nav-btn" data-tab="accounts">
         <span class="nav-icon">🏦</span>
-        <span class="nav-label">口座</span>
-      </button>
-      <button class="nav-btn" data-tab="planned">
-        <span class="nav-icon">📅</span>
-        <span class="nav-label">予定支出</span>
+        <span class="nav-label">Accounts</span>
       </button>
       <button class="nav-btn" data-tab="sim">
         <span class="nav-icon">🧮</span>
-        <span class="nav-label">シミュ</span>
+        <span class="nav-label">Sim</span>
       </button>
       <button class="nav-btn" data-tab="data">
         <span class="nav-icon">📊</span>
@@ -256,367 +252,6 @@
       </section>
     </main>
 
-    <!-- ======== 予定支出タブ ======== -->
-    <main id="tab-planned" class="tab-content">
-
-      <!-- サブタブ -->
-      <div class="sub-nav">
-        <button class="sub-nav-btn active" data-sub="monthly">📅 月別</button>
-        <button class="sub-nav-btn" data-sub="subscriptions">💳 サブスク</button>
-        <button class="sub-nav-btn" data-sub="loans">💴 ローン</button>
-      </div>
-
-      <!-- ===== 月別ビュー ===== -->
-      <div id="sub-monthly" class="sub-content">
-        <div class="planned-header">
-          <div class="month-nav">
-            <button id="planned-prev">＜</button>
-            <h2 id="planned-month-label"></h2>
-            <button id="planned-next">＞</button>
-          </div>
-          <button id="btn-add-planned" class="btn-primary-sm">＋ その他追加</button>
-        </div>
-        <div class="planned-total-card">
-          <span class="planned-total-label">今月の予定支出合計</span>
-          <span class="planned-total-val" id="planned-total">¥0</span>
-        </div>
-        <div class="planned-total-card planned-remaining-card" id="planned-remaining-card" hidden>
-          <span class="planned-total-label">今月の残りで必要な金額<span class="planned-remaining-sub" id="planned-remaining-sub"></span></span>
-          <button type="button" class="planned-total-val planned-remaining-btn" id="planned-remaining" title="明細を見る">¥0</button>
-        </div>
-        <!-- モーダル: 今月の残りで必要な金額の明細 -->
-        <div id="planned-remaining-modal" class="sim-modal" hidden>
-          <div class="form-card planned-modal-card sim-planned-card">
-            <div class="sim-planned-head">
-              <h3>残りで必要な金額</h3>
-              <button type="button" class="btn-cancel sim-planned-close" id="btn-planned-remaining-close">閉じる</button>
-            </div>
-            <div id="planned-remaining-body"></div>
-          </div>
-        </div>
-        <div id="planned-list"></div>
-      </div>
-
-      <!-- ===== サブスク管理 ===== -->
-      <div id="sub-subscriptions" class="sub-content" hidden>
-        <div class="planned-header">
-          <h2 class="sub-title">サブスク管理</h2>
-          <button id="btn-add-sub-f" class="btn-primary-sm">＋ 追加</button>
-        </div>
-        <div class="sub-summary" id="sub-summary-f"></div>
-        <div id="sub-list-f"></div>
-      </div>
-
-      <!-- ===== ローン管理 ===== -->
-      <div id="sub-loans" class="sub-content" hidden>
-        <div class="planned-header">
-          <h2 class="sub-title">ローン・返済管理</h2>
-          <button id="btn-add-loan" class="btn-primary-sm">＋ 追加</button>
-        </div>
-        <div id="loan-list"></div>
-      </div>
-
-      <!-- フラッシュ: 支出登録完了 -->
-      <div id="pr-flash" hidden style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#22C55E;color:#fff;padding:10px 20px;border-radius:10px;font-weight:700;font-size:14px;z-index:2000;box-shadow:0 4px 16px rgba(0,0,0,0.2)"></div>
-
-      <!-- モーダル: 予定支出 → 実際の支出登録 -->
-      <div id="planned-register-modal" hidden>
-        <div class="day-override-card" style="min-width:300px">
-          <h3>💸 支出として登録</h3>
-          <form id="planned-register-form" novalidate style="display:flex;flex-direction:column;gap:12px">
-            <div>
-              <label style="font-size:12px;color:#666">名前</label>
-              <input type="text" name="prName" readonly style="width:100%;padding:6px 8px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;background:#f9f9f9;box-sizing:border-box;color:#555">
-            </div>
-            <div style="display:flex;gap:10px">
-              <div style="flex:1">
-                <label style="font-size:12px;color:#666">日付</label>
-                <input type="date" name="prDate" required style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
-              </div>
-              <div style="flex:1">
-                <label style="font-size:12px;color:#666">金額 (¥)</label>
-                <input type="number" name="prAmount" required min="1" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
-              </div>
-            </div>
-            <div>
-              <label style="font-size:12px;color:#666">支払方法</label>
-              <select name="prPayment" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
-                <option value="deposit（銀行）">deposit（銀行）</option>
-                <option value="cash（現金）">cash（現金）</option>
-                <option value="PayPay">PayPay</option>
-                <option value="Rakuten Pay">Rakuten Pay</option>
-                <option value="non-trade payables">non-trade payables</option>
-                <option value="credit trade payable">credit trade payable</option>
-              </select>
-            </div>
-            <div>
-              <label style="font-size:12px;color:#666">メモ</label>
-              <input type="text" name="prMemo" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
-            </div>
-            <div class="day-override-actions">
-              <button type="button" id="btn-pr-cancel" class="planned-edit-btn" style="background:#f3f4f6;color:#555">キャンセル</button>
-              <button type="submit" id="btn-pr-save" class="planned-edit-btn" style="background:#22C55E;color:#fff">登録する</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- モーダル: サブスク支払日 今月だけ変更 -->
-      <div id="day-override-modal" hidden>
-        <div class="day-override-card">
-          <h3>📅 支払日を今月だけ変更</h3>
-          <div>
-            <label id="day-override-label"></label>
-            <input type="number" id="day-override-input" min="1" max="31" placeholder="例: 15">
-          </div>
-          <div class="day-override-actions">
-            <button id="btn-day-override-clear" class="btn-day-override-clear" hidden>元に戻す</button>
-            <button id="btn-day-override-cancel" class="planned-edit-btn" style="background:#f3f4f6;color:#555">キャンセル</button>
-            <button id="btn-day-override-save" class="planned-edit-btn">保存</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- モーダル: その月の金額を確定 -->
-      <div id="amount-override-modal" hidden>
-        <div class="day-override-card">
-          <h3 id="amount-override-title">💴 金額を確定</h3>
-          <div>
-            <label id="amount-override-label"></label>
-            <div class="amount-override-planned" id="amount-override-planned"></div>
-            <input type="number" id="amount-override-input" min="0" inputmode="numeric">
-          </div>
-          <div class="day-override-actions">
-            <button id="btn-amount-override-clear" class="btn-day-override-clear" hidden>予定額に戻す</button>
-            <button id="btn-amount-override-cancel" class="planned-edit-btn" style="background:#f3f4f6;color:#555">キャンセル</button>
-            <button id="btn-amount-override-save" class="planned-edit-btn">確定</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- モーダル: その他予定支出 -->
-      <div id="planned-modal" hidden>
-        <div class="form-card planned-modal-card">
-          <h3 id="planned-form-title">予定支出を追加</h3>
-          <form id="planned-form" novalidate>
-            <div class="form-group">
-              <label>名前</label>
-              <input type="text" name="name" placeholder="定期代など" required>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>金額 (¥)</label>
-                <input type="number" name="amount" min="1" placeholder="15000" required>
-              </div>
-              <div class="form-group">
-                <label>カテゴリ</label>
-                <select name="category">
-                  <option value="transport">🚃 交通</option>
-                  <option value="utility">💡 光熱費・通信</option>
-                  <option value="other">📦 その他</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>頻度</label>
-                <select name="frequency" id="planned-frequency">
-                  <option value="monthly">毎月</option>
-                  <option value="yearly">毎年</option>
-                  <option value="quarterly">3ヶ月ごと</option>
-                  <option value="once">一回のみ</option>
-                </select>
-              </div>
-              <div class="form-group" id="planned-day-wrap">
-                <label>引き落とし日</label>
-                <input type="number" name="billingDay" min="1" max="31" placeholder="25">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>開始日</label>
-                <input type="date" name="startDate">
-              </div>
-              <div class="form-group">
-                <label>終了日（任意）</label>
-                <input type="date" name="endDate">
-              </div>
-            </div>
-            <div class="form-group">
-              <label>メモ（任意）</label>
-              <input type="text" name="note" placeholder="備考など">
-            </div>
-            <div class="form-btns">
-              <button type="button" id="btn-cancel-planned" class="btn-cancel">キャンセル</button>
-              <button type="submit" class="btn-primary">保存</button>
-            </div>
-            <input type="hidden" name="id">
-          </form>
-        </div>
-      </div>
-
-      <!-- モーダル: サブスク -->
-      <div id="sub-modal-f" hidden>
-        <div class="form-card planned-modal-card">
-          <h3 id="sub-form-title-f">サブスクを追加</h3>
-          <form id="sub-form-f" novalidate>
-            <div class="form-row">
-              <div class="form-group">
-                <label>サービス名</label>
-                <input type="text" name="name" placeholder="Netflix" required>
-              </div>
-              <div class="form-group">
-                <label>契約形態</label>
-                <select name="contractForm" id="sub-contract-f">
-                  <option value="month">月払い</option>
-                  <option value="year">年払い</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>通貨</label>
-                <select name="currency">
-                  <option value="JPY">¥ 円</option>
-                  <option value="USD">$ ドル</option>
-                </select>
-              </div>
-              <div class="form-group" id="sub-cost-month-f">
-                <label>月額</label>
-                <input type="number" name="costPerMonth" min="0" placeholder="980">
-              </div>
-              <div class="form-group" id="sub-cost-year-f" hidden>
-                <label>年額</label>
-                <input type="number" name="costPerYear" min="0" placeholder="9800">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>カテゴリ</label>
-                <select name="purpose">
-                  <option value="">なし</option>
-                  <option value="娯楽">娯楽</option>
-                  <option value="勉強">勉強</option>
-                  <option value="仕事">仕事</option>
-                  <option value="生活必需品">生活必需品</option>
-                  <option value="クラウド">クラウド</option>
-                  <option value="その他">その他</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>開始日</label>
-                <input type="date" name="startDate">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>毎月の支払日（日）</label>
-                <input type="number" name="billingDay" min="1" max="31" placeholder="例: 1">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>支払い方法</label>
-                <select name="paymentMethod">
-                  <option value="">未設定</option>
-                  <option value="クレジットカード">クレジットカード</option>
-                  <option value="デビットカード">デビットカード</option>
-                  <option value="銀行口座">銀行口座</option>
-                  <option value="PayPay">PayPay</option>
-                  <option value="キャリア決済">キャリア決済</option>
-                  <option value="その他">その他</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>ステータス</label>
-                <select name="status">
-                  <option value="active">契約中</option>
-                  <option value="cancelled">解約済み</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>支払者</label>
-                <select name="payer">
-                  <option value="自分">自分</option>
-                  <option value="家族">家族</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-group">
-              <label>メモ</label>
-              <textarea name="note" rows="2" placeholder="備考など"></textarea>
-            </div>
-            <div class="form-btns">
-              <button type="button" id="btn-cancel-sub-f" class="btn-cancel">キャンセル</button>
-              <button type="submit" class="btn-primary">保存</button>
-            </div>
-            <input type="hidden" name="id">
-          </form>
-        </div>
-      </div>
-
-      <!-- モーダル: ローン -->
-      <div id="loan-modal" hidden>
-        <div class="form-card planned-modal-card">
-          <h3 id="loan-form-title">ローンを追加</h3>
-          <form id="loan-form" novalidate>
-            <div class="form-group">
-              <label>名前</label>
-              <input type="text" name="name" placeholder="奨学金・借入金など" required>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>借入総額 (¥)</label>
-                <input type="number" name="totalAmount" min="1" placeholder="1000000" required>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>最小返済額 (¥・任意)</label>
-                <input type="number" name="minPayment" min="1" placeholder="10000">
-              </div>
-              <div class="form-group">
-                <label>欽定返済額 (¥)</label>
-                <input type="number" name="monthlyPayment" min="1" placeholder="15000" required>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>残高 (¥)</label>
-                <input type="number" name="remainingAmount" min="0" placeholder="800000">
-              </div>
-              <div class="form-group">
-                <label>返済開始日</label>
-                <input type="date" name="startDate">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>毎月の支払日（日）</label>
-                <input type="number" name="billingDay" min="1" max="31" placeholder="例: 1">
-              </div>
-              <div class="form-group">
-                <label>返済終了日（任意）</label>
-                <input type="date" name="endDate">
-              </div>
-            </div>
-            <div class="form-group">
-              <label>メモ（任意）</label>
-              <input type="text" name="note" placeholder="備考など">
-            </div>
-            <div class="form-btns">
-              <button type="button" id="btn-cancel-loan" class="btn-cancel">キャンセル</button>
-              <button type="submit" class="btn-primary">保存</button>
-            </div>
-            <input type="hidden" name="id">
-          </form>
-        </div>
-      </div>
-
-    </main>
-
     <!-- ======== Wish List タブ ======== -->
     <!-- ======== シミュレーションタブ ======== -->
     <main id="tab-sim" class="tab-content">
@@ -624,6 +259,368 @@
       <div class="sub-nav">
         <button class="sim-sub-btn active" data-sub="month">📆 月の計画</button>
         <button class="sim-sub-btn" data-sub="trend">📈 貯金の推移</button>
+        <button class="sim-sub-btn" data-sub="planned">📅 予定支出</button>
+      </div>
+
+      <!-- ===== 予定支出（月別・サブスク・ローン） ===== -->
+      <div id="sim-sub-planned" class="sim-sub-content" hidden>
+
+        <!-- サブタブ -->
+        <div class="sub-nav">
+          <button class="sub-nav-btn active" data-sub="monthly">📅 月別</button>
+          <button class="sub-nav-btn" data-sub="subscriptions">💳 サブスク</button>
+          <button class="sub-nav-btn" data-sub="loans">💴 ローン</button>
+        </div>
+
+        <!-- ===== 月別ビュー ===== -->
+        <div id="sub-monthly" class="sub-content">
+          <div class="planned-header">
+            <div class="month-nav">
+              <button id="planned-prev">＜</button>
+              <h2 id="planned-month-label"></h2>
+              <button id="planned-next">＞</button>
+            </div>
+            <button id="btn-add-planned" class="btn-primary-sm">＋ その他追加</button>
+          </div>
+          <div class="planned-total-card">
+            <span class="planned-total-label">今月の予定支出合計</span>
+            <span class="planned-total-val" id="planned-total">¥0</span>
+          </div>
+          <div class="planned-total-card planned-remaining-card" id="planned-remaining-card" hidden>
+            <span class="planned-total-label">今月の残りで必要な金額<span class="planned-remaining-sub" id="planned-remaining-sub"></span></span>
+            <button type="button" class="planned-total-val planned-remaining-btn" id="planned-remaining" title="明細を見る">¥0</button>
+          </div>
+          <!-- モーダル: 今月の残りで必要な金額の明細 -->
+          <div id="planned-remaining-modal" class="sim-modal" hidden>
+            <div class="form-card planned-modal-card sim-planned-card">
+              <div class="sim-planned-head">
+                <h3>残りで必要な金額</h3>
+                <button type="button" class="btn-cancel sim-planned-close" id="btn-planned-remaining-close">閉じる</button>
+              </div>
+              <div id="planned-remaining-body"></div>
+            </div>
+          </div>
+          <div id="planned-list"></div>
+        </div>
+
+        <!-- ===== サブスク管理 ===== -->
+        <div id="sub-subscriptions" class="sub-content" hidden>
+          <div class="planned-header">
+            <h2 class="sub-title">サブスク管理</h2>
+            <button id="btn-add-sub-f" class="btn-primary-sm">＋ 追加</button>
+          </div>
+          <div class="sub-summary" id="sub-summary-f"></div>
+          <div id="sub-list-f"></div>
+        </div>
+
+        <!-- ===== ローン管理 ===== -->
+        <div id="sub-loans" class="sub-content" hidden>
+          <div class="planned-header">
+            <h2 class="sub-title">ローン・返済管理</h2>
+            <button id="btn-add-loan" class="btn-primary-sm">＋ 追加</button>
+          </div>
+          <div id="loan-list"></div>
+        </div>
+
+        <!-- フラッシュ: 支出登録完了 -->
+        <div id="pr-flash" hidden style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#22C55E;color:#fff;padding:10px 20px;border-radius:10px;font-weight:700;font-size:14px;z-index:2000;box-shadow:0 4px 16px rgba(0,0,0,0.2)"></div>
+
+        <!-- モーダル: 予定支出 → 実際の支出登録 -->
+        <div id="planned-register-modal" hidden>
+          <div class="day-override-card" style="min-width:300px">
+            <h3>💸 支出として登録</h3>
+            <form id="planned-register-form" novalidate style="display:flex;flex-direction:column;gap:12px">
+              <div>
+                <label style="font-size:12px;color:#666">名前</label>
+                <input type="text" name="prName" readonly style="width:100%;padding:6px 8px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;background:#f9f9f9;box-sizing:border-box;color:#555">
+              </div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1">
+                  <label style="font-size:12px;color:#666">日付</label>
+                  <input type="date" name="prDate" required style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
+                </div>
+                <div style="flex:1">
+                  <label style="font-size:12px;color:#666">金額 (¥)</label>
+                  <input type="number" name="prAmount" required min="1" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
+                </div>
+              </div>
+              <div>
+                <label style="font-size:12px;color:#666">支払方法</label>
+                <select name="prPayment" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
+                  <option value="deposit（銀行）">deposit（銀行）</option>
+                  <option value="cash（現金）">cash（現金）</option>
+                  <option value="PayPay">PayPay</option>
+                  <option value="Rakuten Pay">Rakuten Pay</option>
+                  <option value="non-trade payables">non-trade payables</option>
+                  <option value="credit trade payable">credit trade payable</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:12px;color:#666">メモ</label>
+                <input type="text" name="prMemo" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box">
+              </div>
+              <div class="day-override-actions">
+                <button type="button" id="btn-pr-cancel" class="planned-edit-btn" style="background:#f3f4f6;color:#555">キャンセル</button>
+                <button type="submit" id="btn-pr-save" class="planned-edit-btn" style="background:#22C55E;color:#fff">登録する</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- モーダル: サブスク支払日 今月だけ変更 -->
+        <div id="day-override-modal" hidden>
+          <div class="day-override-card">
+            <h3>📅 支払日を今月だけ変更</h3>
+            <div>
+              <label id="day-override-label"></label>
+              <input type="number" id="day-override-input" min="1" max="31" placeholder="例: 15">
+            </div>
+            <div class="day-override-actions">
+              <button id="btn-day-override-clear" class="btn-day-override-clear" hidden>元に戻す</button>
+              <button id="btn-day-override-cancel" class="planned-edit-btn" style="background:#f3f4f6;color:#555">キャンセル</button>
+              <button id="btn-day-override-save" class="planned-edit-btn">保存</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- モーダル: その月の金額を確定 -->
+        <div id="amount-override-modal" hidden>
+          <div class="day-override-card">
+            <h3 id="amount-override-title">💴 金額を確定</h3>
+            <div>
+              <label id="amount-override-label"></label>
+              <div class="amount-override-planned" id="amount-override-planned"></div>
+              <input type="number" id="amount-override-input" min="0" inputmode="numeric">
+            </div>
+            <div class="day-override-actions">
+              <button id="btn-amount-override-clear" class="btn-day-override-clear" hidden>予定額に戻す</button>
+              <button id="btn-amount-override-cancel" class="planned-edit-btn" style="background:#f3f4f6;color:#555">キャンセル</button>
+              <button id="btn-amount-override-save" class="planned-edit-btn">確定</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- モーダル: その他予定支出 -->
+        <div id="planned-modal" hidden>
+          <div class="form-card planned-modal-card">
+            <h3 id="planned-form-title">予定支出を追加</h3>
+            <form id="planned-form" novalidate>
+              <div class="form-group">
+                <label>名前</label>
+                <input type="text" name="name" placeholder="定期代など" required>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>金額 (¥)</label>
+                  <input type="number" name="amount" min="1" placeholder="15000" required>
+                </div>
+                <div class="form-group">
+                  <label>カテゴリ</label>
+                  <select name="category">
+                    <option value="transport">🚃 交通</option>
+                    <option value="utility">💡 光熱費・通信</option>
+                    <option value="other">📦 その他</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>頻度</label>
+                  <select name="frequency" id="planned-frequency">
+                    <option value="monthly">毎月</option>
+                    <option value="yearly">毎年</option>
+                    <option value="quarterly">3ヶ月ごと</option>
+                    <option value="once">一回のみ</option>
+                  </select>
+                </div>
+                <div class="form-group" id="planned-day-wrap">
+                  <label>引き落とし日</label>
+                  <input type="number" name="billingDay" min="1" max="31" placeholder="25">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>開始日</label>
+                  <input type="date" name="startDate">
+                </div>
+                <div class="form-group">
+                  <label>終了日（任意）</label>
+                  <input type="date" name="endDate">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>メモ（任意）</label>
+                <input type="text" name="note" placeholder="備考など">
+              </div>
+              <div class="form-btns">
+                <button type="button" id="btn-cancel-planned" class="btn-cancel">キャンセル</button>
+                <button type="submit" class="btn-primary">保存</button>
+              </div>
+              <input type="hidden" name="id">
+            </form>
+          </div>
+        </div>
+
+        <!-- モーダル: サブスク -->
+        <div id="sub-modal-f" hidden>
+          <div class="form-card planned-modal-card">
+            <h3 id="sub-form-title-f">サブスクを追加</h3>
+            <form id="sub-form-f" novalidate>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>サービス名</label>
+                  <input type="text" name="name" placeholder="Netflix" required>
+                </div>
+                <div class="form-group">
+                  <label>契約形態</label>
+                  <select name="contractForm" id="sub-contract-f">
+                    <option value="month">月払い</option>
+                    <option value="year">年払い</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>通貨</label>
+                  <select name="currency">
+                    <option value="JPY">¥ 円</option>
+                    <option value="USD">$ ドル</option>
+                  </select>
+                </div>
+                <div class="form-group" id="sub-cost-month-f">
+                  <label>月額</label>
+                  <input type="number" name="costPerMonth" min="0" placeholder="980">
+                </div>
+                <div class="form-group" id="sub-cost-year-f" hidden>
+                  <label>年額</label>
+                  <input type="number" name="costPerYear" min="0" placeholder="9800">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>カテゴリ</label>
+                  <select name="purpose">
+                    <option value="">なし</option>
+                    <option value="娯楽">娯楽</option>
+                    <option value="勉強">勉強</option>
+                    <option value="仕事">仕事</option>
+                    <option value="生活必需品">生活必需品</option>
+                    <option value="クラウド">クラウド</option>
+                    <option value="その他">その他</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>開始日</label>
+                  <input type="date" name="startDate">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>毎月の支払日（日）</label>
+                  <input type="number" name="billingDay" min="1" max="31" placeholder="例: 1">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>支払い方法</label>
+                  <select name="paymentMethod">
+                    <option value="">未設定</option>
+                    <option value="クレジットカード">クレジットカード</option>
+                    <option value="デビットカード">デビットカード</option>
+                    <option value="銀行口座">銀行口座</option>
+                    <option value="PayPay">PayPay</option>
+                    <option value="キャリア決済">キャリア決済</option>
+                    <option value="その他">その他</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>ステータス</label>
+                  <select name="status">
+                    <option value="active">契約中</option>
+                    <option value="cancelled">解約済み</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>支払者</label>
+                  <select name="payer">
+                    <option value="自分">自分</option>
+                    <option value="家族">家族</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>メモ</label>
+                <textarea name="note" rows="2" placeholder="備考など"></textarea>
+              </div>
+              <div class="form-btns">
+                <button type="button" id="btn-cancel-sub-f" class="btn-cancel">キャンセル</button>
+                <button type="submit" class="btn-primary">保存</button>
+              </div>
+              <input type="hidden" name="id">
+            </form>
+          </div>
+        </div>
+
+        <!-- モーダル: ローン -->
+        <div id="loan-modal" hidden>
+          <div class="form-card planned-modal-card">
+            <h3 id="loan-form-title">ローンを追加</h3>
+            <form id="loan-form" novalidate>
+              <div class="form-group">
+                <label>名前</label>
+                <input type="text" name="name" placeholder="奨学金・借入金など" required>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>借入総額 (¥)</label>
+                  <input type="number" name="totalAmount" min="1" placeholder="1000000" required>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>最小返済額 (¥・任意)</label>
+                  <input type="number" name="minPayment" min="1" placeholder="10000">
+                </div>
+                <div class="form-group">
+                  <label>欽定返済額 (¥)</label>
+                  <input type="number" name="monthlyPayment" min="1" placeholder="15000" required>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>残高 (¥)</label>
+                  <input type="number" name="remainingAmount" min="0" placeholder="800000">
+                </div>
+                <div class="form-group">
+                  <label>返済開始日</label>
+                  <input type="date" name="startDate">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>毎月の支払日（日）</label>
+                  <input type="number" name="billingDay" min="1" max="31" placeholder="例: 1">
+                </div>
+                <div class="form-group">
+                  <label>返済終了日（任意）</label>
+                  <input type="date" name="endDate">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>メモ（任意）</label>
+                <input type="text" name="note" placeholder="備考など">
+              </div>
+              <div class="form-btns">
+                <button type="button" id="btn-cancel-loan" class="btn-cancel">キャンセル</button>
+                <button type="submit" class="btn-primary">保存</button>
+              </div>
+              <input type="hidden" name="id">
+            </form>
+          </div>
+        </div>
+
       </div>
 
       <!-- ===== 月の計画 ===== -->
@@ -839,6 +836,23 @@
             <button type="button" class="btn-cancel sim-planned-close" id="btn-sim-planned-close">閉じる</button>
           </div>
           <div id="sim-planned-body"></div>
+        </div>
+      </div>
+
+      <!-- モーダル: 塾の生徒ごとのコマ数 -->
+      <div id="sim-koma-student-modal" class="sim-modal" hidden>
+        <div class="form-card planned-modal-card">
+          <h3 id="sim-koma-student-title">生徒ごとのコマ数</h3>
+          <div id="sim-koma-student-body"></div>
+          <div class="sim-koma-student-add">
+            <input type="text" id="sim-koma-student-name" list="sim-koma-student-list" placeholder="生徒の名前（登録済みは候補から）" autocomplete="off">
+            <datalist id="sim-koma-student-list"></datalist>
+            <button type="button" id="btn-sim-koma-student-add">＋ 追加</button>
+          </div>
+          <div class="form-btns">
+            <button type="button" class="btn-cancel" data-close="sim-koma-student-modal">キャンセル</button>
+            <button type="button" class="btn-primary" id="btn-sim-koma-student-save">保存</button>
+          </div>
         </div>
       </div>
 

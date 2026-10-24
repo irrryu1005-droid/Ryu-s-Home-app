@@ -1999,6 +1999,27 @@ h3.section-title {
 
 .sim-card-sub { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
 
+/* 塾: 時給をタップ → 生徒ごとのコマ数 */
+.sim-koma-rate {
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--text-muted);
+  padding: 0;
+  font: inherit;
+  color: var(--expense);
+  cursor: pointer;
+}
+.sim-koma-table input.sim-koma-by-student { background: var(--bg); color: var(--expense); cursor: pointer; }
+.sim-koma-student-table th span { font-weight: 400; font-size: 10px; }
+.sim-koma-student-table tbody th { font-size: 12px; color: var(--text); max-width: 72px; overflow: hidden; text-overflow: ellipsis; }
+.sim-koma-student-table tbody tr.sim-koma-other th { font-size: 10px; color: var(--text-muted); white-space: normal; line-height: 1.3; }
+.sim-koma-student-table tfoot th, .sim-koma-student-table tfoot td { text-align: center; font-size: 13px; font-weight: 700; padding-top: 6px; border-top: 1px dashed var(--border); }
+.sim-koma-student-table tfoot th { text-align: left; }
+.sim-koma-student-del { width: 28px; height: 28px; border: none; background: none; color: var(--text-muted); font-size: 16px; cursor: pointer; }
+.sim-koma-student-sum { text-align: right; font-size: 13px; font-weight: 700; margin-top: 6px; }
+.sim-koma-student-add { display: flex; gap: 6px; margin-top: 12px; }
+.sim-koma-student-add input { flex: 1; min-width: 0; padding: 9px 10px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 16px; }
+.sim-koma-student-add button { padding: 0 12px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--white); font-weight: 700; cursor: pointer; white-space: nowrap; }
 .sim-koma-cancel { margin-top: 8px; }
 .sim-koma-cancel summary { font-size: 12px; font-weight: 700; color: var(--text-muted); cursor: pointer; padding: 4px 0; }
 .sim-koma-cancel[open] summary { color: var(--text); }
