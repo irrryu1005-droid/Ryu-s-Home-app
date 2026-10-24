@@ -910,6 +910,7 @@
               <input type="date" name="achieved">
             </div>
             <p class="sim-goal-pace" id="sim-goal-pace"></p>
+            <p class="sim-goal-pace" id="sim-goal-expense-note" hidden></p>
             <p class="sim-row-sub">毎月積み立てる額が、月末ごとに「今たまっている額」へ足されていく計算です（目標に届いたら止まります）。余りが足りない月は、上の目標から順に積み立てます。実際にたまった額が変わったら「今たまっている額」を直してください。</p>
             <div class="form-btns">
               <button type="button" class="btn-cancel" data-close="sim-goal-modal">キャンセル</button>
@@ -917,6 +918,7 @@
             </div>
             <button type="button" class="sim-delete-btn" id="btn-sim-del-goal" hidden>この目標を削除</button>
             <input type="hidden" name="id">
+            <input type="hidden" name="expenseRef">
           </form>
         </div>
       </div>
