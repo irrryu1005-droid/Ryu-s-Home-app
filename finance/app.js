@@ -2416,6 +2416,34 @@ async function loadSimData() {
   _simMonths = {};
   for (const r of (monRes.data || [])) _simMonths[r.year_month] = r;
   _simPlannedSrc = { subs: subRes.data, plans: planRes.data, loans: loanRes.data };
+  // 支出・旅行から作った目標は、目標額をいまの支出の額に合わせる（あとで支出の額を変えてもついていく）
+  for (const g of _simGoals) {
+    const amt = simExpenseRefAmount(g.expense_ref);
+    if (amt == null || amt === g.target_amount) continue;
+    g.target_amount = amt;
+    db.from('sim_goals').update({ target_amount: amt }).eq('id', g.id).then(({ error }) => { if (error) console.error(error); });
+  }
+}
+
+// 目標の expense_ref（'YYYY-MM|trip:旅行id' か 'YYYY-MM|名前|日'）から、いまの支出の額を出す。見つからなければ null
+function simExpenseRefAmount(ref) {
+  if (!ref) return null;
+  const [ym, key, day = ''] = ref.split('|');
+  if (key.startsWith('trip:')) {
+    const trip = _simTrips.find(t => String(t.id) === key.slice(5));
+    const amt = trip ? simTripMonth(trip, ym).amount : 0;
+    return amt || null;
+  }
+  const d = simYmToDate(ym);
+  const y = d.getFullYear(), m = d.getMonth();
+  const hit = (name, dd) => name === key && String(dd || '') === day;
+  const { subItems, planItems, loanItems } = buildPlannedItems(_simPlannedSrc.subs, _simPlannedSrc.plans, _simPlannedSrc.loans, {}, _simAmountOverrides[ym] || {});
+  const it = [...subItems, ...planItems, ...loanItems].find(it => isActiveInMonth(it, y, m) && hit(it.name, it.billingDay));
+  if (it) return it.amountMax || it.amount;
+  const r = _simRecurring.find(r => r.kind === 'expense' && simLongActive(r, ym) && hit(r.name, r.day));
+  if (r) return Number(r.amount) || null;
+  const p = simMonthPlan(ym).items.find(it => it.kind === 'expense' && hit(it.name, it.day));
+  return p ? Number(p.amount) || null : null;
 }
 
 // その月の計画（保存していなければ前の月の出勤日数を引き継ぐ）
@@ -4002,9 +4030,12 @@ function simUpdateGoalPaceNote() {
   // 支出のための目標の説明
   const exp = document.getElementById('sim-goal-expense-note');
   exp.hidden = !g.expense_ref || !g.deadline_ym;
+  // 支出がまだあれば、目標額は支出の額に合わせる（ここでは直せない）
+  const linked = simExpenseRefAmount(g.expense_ref) != null;
+  f.elements.target.readOnly = linked;
   if (!exp.hidden) {
     const pm = simYmToDate(simPrevYm(g.deadline_ym)).getMonth() + 1;
-    exp.textContent = `💳 支出のための目標: ${simYmLabel(g.deadline_ym)}は積み立てず、${pm}月末までに貯めた分でこの支出を払います（その分、${simYmLabel(g.deadline_ym)}の必要な額から引きます）`;
+    exp.textContent = `💳 支出のための目標: ${simYmLabel(g.deadline_ym)}は積み立てず、${pm}月末までに貯めた分でこの支出を払います（その分、${simYmLabel(g.deadline_ym)}の必要な額から引きます）${linked ? '。目標額は支出の金額に自動で合わせています' : ''}`;
   }
 }
 
