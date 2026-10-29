@@ -95,7 +95,7 @@ function updateScheduleTitle() {
   }
   ['sch-date-label', 'm-sch-date-label'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.textContent = `📅 ${prefix}Schedule`;
+    if (el) el.innerHTML = `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> ${prefix}Schedule`;
   });
 }
 
@@ -273,9 +273,9 @@ function openScheduleDetail(ev) {
     <div class="sch-detail-card" style="--c:${color}">
       <button class="sch-detail-close" aria-label="閉じる">✕</button>
       <div class="sch-detail-title"><span class="sch-detail-dot"></span>${schEscape(ev.summary || '（タイトルなし）')}</div>
-      <div class="sch-detail-row">🕒 ${schEventWhen(ev)}</div>
-      ${ev._calName ? `<div class="sch-detail-row">📅 ${schEscape(ev._calName)}</div>` : ''}
-      ${ev.location ? `<div class="sch-detail-row">📍 <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.location)}" target="_blank" rel="noopener">${schEscape(ev.location)}</a></div>` : ''}
+      <div class="sch-detail-row"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ${schEventWhen(ev)}</div>
+      ${ev._calName ? `<div class="sch-detail-row"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> ${schEscape(ev._calName)}</div>` : ''}
+      ${ev.location ? `<div class="sch-detail-row"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg> <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.location)}" target="_blank" rel="noopener">${schEscape(ev.location)}</a></div>` : ''}
       ${ev.description ? `<div class="sch-detail-desc">${schPlainText(ev.description)}</div>` : ''}
       ${ev.htmlLink ? `<a class="sch-detail-link" href="${schEscape(ev.htmlLink)}" target="_blank" rel="noopener">Googleカレンダーで開く ↗</a>` : ''}
     </div>`;
@@ -774,8 +774,8 @@ function initHomeTodoModal() {
 const HOME_CAT_COLORS = {
   '神大':   '#2980B9',
   'バイト': '#F39C12',
-  'Betting':'#E74C3C',
-  '資格':   '#27AE60',
+  'Betting':'#ff3b30',
+  '資格':   '#34c759',
   'その他': '#95A5A6',
 };
 
@@ -824,7 +824,7 @@ async function loadPcTodos() {
     const catBadge   = t.category ? `<span class="cat-badge cat-${t.category}">${t.category}</span>` : '';
     const schedules  = (t.task_schedules || []).sort((a, b) => a.schedule_date.localeCompare(b.schedule_date));
     const schedBadges = schedules.length > 0
-      ? `<div class="todo-schedules">${schedules.map(s => `<span class="s-badge">🗓 ${formatHomeDate(s.schedule_date)}</span>`).join('')}</div>`
+      ? `<div class="todo-schedules">${schedules.map(s => `<span class="s-badge"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg> ${formatHomeDate(s.schedule_date)}</span>`).join('')}</div>`
       : '';
     return `
       <div class="todo-item status-${t.status || 'will'}" data-id="${t.id}">
@@ -838,7 +838,7 @@ async function loadPcTodos() {
             <div class="todo-text ${t.status === 'done' ? 'done' : ''}">${t.text}</div>
             <div class="todo-meta">
               ${catBadge}
-              ${t.due_date ? `<span class="todo-due ${overdue ? 'overdue' : ''}">📅 ${formatHomeDate(t.due_date)}</span>` : ''}
+              ${t.due_date ? `<span class="todo-due ${overdue ? 'overdue' : ''}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> ${formatHomeDate(t.due_date)}</span>` : ''}
             </div>
             ${schedBadges}
           </div>
@@ -973,7 +973,7 @@ function homeNotionListHtml() {
     .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
   if (!open.length) return '';
   const now = new Date();
-  return `<div class="home-notion-head">📚 神大（Notion）<span class="home-notion-sub">この1週間 ${open.length}件</span></div>` +
+  return `<div class="home-notion-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> 神大（Notion）<span class="home-notion-sub">この1週間 ${open.length}件</span></div>` +
     open.map(n => {
       const due = n.due ? homeNotionDue(n.due) : null;
       const overdue = n.due && new Date(n.due.includes('T') ? n.due : n.due + 'T23:59:59') < now;
@@ -985,7 +985,7 @@ function homeNotionListHtml() {
               <div class="todo-text">${schEscape(n.title)}</div>
               <div class="todo-meta">
                 ${n.subjects.length ? `<span class="cat-badge cat-神大">${schEscape(n.subjects.join('・'))}</span>` : ''}
-                ${due ? `<span class="todo-due ${overdue ? 'overdue' : ''}">📅 ${due.label}</span>` : ''}
+                ${due ? `<span class="todo-due ${overdue ? 'overdue' : ''}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> ${due.label}</span>` : ''}
               </div>
             </div>
           </div>
@@ -1128,7 +1128,7 @@ function buildGanttTimeline(todos) {
   if (!labelsEl) return;
   labelsEl.innerHTML =
     `<div class="home-tl-label-header"></div>` +
-    notionRows.map(({ n }) => `<div class="home-tl-label-row home-tl-label-notion" data-notion="${n.id}"><span class="home-tl-label-name ${n.status === 'done' ? 'done' : ''}" title="${schEscape(n.title)}">📚 ${schEscape(n.title)}</span></div>`).join('') +
+    notionRows.map(({ n }) => `<div class="home-tl-label-row home-tl-label-notion" data-notion="${n.id}"><span class="home-tl-label-name ${n.status === 'done' ? 'done' : ''}" title="${schEscape(n.title)}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> ${schEscape(n.title)}</span></div>`).join('') +
     dated.map(t => `<div class="home-tl-label-row"><span class="home-tl-label-name ${t.status === 'done' ? 'done' : ''}" title="${t.text}">${t.text}</span></div>`).join('') +
     (dated.length + notionRows.length === 0 ? '<div class="home-tl-empty">この1週間の予定はありません</div>' : '');
   labelsEl.querySelectorAll('[data-notion]').forEach(el => {
@@ -1217,7 +1217,7 @@ function buildGanttTimeline(todos) {
     const e   = dayIdx(endStr   > lastStr  ? lastStr  : endStr);
     const bar = document.createElement('div');
     bar.className = 'home-tl-bar';
-    const barColor = HOME_CAT_COLORS[task.category] || '#4A90D9';
+    const barColor = HOME_CAT_COLORS[task.category] || '#007aff';
     bar.style.cssText = `left:${s * HOME_CELL_W + 2}px;width:${(e - s + 1) * HOME_CELL_W - 4}px;opacity:${task.status === 'done' ? 0.4 : 1};background:${barColor}`;
     const span = document.createElement('span');
     span.className   = 'home-tl-bar-text';
@@ -1428,7 +1428,7 @@ async function loadHabitChart() {
 
     labels.push(d.slice(5));  // MM-DD
     counts.push(cnt);
-    colors.push(cnt === 3 ? '#27AE60' : cnt >= 1 ? '#F5A623' : '#E4E9F0');
+    colors.push(cnt === 3 ? '#34c759' : cnt >= 1 ? '#ff9500' : '#e5e5ea');
   }
 
   if (habitChart) habitChart.destroy();
@@ -1459,7 +1459,7 @@ async function loadHabitChart() {
         y: {
           min: 0, max: 3,
           ticks: { stepSize: 1 },
-          grid: { color: '#F2F4F7' },
+          grid: { color: '#f5f5f7' },
         },
         x: {
           ticks: {

@@ -32,8 +32,8 @@ const CELL_W       = 36;
 const CAT_COLORS = {
   '神大':   '#2980B9',
   'バイト': '#F39C12',
-  'Betting':'#E74C3C',
-  '資格':   '#27AE60',
+  'Betting':'#ff3b30',
+  '資格':   '#34c759',
   'その他': '#95A5A6',
 };
 
@@ -55,7 +55,7 @@ function showGcalAuthBtn() {
   const btn = document.createElement('button');
   btn.id        = 'gcal-auth-btn';
   btn.className = 'gcal-auth-btn';
-  btn.textContent = '📅 GCal 認証';
+  btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> GCal 認証';
   btn.addEventListener('click', gcalConnect);
   document.querySelector('.header').appendChild(btn);
 }
@@ -222,20 +222,20 @@ async function loadTodos() {
     const overdue  = t.due_date && t.due_date < today && t.status !== 'done';
     const dueLabel = t.due_date
       ? (t.is_all_day || !t.due_time
-          ? `📅 ${formatDate(t.due_date)}`
-          : `📅 ${formatDate(t.due_date)} ${t.due_time}`)
+          ? `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> ${formatDate(t.due_date)}`
+          : `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> ${formatDate(t.due_date)} ${t.due_time}`)
       : '';
     const catBadge  = t.category ? `<span class="cat-badge cat-${t.category}">${t.category}</span>` : '';
     const doneDate  = t.done_at  ? `<span class="done-date">✓ ${t.done_at}</span>` : '';
     const goal      = t.goal_id  ? planGoals.find(g => g.id === t.goal_id) : null;
-    const goalBadge = goal ? `<span class="goal-badge" style="color:${goal.color}">🎯 ${escapeHtmlT(goal.title)}</span>` : '';
+    const goalBadge = goal ? `<span class="goal-badge" style="color:${goal.color}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> ${escapeHtmlT(goal.title)}</span>` : '';
 
     // 実行予定日チップ
     const schedules = (t.task_schedules || [])
       .sort((a, b) => a.schedule_date.localeCompare(b.schedule_date));
     const scheduleBadges = schedules.length > 0
       ? `<div class="todo-schedules">${schedules.map(s =>
-          `<span class="s-badge">🗓 ${formatDate(s.schedule_date)}</span>`
+          `<span class="s-badge"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg> ${formatDate(s.schedule_date)}</span>`
         ).join('')}</div>`
       : '';
 
@@ -259,7 +259,7 @@ async function loadTodos() {
           </div>
         </div>
         <div class="todo-actions">
-          <button class="todo-edit-btn" data-id="${t.id}">✏️</button>
+          <button class="todo-edit-btn" data-id="${t.id}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button>
           <button class="todo-del" data-id="${t.id}">×</button>
         </div>
       </div>`;
@@ -342,11 +342,11 @@ async function loadNotionAssignments() {
 function notionDueInfo(due) {
   if (!due) return { label: '', overdue: false };
   if (!due.includes('T')) {
-    return { label: `📅 ${formatDate(due)}`, overdue: due < todayStr() };
+    return { label: `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> ${formatDate(due)}`, overdue: due < todayStr() };
   }
   const d    = new Date(due);
   const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  return { label: `📅 ${formatDate(localDateStr(d))} ${time}`, overdue: d < new Date() };
+  return { label: `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> ${formatDate(localDateStr(d))} ${time}`, overdue: d < new Date() };
 }
 
 function renderNotionList() {
@@ -354,11 +354,11 @@ function renderNotionList() {
   if (currentCat !== 'all' && currentCat !== '神大') { box.innerHTML = ''; return; }
 
   if (notionItems === null) {
-    box.innerHTML = '<div class="notion-head">📚 神大（Notion）<span class="notion-sub">読み込み中…</span></div>';
+    box.innerHTML = '<div class="notion-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> 神大（Notion）<span class="notion-sub">読み込み中…</span></div>';
     return;
   }
   if (notionItems === 'error') {
-    box.innerHTML = '<div class="notion-head">📚 神大（Notion）<span class="notion-sub">取得できませんでした</span></div>';
+    box.innerHTML = '<div class="notion-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> 神大（Notion）<span class="notion-sub">取得できませんでした</span></div>';
     return;
   }
 
@@ -385,14 +385,14 @@ function renderNotionList() {
           </div>
         </div>
         <div class="todo-actions">
-          <button class="todo-edit-btn notion-edit-btn" data-id="${n.id}">✏️</button>
+          <button class="todo-edit-btn notion-edit-btn" data-id="${n.id}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button>
           <a class="notion-open" href="${escapeHtmlT(n.url)}" target="_blank" rel="noopener" title="Notion で開く">↗</a>
         </div>
       </div>`;
   }).join('');
 
   box.innerHTML = `
-    <div class="notion-head">📚 神大（Notion）<span class="notion-sub">${items.length}件 ・ ✏️で編集 ／ ↗で Notion を開く</span></div>
+    <div class="notion-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> 神大（Notion）<span class="notion-sub">${items.length}件 ・ <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>で編集 ／ ↗で Notion を開く</span></div>
     ${rows || '<div class="empty-msg">該当する課題はありません</div>'}`;
 
   box.querySelectorAll('.notion-edit-btn').forEach(btn => {
@@ -641,7 +641,7 @@ async function renderTimeline() {
   labelsEl.innerHTML =
     `<div class="tl-label-header"></div>` +
     notionDues.map(({ n }) =>
-      `<div class="tl-label-row tl-label-notion ${n.status === 'done' ? 'done' : ''}" data-notion="${n.id}" title="${escapeHtmlT(n.title)}"><span class="tl-label-name">📚 ${escapeHtmlT(n.title)}</span></div>`
+      `<div class="tl-label-row tl-label-notion ${n.status === 'done' ? 'done' : ''}" data-notion="${n.id}" title="${escapeHtmlT(n.title)}"><span class="tl-label-name"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> ${escapeHtmlT(n.title)}</span></div>`
     ).join('') +
     tasks.map(t =>
       `<div class="tl-label-row" title="${t.text}"><span class="tl-label-name">${t.text}</span></div>`
@@ -855,7 +855,7 @@ async function renderTimeline() {
       mark.style.left  = `${endIdx * CELL_W + 2}px`;
       mark.style.width = `${CELL_W - 4}px`;
       mark.textContent = n.due.includes('T') ? label.split(' ').pop() : '締';
-      mark.title = `${n.title}（${label.replace('📅 ', '')}・${n.statusName}）`;
+      mark.title = `${n.title}（${label.replace(/<svg[\s\S]*?<\/svg>\s*/, '')}・${n.statusName}）`;
       mark.addEventListener('mousedown', ev => ev.stopPropagation());  // 空きマスのドラッグ作成を起こさない
       mark.addEventListener('click', ev => { ev.stopPropagation(); openNotionEdit(n); });
       row.appendChild(mark);
@@ -1348,7 +1348,7 @@ async function loadHabitChart() {
     const cnt = log ? ROUTINE_KEYS.reduce((s, k) => s + (log[k] ? 1 : 0), 0) : 0;
     labels.push(d.slice(5));
     counts.push(cnt);
-    colors.push(cnt === 3 ? '#27AE60' : cnt >= 1 ? '#F5A623' : '#E4E9F0');
+    colors.push(cnt === 3 ? '#34c759' : cnt >= 1 ? '#ff9500' : '#e5e5ea');
   }
 
   if (habitChart) habitChart.destroy();
@@ -1359,7 +1359,7 @@ async function loadHabitChart() {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} / 3 完了` } } },
       scales: {
-        y: { min: 0, max: 3, ticks: { stepSize: 1 }, grid: { color: '#F2F4F7' } },
+        y: { min: 0, max: 3, ticks: { stepSize: 1 }, grid: { color: '#f5f5f7' } },
         x: { ticks: { maxRotation: 0, callback: (v, i) => i % 5 === 0 ? labels[i] : '' }, grid: { display: false } },
       },
     },
@@ -1385,8 +1385,8 @@ async function loadGoals() {
   ['todo-goal', 'tl-edit-goal'].forEach(id => {
     const sel  = document.getElementById(id);
     const prev = sel.value;
-    sel.innerHTML = '<option value="">🎯 目標なし</option>' + planGoals.map(g =>
-      `<option value="${g.id}">🎯 ${escapeHtmlT(g.title)}</option>`
+    sel.innerHTML = '<option value="">目標なし</option>' + planGoals.map(g =>
+      `<option value="${g.id}">${escapeHtmlT(g.title)}</option>`
     ).join('');
     sel.value = prev;
   });
@@ -1487,11 +1487,11 @@ function renderGoalCards(todos) {
       <div class="plan-card goal-card" style="border-left-color:${g.color}">
         <div class="goal-card-head">
           <div>
-            <div class="goal-card-title">🎯 ${escapeHtmlT(g.title)}</div>
+            <div class="goal-card-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> ${escapeHtmlT(g.title)}</div>
             <div class="goal-card-period">${formatDate(g.start_date)} 〜 ${formatDate(g.end_date)} ・ ${leftLabel}</div>
           </div>
           <div class="todo-actions">
-            <button class="todo-edit-btn goal-edit" data-id="${g.id}">✏️</button>
+            <button class="todo-edit-btn goal-edit" data-id="${g.id}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg></button>
             <button class="todo-del goal-del" data-id="${g.id}">×</button>
           </div>
         </div>
@@ -1565,9 +1565,9 @@ function startGoalEdit(g) {
   document.getElementById('goal-title').value = g.title;
   document.getElementById('goal-start').value = g.start_date;
   document.getElementById('goal-end').value   = g.end_date;
-  document.getElementById('goal-color').value = g.color || '#9B59B6';
+  document.getElementById('goal-color').value = g.color || '#af52de';
   document.getElementById('goal-note').value  = g.note || '';
-  document.getElementById('goal-form-title').textContent = '✏️ 目標を編集';
+  document.getElementById('goal-form-title').innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> 目標を編集';
   document.getElementById('goal-submit').textContent     = '保存';
   document.getElementById('goal-cancel').hidden          = false;
   document.getElementById('goal-form').scrollIntoView({ behavior: 'smooth', block: 'center' });

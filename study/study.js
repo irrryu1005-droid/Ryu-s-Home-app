@@ -475,8 +475,8 @@ const html = \`
         body: `<p>色やサイズを一か所で管理できる。変更が楽になる。</p>
 <pre>/* :root で全体に適用 */
 :root {
-  --accent: #2563EB;
-  --bg:     #F2F4F7;
+  --accent: #007aff;
+  --bg:     #f5f5f7;
   --radius: 14px;
 }
 
@@ -518,7 +518,7 @@ const html = \`
   transition: transform 0.2s;
 }
 /* チェック時 */
-.toggle-lbl input:checked + .toggle-switch { background: #2563EB; }
+.toggle-lbl input:checked + .toggle-switch { background: #007aff; }
 .toggle-lbl input:checked + .toggle-switch::after { transform: translateX(18px); }</pre>`
       },
     ]

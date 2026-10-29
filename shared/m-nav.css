@@ -1,3 +1,6 @@
+/* Lucide アイコン（UIルール） */
+.ic{width:1.15em;height:1.15em;vertical-align:-.2em;flex-shrink:0}
+
 /* ============================================================
    モバイルアプリナビ（全ページ共通）768px未満のみ表示
 ============================================================ */
@@ -13,7 +16,7 @@
     top: 0;
     z-index: 200;
     background: #fff;
-    border-bottom: 1px solid #E4E9F0;
+    border-bottom: 1px solid #e5e5ea;
     box-shadow: 0 1px 6px rgba(0,0,0,0.06);
   }
 
@@ -32,7 +35,7 @@
   padding: 8px 2px 6px;
   text-decoration: none;
   font-size: 10px;
-  color: #8A9BB0;
+  color: #8e8e93;
   transition: color 0.15s;
 }
 .m-app-tab-icon {
@@ -40,7 +43,7 @@
   line-height: 1;
 }
 .m-app-tab.active {
-  color: #4A90D9;
+  color: #007aff;
   font-weight: 700;
 }
 
@@ -48,18 +51,18 @@
 .refresh-btn {
   margin-left: auto;
   background: none;
-  border: 1.5px solid var(--border, #E4E9F0);
+  border: 1.5px solid var(--border, #e5e5ea);
   border-radius: 8px;
   padding: 4px 10px;
   font-size: 17px;
   cursor: pointer;
-  color: var(--muted, #8A9BB0);
+  color: var(--muted, #8e8e93);
   line-height: 1;
   transition: color 0.2s, border-color 0.2s, transform 0.2s;
 }
 .refresh-btn:hover {
-  color: var(--text, #2C3E50);
-  border-color: var(--text, #2C3E50);
+  color: var(--text, #1d1d1f);
+  border-color: var(--text, #1d1d1f);
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -81,13 +84,13 @@
     gap: 4px;
     padding: 8px 20px;
     background: #fff;
-    border-bottom: 1px solid #E4E9F0;
+    border-bottom: 1px solid #e5e5ea;
   }
   /* HOME画面だけ、周りのカードに合わせて角丸・影付きにする */
   .pc-app-nav.pc-app-nav-card {
     padding: 6px 14px;
     margin-bottom: 6px;
-    border: 1px solid var(--border, #E4E9F0);
+    border: 1px solid var(--border, #e5e5ea);
     border-radius: var(--radius, 14px);
     box-shadow: var(--shadow, 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03));
   }
@@ -101,8 +104,8 @@
   text-decoration: none;
   font-size: 13px;
   font-weight: 600;
-  color: #8A9BB0;
+  color: #8e8e93;
   transition: background 0.15s, color 0.15s;
 }
-.pc-app-nav-link:hover { background: #F3F5F8; color: #4A90D9; }
-.pc-app-nav-link.active { background: #EEF4FC; color: #4A90D9; }
+.pc-app-nav-link:hover { background: #F3F5F8; color: #007aff; }
+.pc-app-nav-link.active { background: #EEF4FC; color: #007aff; }

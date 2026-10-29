@@ -6,7 +6,7 @@
   <title>HOME</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="home.css">
   <link rel="stylesheet" href="../shared/m-nav.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -20,17 +20,17 @@
   <div id="pc-home" class="pc-only">
 
     <header class="pc-header">
-      <div class="pc-header-title">🏠 HOME</div>
+      <div class="pc-header-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> HOME</div>
       <button id="btn-refresh" class="refresh-btn" title="データを更新">↻</button>
     </header>
 
     <nav class="pc-app-nav pc-app-nav-card">
-      <a href="home.html"               class="pc-app-nav-link active"><span>🏠</span>Home</a>
-      <a href="../study/study.html"     class="pc-app-nav-link"><span>📚</span>Study</a>
-      <a href="../tasks/task.html"      class="pc-app-nav-link"><span>✅</span>Tasks</a>
-      <a href="../health/health.html"   class="pc-app-nav-link"><span>💪</span>Health</a>
-      <a href="../finance/finance.html" class="pc-app-nav-link"><span>💰</span>Finance</a>
-      <a href="../betting/betting.html" class="pc-app-nav-link"><span>🎯</span>Betting</a>
+      <a href="home.html"               class="pc-app-nav-link active"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Home</a>
+      <a href="../study/study.html"     class="pc-app-nav-link"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></span>Study</a>
+      <a href="../tasks/task.html"      class="pc-app-nav-link"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg></span>Tasks</a>
+      <a href="../health/health.html"   class="pc-app-nav-link"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg></span>Health</a>
+      <a href="../finance/finance.html" class="pc-app-nav-link"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>Finance</a>
+      <a href="../betting/betting.html" class="pc-app-nav-link"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>Betting</a>
     </nav>
 
     <div class="pc-grid">
@@ -46,7 +46,7 @@
       <div class="pc-card schedule-card">
         <div class="card-title-nav">
           <button class="sch-nav-btn" id="sch-prev">‹</button>
-          <span class="card-title" id="sch-date-label">📅 Schedule</span>
+          <span class="card-title" id="sch-date-label"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> Schedule</span>
           <button class="sch-nav-btn" id="sch-next">›</button>
         </div>
         <div id="schedule-list" class="schedule-list">
@@ -76,7 +76,7 @@
       <!-- ToDo -->
       <div class="pc-card todo-card">
         <div class="card-title-row">
-          <div class="card-title">✅ ToDo</div>
+          <div class="card-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg> ToDo</div>
           <button type="button" class="todo-add-open-btn" id="pc-todo-open">＋ 追加</button>
         </div>
         <div class="todo-inner">
@@ -104,7 +104,7 @@
     <!-- ToDo を追加するモーダル（「＋ 追加」で開く） -->
     <div class="home-tl-overlay" id="pc-todo-overlay">
             <form id="pc-todo-form" class="todo-add-form home-tl-modal todo-add-modal">
-              <div class="home-tl-modal-title">✅ タスクを追加</div>
+              <div class="home-tl-modal-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg> タスクを追加</div>
               <input type="text" id="pc-todo-input" placeholder="タスク名" required>
               <div class="todo-form-row">
                 <select id="pc-todo-category">
@@ -127,7 +127,7 @@
               </div>
               <div class="schedule-section">
                 <div class="schedule-row">
-                  <span class="schedule-label">🗓 実行予定日</span>
+                  <span class="schedule-label"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg> 実行予定日</span>
                   <input type="date" id="pc-todo-scheduled-input">
                   <button type="button" id="pc-todo-schedule-add" class="add-schedule-btn">＋追加</button>
                 </div>
@@ -143,7 +143,7 @@
     <!-- Notion の課題を編集（Tasks と同じ項目。Notion に保存） -->
     <div class="home-tl-overlay" id="home-ne-overlay">
       <form class="home-tl-modal home-ne" id="home-ne-form" novalidate>
-        <div class="home-tl-modal-title">✏️ 課題を編集 <span class="home-notion-sub">Notion に保存されます</span></div>
+        <div class="home-tl-modal-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> 課題を編集 <span class="home-notion-sub">Notion に保存されます</span></div>
         <input type="text" id="home-ne-title" placeholder="課題名" required>
         <div class="home-tl-form-row">
           <label>状態
@@ -182,11 +182,11 @@
 
     <div class="home-tl-overlay" id="home-tl-overlay">
       <div class="home-tl-modal">
-        <div class="home-tl-modal-title">✏️ タスクを編集</div>
+        <div class="home-tl-modal-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg> タスクを編集</div>
         <input type="text" id="home-tl-edit-text" placeholder="タスク名">
         <div class="home-tl-form-row">
-          <label>📅 実行予定日<input type="date" id="home-tl-edit-scheduled"></label>
-          <label>⏰ 締切日<input type="date" id="home-tl-edit-due"></label>
+          <label><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> 実行予定日<input type="date" id="home-tl-edit-scheduled"></label>
+          <label><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/><path d="M6.38 18.7 4 21"/><path d="M17.64 18.67 20 21"/></svg> 締切日<input type="date" id="home-tl-edit-due"></label>
         </div>
         <div class="home-tl-modal-btns">
           <button id="home-tl-edit-cancel">キャンセル</button>
@@ -197,21 +197,21 @@
 
       <!-- ルーティン -->
       <div class="pc-card routine-card">
-        <div class="card-title">🔄 Routine <span class="routine-date-inline" id="routine-today-label"></span></div>
+        <div class="card-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> Routine <span class="routine-date-inline" id="routine-today-label"></span></div>
         <div class="routine-items">
           <label class="routine-item">
             <input type="checkbox" data-key="ielts">
-            <span class="routine-icon">📖</span>
+            <span class="routine-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M16 12h2"/><path d="M16 8h2"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/><path d="M6 12h2"/><path d="M6 8h2"/></svg></span>
             <span>IELTS単語</span>
           </label>
           <label class="routine-item">
             <input type="checkbox" data-key="reading">
-            <span class="routine-icon">📚</span>
+            <span class="routine-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></span>
             <span>読書</span>
           </label>
           <label class="routine-item">
             <input type="checkbox" data-key="training">
-            <span class="routine-icon">💪</span>
+            <span class="routine-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg></span>
             <span>Work out</span>
           </label>
         </div>
@@ -225,7 +225,7 @@
 
       <!-- Habit Chart -->
       <div class="pc-card chart-card">
-        <div class="card-title">📈 Habit Chart <span class="chart-subtitle">（直近30日）</span></div>
+        <div class="card-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></svg> Habit Chart <span class="chart-subtitle">（直近30日）</span></div>
         <div class="chart-wrap">
           <canvas id="habit-chart"></canvas>
         </div>
@@ -235,7 +235,7 @@
 
     <!-- 今月の収支 -->
     <div class="pc-card finance-card">
-      <div class="card-title">📊 今月の収支</div>
+      <div class="card-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> 今月の収支</div>
       <div class="finance-summary">
         <div class="fin-item">
           <div class="fin-label">収入</div>
@@ -262,34 +262,34 @@
   <div id="mobile-home" class="mobile-only">
 
     <nav class="m-app-nav" style="display:flex">
-      <a href="home.html"               class="m-app-tab active"><span class="m-app-tab-icon">🏠</span>Home</a>
-      <a href="../study/study.html"     class="m-app-tab"><span class="m-app-tab-icon">📚</span>Study</a>
-      <a href="../tasks/task.html"      class="m-app-tab"><span class="m-app-tab-icon">✅</span>Tasks</a>
-      <a href="../health/health.html"   class="m-app-tab"><span class="m-app-tab-icon">💪</span>Health</a>
-      <a href="../finance/finance.html" class="m-app-tab"><span class="m-app-tab-icon">💰</span>Finance</a>
-      <a href="../betting/betting.html" class="m-app-tab"><span class="m-app-tab-icon">🎯</span>Betting</a>
+      <a href="home.html"               class="m-app-tab active"><span class="m-app-tab-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Home</a>
+      <a href="../study/study.html"     class="m-app-tab"><span class="m-app-tab-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></span>Study</a>
+      <a href="../tasks/task.html"      class="m-app-tab"><span class="m-app-tab-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg></span>Tasks</a>
+      <a href="../health/health.html"   class="m-app-tab"><span class="m-app-tab-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg></span>Health</a>
+      <a href="../finance/finance.html" class="m-app-tab"><span class="m-app-tab-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>Finance</a>
+      <a href="../betting/betting.html" class="m-app-tab"><span class="m-app-tab-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>Betting</a>
     </nav>
 
     <!-- ルーティン -->
     <section class="m-section m-routine-section">
       <div class="m-section-head">
-        <h2>🔄 Routine <span class="routine-date-inline" id="m-routine-date"></span></h2>
+        <h2><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> Routine <span class="routine-date-inline" id="m-routine-date"></span></h2>
         <span class="m-routine-badge" id="m-routine-count">0 / 3</span>
       </div>
       <div class="routine-items">
         <label class="routine-item">
           <input type="checkbox" data-key="ielts">
-          <span class="routine-icon">📖</span>
+          <span class="routine-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M16 12h2"/><path d="M16 8h2"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/><path d="M6 12h2"/><path d="M6 8h2"/></svg></span>
           <span>IELTS</span>
         </label>
         <label class="routine-item">
           <input type="checkbox" data-key="reading">
-          <span class="routine-icon">📚</span>
+          <span class="routine-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></span>
           <span>読書</span>
         </label>
         <label class="routine-item">
           <input type="checkbox" data-key="training">
-          <span class="routine-icon">💪</span>
+          <span class="routine-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg></span>
           <span>Workout</span>
         </label>
       </div>
@@ -297,7 +297,7 @@
 
     <!-- 収支を記録 -->
     <section class="m-section">
-      <h2>💰 収支を記録</h2>
+      <h2><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg> 収支を記録</h2>
       <div class="type-toggle">
         <button type="button" class="type-btn expense active" data-type="expense">支出</button>
         <button type="button" class="type-btn income" data-type="income">収入</button>
@@ -328,7 +328,7 @@
 
     <!-- ToDo追加 -->
     <section class="m-section">
-      <button type="button" class="m-todo-open-btn" id="m-todo-open-btn">✅ ToDoを追加</button>
+      <button type="button" class="m-todo-open-btn" id="m-todo-open-btn"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg> ToDoを追加</button>
     </section>
 
   </div><!-- /mobile-home -->
@@ -336,7 +336,7 @@
   <!-- ToDo追加モーダル -->
   <div class="m-todo-modal-overlay hidden" id="m-todo-modal-overlay">
     <div class="m-todo-modal">
-      <div class="m-todo-modal-title">✅ ToDoを追加</div>
+      <div class="m-todo-modal-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg> ToDoを追加</div>
       <form id="m-todo-form" novalidate>
         <div class="form-group">
           <label>タスク名</label>

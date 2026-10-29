@@ -487,7 +487,7 @@ async function renderList() {
     ? '<div class="txn-empty">なし</div>'
     : list.map(t => {
         const memo     = t.memo     ? ` · ${t.memo}`     : '';
-        const location = t.location ? ` · 📍${t.location}` : '';
+        const location = t.location ? ` · <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>${t.location}` : '';
         return `
           <div class="txn-item" data-id="${t.id}">
             <span class="txn-drag-handle" title="ドラッグで並べ替え（同じ${_listSort.key === 'date' ? '日付' : '金額'}の中）">⠿</span>
@@ -966,11 +966,11 @@ let _plannedMonth = new Date();
 _plannedMonth.setDate(1);
 
 const PLANNED_CATEGORY_LABEL = {
-  transport: '🚃 交通',
-  loan:      '💴 ローン・返済',
-  utility:   '💡 光熱費・通信',
-  other:     '📦 その他',
-  subscription: '💳 サブスク',
+  transport: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3.1V7a4 4 0 0 0 8 0V3.1"/><path d="m9 15-1-1"/><path d="m15 15 1-1"/><path d="M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5Z"/><path d="m8 19-2 3"/><path d="m16 19 2 3"/></svg> 交通',
+  loan:      '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg> ローン・返済',
+  utility:   '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg> 光熱費・通信',
+  other:     '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></svg> その他',
+  subscription: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg> サブスク',
 };
 
 function plannedMonthLabel(d) {
@@ -1153,10 +1153,10 @@ async function renderPlannedTab() {
       const typeBadge = it.source === 'subscription'
         ? `<span class="badge-sub">サブスク</span><span class="badge-freq">${it.frequency === 'yearly' ? '年' : '月'}</span>`
         : it.source === 'loan'
-        ? `<span class="badge-sub" style="background:#e8f4e8;color:#27ae60">ローン</span>`
+        ? `<span class="badge-sub" style="background:#e8f4e8;color:#34c759">ローン</span>`
         : '';
       const dayOverrideBtn = it.source === 'subscription'
-        ? `<button class="planned-day-override-btn" data-id="${it.id}" data-current="${it.billingDay || ''}" data-overridden="${it.billingDayOverridden}" title="今月の支払日を変更">📅</button>`
+        ? `<button class="planned-day-override-btn" data-id="${it.id}" data-current="${it.billingDay || ''}" data-overridden="${it.billingDayOverridden}" title="今月の支払日を変更"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg></button>`
         : '';
       return `
         <div class="planned-item${it.paid ? ' planned-item-paid' : ''}">
@@ -1301,7 +1301,7 @@ function openAmountOverrideModal({ id, source, name, amount, confirmed, planned,
   const input = document.getElementById('amount-override-input');
   const isConfirmed = confirmed === 'true';
   const m = Number(yearMonth.split('-')[1]);
-  document.getElementById('amount-override-title').textContent = `💴 ${m}月の金額を確定`;
+  document.getElementById('amount-override-title').innerHTML = `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg> ${m}月の金額を確定`;
   document.getElementById('amount-override-label').textContent = name;
   document.getElementById('amount-override-planned').textContent = plannedMax
     ? `予定: ¥${Number(planned).toLocaleString()}〜¥${Number(plannedMax).toLocaleString()}`
@@ -2912,7 +2912,7 @@ function renderSimUse(c) {
   const el = document.getElementById('sim-use');
   if (c.leftover < 0) {
     el.innerHTML = `
-      <div class="sim-use-title">💡 余りの使い道</div>
+      <div class="sim-use-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg> 余りの使い道</div>
       <div class="sim-use-short">この月は ${yen(c.leftover)} 足りません</div>
       <div class="sim-row-sub">貯金から出すか、上の「収入」を増やす必要があります。自由に使えるお金・貯金はどちらも ¥0 です。</div>`;
     return;
@@ -2922,9 +2922,9 @@ function renderSimUse(c) {
   const goalsTotal = c.goalAlloc?.goalsTotal || 0;
   const sliderMax = c.room - goalsTotal, sliderVal = c.saving - goalsTotal;
   el.innerHTML = `
-    <div class="sim-use-title">💡 余りの使い道</div>
+    <div class="sim-use-title"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg> 余りの使い道</div>
     <div class="sim-use-formula">入るお金 ${yen(c.cashIncome)} − 必要な額 ${yen(c.need)} ＝ <b>余り ${yen(c.leftover)}</b></div>
-    ${c.goalUsed ? `<div class="sim-row-sub">🎯 貯めた分から払う ${yen(c.goalUsed)} は、必要な額から引いています</div>` : ''}
+    ${c.goalUsed ? `<div class="sim-row-sub"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 貯めた分から払う ${yen(c.goalUsed)} は、必要な額から引いています</div>` : ''}
     <div class="sim-use-split">
       <div class="sim-use-box sim-use-free">
         <div class="sim-use-label">自由に使えるお金</div>
@@ -2979,7 +2979,7 @@ function simGoalAllocHtml(c) {
     // 自動はこの月に割り直した額（前の月までの不足分を上乗せしていれば「上乗せ」と出す）
     const monthly = simGoalIsAuto(g) ? want : simGoalMonthly(g);
     const autoNote = !simGoalIsAuto(g) ? '' : want > (simGoalPace(g) ?? 0) ? '（自動・不足分を上乗せ）' : '（自動）';
-    const rank = _simGoals.length > 1 ? ('①②③④⑤⑥⑦⑧⑨⑩'[_simGoals.indexOf(g)] || '') : '🎯';
+    const rank = _simGoals.length > 1 ? ('①②③④⑤⑥⑦⑧⑨⑩'[_simGoals.indexOf(g)] || '') : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
     return `<div class="sim-goal-alloc-row" data-goal-edit="${g.id}"><span>${rank} ${escapeHtmlF(g.name)}${note}</span><span>${yen(amt)}<span class="sim-row-sub"> / 毎月${yen(monthly)}${autoNote}</span></span></div>`;
   }).join('');
   return `<div class="sim-goal-alloc">${rows}</div>`;
@@ -3062,13 +3062,13 @@ function openSimNeedModal() {
     } else continue;
     const g = [..._simGoals, ..._simGoalsDone].find(x => x.expense_ref === r.ref);
     r.btn = g
-      ? `<button type="button" class="sim-goal-from-btn is-set" data-goal-open="${g.id}">🎯 目標あり</button>`
-      : `<button type="button" class="sim-goal-from-btn" data-goal-from="${escapeHtmlF(r.ref)}">🎯 ${r.trip ? `${m + 1}月の${escapeHtmlF(r.trip.name)}の分（${yen(r.tripMonth.amount)}）を目標にする` : '目標にする'}</button>`;
+      ? `<button type="button" class="sim-goal-from-btn is-set" data-goal-open="${g.id}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 目標あり</button>`
+      : `<button type="button" class="sim-goal-from-btn" data-goal-from="${escapeHtmlF(r.ref)}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> ${r.trip ? `${m + 1}月の${escapeHtmlF(r.trip.name)}の分（${yen(r.tripMonth.amount)}）を目標にする` : '目標にする'}</button>`;
   }
   if (c.goalUsed) {
     const usedPer = simGoalsPlan()?.alloc[ym]?.usedPer || {};
     const names = _simGoals.filter(g => usedPer[g.id]).map(g => g.name).join('・');
-    rows.push({ name: '🎯 貯めた分から払う', note: names, day: 100, amount: -c.goalUsed });
+    rows.push({ name: '貯めた分から払う', note: names, day: 100, amount: -c.goalUsed });
   }
   simShowBreakdown(`${m + 1}月に必要な額`, rows.filter(r => r.amount), c.need, 'この月に必要な支出はありません');
   const list = document.getElementById('sim-cash-list');
@@ -3092,7 +3092,7 @@ function openSimGoalFromExpense(r, y, m) {
   f.elements.target.value = r.trip ? r.tripMonth.amount : r.amount;
   f.elements.deadline.value = dateStr(y, m, Math.min(r.day || 99, new Date(y, m + 1, 0).getDate()));
   f.elements.expenseRef.value = r.ref;
-  document.getElementById('sim-goal-title').textContent = '🎯 支出のために貯める';
+  document.getElementById('sim-goal-title').innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 支出のために貯める';
   simUpdateGoalPaceNote();
 }
 
@@ -3412,7 +3412,7 @@ function jpHolidays(y) {
   return (_jpHolidayCache[y] = h);
 }
 
-const SIM_JOB_COLORS = ['#4A90D9', '#8E44AD', '#16A085', '#C0392B', '#2C3E50'];
+const SIM_JOB_COLORS = ['#007aff', '#8E44AD', '#34c759', '#C0392B', '#1d1d1f'];
 let _simCalJob = null;  // まとめカレンダーで今入れているバイトの id
 
 // バイトのカードに出す「出勤 ○日・日払い ○日」（日にちはまとめカレンダーで選ぶ）
@@ -3464,7 +3464,7 @@ function renderSimCalendar(c) {
 
   el.innerHTML = `
     <div class="sim-cal-head">
-      <span class="sim-step-label">📅 出勤カレンダー</span>
+      <span class="sim-step-label"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg> 出勤カレンダー</span>
       <span class="sim-row-sub">出勤 ${c.workDays}日・休み ${Math.max(0, c.daysInMonth - c.workDays)}日</span>
     </div>
     <div class="sim-cal-jobs">
@@ -3653,7 +3653,7 @@ function renderSimTrips(c) {
     return `
       <div class="sim-row sim-row-tap sim-trip-row" data-trip="${t.trip.id}">
         <div>
-          <div class="sim-row-name">✈️ ${escapeHtmlF(t.trip.name)}<span class="sim-badge sim-badge-when">${md(t.trip.start_date)}〜${md(t.trip.end_date)}</span></div>
+          <div class="sim-row-name"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg> ${escapeHtmlF(t.trip.name)}<span class="sim-badge sim-badge-when">${md(t.trip.start_date)}〜${md(t.trip.end_date)}</span></div>
           <div class="sim-row-sub">${parts.join(' ／ ')}</div>
         </div>
         <span class="sim-row-amount">${yen(t.amount)}</span>
@@ -3882,14 +3882,14 @@ function simTrendEvents(today, months) {
 function renderSimGoal(plan, todayBalance) {
   const el = document.getElementById('sim-goal');
   if (!_simGoals.length) {
-    el.innerHTML = `<div class="sim-goal-empty"><span>🎯 貯金の目標がまだありません</span><button class="btn-primary-sm" data-goal-add>＋ 目標を作る</button></div>`;
+    el.innerHTML = `<div class="sim-goal-empty"><span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 貯金の目標がまだありません</span><button class="btn-primary-sm" data-goal-add>＋ 目標を作る</button></div>`;
   } else {
     const savedNow = plan.startTotal;
     const usable = todayBalance - savedNow;
     el.innerHTML = `
       <div class="sim-goal-head">
         <button type="button" class="sim-goal-toggle" title="開く／閉じる">
-          <span class="sim-goal-caret">▼</span><b>🎯 貯金の目標</b>
+          <span class="sim-goal-caret">▼</span><b><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 貯金の目標</b>
           <span class="sim-goal-summary"><span>${_simGoals.length}件</span>・<span>貯金 ${yen(savedNow)}</span>・<span>使っていいお金 ${usable < 0 ? '−' : ''}${yen(usable)}</span></span>
         </button>
         <button class="btn-primary-sm" data-goal-add>＋ 追加</button>
@@ -3899,7 +3899,7 @@ function renderSimGoal(plan, todayBalance) {
       ${_simGoals.map((g, gi) => {
         const st = plan.stats[g.id], saved = g.saved_amount || 0;
         const pct = Math.min(100, Math.round(saved / g.target_amount * 100));
-        const reach = st.reachYm === 'now' ? 'もう達成しています 🎉' : st.reachYm ? `予想では <b>${simYmLabel(st.reachYm)}末</b> に達成` : (simGoalMonthly(g) ? '今の計画では3年以内に届きません' : '毎月の額か期限を入れると、たまっていきます');
+        const reach = st.reachYm === 'now' ? 'もう達成しています <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></svg>' : st.reachYm ? `予想では <b>${simYmLabel(st.reachYm)}末</b> に達成` : (simGoalMonthly(g) ? '今の計画では3年以内に届きません' : '毎月の額か期限を入れると、たまっていきます');
         let deadline = '';
         if (g.deadline_ym && st.needPerMonth != null) {
           deadline = st.deadlineOk
@@ -3932,7 +3932,7 @@ function renderSimGoal(plan, todayBalance) {
   if (_simGoalsDone.length) {
     el.insertAdjacentHTML('beforeend', `
       <details class="sim-goal-done-list">
-        <summary>✅ 達成した目標（${_simGoalsDone.length}）</summary>
+        <summary><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg> 達成した目標（${_simGoalsDone.length}）</summary>
         ${_simGoalsDone.map(g => `
           <div class="sim-goal-row sim-goal-done-row">
             <span><b>${escapeHtmlF(g.name)}</b> ${yen(g.target_amount)}<span class="sim-badge">${g.achieved_at.replaceAll('-', '/')} 達成</span></span>
@@ -4002,7 +4002,7 @@ function openSimGoalModal(id = null) {
   f.elements.monthly.value = g?.monthly_amount ?? '';
   f.elements.achieved.value = g?.achieved_at || '';
   f.elements.expenseRef.value = g?.expense_ref || '';
-  document.getElementById('sim-goal-title').textContent = g ? '🎯 目標を編集' : '🎯 目標を追加';
+  document.getElementById('sim-goal-title').innerHTML = g ? '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 目標を編集' : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 目標を追加';
   simUpdateGoalPaceNote();
   // Wish List（未購入）から選べる。選ぶと名前と目標額（価格の上限）が入る
   const sel = document.getElementById('sim-goal-wl');
@@ -4035,7 +4035,7 @@ function simUpdateGoalPaceNote() {
   f.elements.target.readOnly = linked;
   if (!exp.hidden) {
     const pm = simYmToDate(simPrevYm(g.deadline_ym)).getMonth() + 1;
-    exp.textContent = `💳 支出のための目標: ${simYmLabel(g.deadline_ym)}は積み立てず、${pm}月末までに貯めた分でこの支出を払います（その分、${simYmLabel(g.deadline_ym)}の必要な額から引きます）${linked ? '。目標額は支出の金額に自動で合わせています' : ''}`;
+    exp.textContent = `支出のための目標: ${simYmLabel(g.deadline_ym)}は積み立てず、${pm}月末までに貯めた分でこの支出を払います（その分、${simYmLabel(g.deadline_ym)}の必要な額から引きます）${linked ? '。目標額は支出の金額に自動で合わせています' : ''}`;
   }
 }
 
@@ -4293,9 +4293,9 @@ function drawBalanceChart(canvas, oldChart, startD, end, today, startBalance, pa
     data: {
       labels,
       datasets: [
-        { label: '残高', data: pastData, borderColor: '#4A90D9', backgroundColor: 'rgba(74,144,217,0.10)', fill: true, stepped: true, pointRadius: 0, borderWidth: 2 },
-        { label: '予想', data: futData, borderColor: '#4A90D9', borderDash: [6, 4], stepped: true, pointRadius: 0, borderWidth: 2, fill: false },
-        ...(savingsAt ? [{ label: '貯金（使わないお金）', data: savData, borderColor: '#27AE60', backgroundColor: 'rgba(39,174,96,0.14)', fill: 'origin', stepped: true, pointRadius: 0, borderWidth: 1.5 }] : []),
+        { label: '残高', data: pastData, borderColor: '#007aff', backgroundColor: 'rgba(74,144,217,0.10)', fill: true, stepped: true, pointRadius: 0, borderWidth: 2 },
+        { label: '予想', data: futData, borderColor: '#007aff', borderDash: [6, 4], stepped: true, pointRadius: 0, borderWidth: 2, fill: false },
+        ...(savingsAt ? [{ label: '貯金（使わないお金）', data: savData, borderColor: '#34c759', backgroundColor: 'rgba(39,174,96,0.14)', fill: 'origin', stepped: true, pointRadius: 0, borderWidth: 1.5 }] : []),
       ],
     },
     options: {

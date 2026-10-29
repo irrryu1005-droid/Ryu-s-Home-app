@@ -4,22 +4,25 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --income:     #F5A623;
-  --expense:    #4A90D9;
-  --profit-pos: #27AE60;
-  --profit-neg: #E74C3C;
-  --purple:     #9B59B6;
-  --bg:         #F2F4F7;
+  --f-ja: "Tsukushi A Round Gothic","TsukuARdGothic-Regular","Hiragino Maru Gothic ProN","Zen Maru Gothic",sans-serif;
+  --f-en: -apple-system,BlinkMacSystemFont,system-ui,"Helvetica Neue",sans-serif;
+  --f-mono: ui-monospace,"SF Mono",Menlo,monospace;
+  --income:     #ff9500;
+  --expense:    #007aff;
+  --profit-pos: #34c759;
+  --profit-neg: #ff3b30;
+  --purple:     #af52de;
+  --bg:         #f5f5f7;
   --white:      #FFFFFF;
-  --text:       #2C3E50;
-  --muted:      #8A9BB0;
-  --border:     #E4E9F0;
-  --radius:     14px;
-  --shadow:     0 2px 12px rgba(0,0,0,0.07);
+  --text:       #1d1d1f;
+  --muted:      #8e8e93;
+  --border:     #e5e5ea;
+  --radius:     10px;
+  --shadow:     0 1px 3px rgba(0,0,0,.06);
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  font-family: var(--f-en), var(--f-ja);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -106,7 +109,7 @@ body {
 }
 .status-btn[data-status="will"].active  { background: #EBF3FB; border-color: #2980B9; color: #2980B9; }
 .status-btn[data-status="doing"].active { background: #FEF9E7; border-color: #F39C12; color: #F39C12; }
-.status-btn[data-status="done"].active  { background: #EAF5EA; border-color: #27AE60; color: #27AE60; }
+.status-btn[data-status="done"].active  { background: #EAF5EA; border-color: #34c759; color: #34c759; }
 .status-btn[data-status="all"].active   { background: var(--purple); border-color: var(--purple); color: var(--white); }
 
 /* ============================================================
@@ -146,8 +149,8 @@ body {
 }
 .cat-神大    { background: #EBF3FB; color: #2980B9; }
 .cat-バイト  { background: #FEF9E7; color: #F39C12; }
-.cat-Betting { background: #FDEDEC; color: #E74C3C; }
-.cat-資格    { background: #EAF5EA; color: #27AE60; }
+.cat-Betting { background: #FDEDEC; color: #ff3b30; }
+.cat-資格    { background: #EAF5EA; color: #34c759; }
 .cat-その他  { background: #F4F6F7; color: #7F8C8D; }
 
 /* ============================================================
@@ -168,7 +171,7 @@ body {
 }
 .todo-item.status-will  { border-left-color: #2980B9; }
 .todo-item.status-doing { border-left-color: #F39C12; }
-.todo-item.status-done  { border-left-color: #27AE60; opacity: 0.6; }
+.todo-item.status-done  { border-left-color: #34c759; opacity: 0.6; }
 
 .todo-main {
   display: flex;
@@ -194,7 +197,7 @@ body {
 }
 .status-select option[value="will"]  { color: #2980B9; }
 .status-select option[value="doing"] { color: #F39C12; }
-.status-select option[value="done"]  { color: #27AE60; }
+.status-select option[value="done"]  { color: #34c759; }
 
 .todo-info { flex: 1; min-width: 0; }
 .todo-text {
@@ -295,7 +298,7 @@ body {
 }
 .notion-status-will  { color: #2980B9; }
 .notion-status-doing { color: #F39C12; }
-.notion-status-done  { color: #27AE60; }
+.notion-status-done  { color: #34c759; }
 .notion-kind { font-size: 11px; color: var(--muted); }
 .notion-open { color: var(--muted); font-size: 14px; flex-shrink: 0; }
 
@@ -409,7 +412,7 @@ body {
   gap: 8px;
 }
 .routine-block-title.before { color: #5D6D7E; }
-.routine-block-title.after  { color: #2C3E50; }
+.routine-block-title.after  { color: #1d1d1f; }
 .routine-block-date {
   font-size: 11px;
   font-weight: 600;
@@ -495,9 +498,9 @@ body {
   border-radius: 50%;
   margin-right: 2px;
 }
-.legend-dot.green  { background: #27AE60; }
-.legend-dot.yellow { background: #F5A623; }
-.legend-dot.gray   { background: #E4E9F0; }
+.legend-dot.green  { background: #34c759; }
+.legend-dot.yellow { background: #ff9500; }
+.legend-dot.gray   { background: #e5e5ea; }
 .chart-wrap { height: 140px; }
 .chart-wrap canvas { width: 100% !important; height: 100% !important; }
 
@@ -518,7 +521,7 @@ body {
   transition: all 0.15s;
 }
 .gcal-auth-btn:hover { border-color: #4285F4; color: #4285F4; }
-.gcal-auth-btn.connected { background: #EAF5EA; border-color: #27AE60; color: #27AE60; }
+.gcal-auth-btn.connected { background: #EAF5EA; border-color: #34c759; color: #34c759; }
 
 /* ============================================================
    実行予定日（フォーム）
@@ -749,8 +752,8 @@ body {
 .tl-day-num { font-weight: 700; font-size: 11px; }
 .tl-day-name { font-size: 9px; color: var(--muted); }
 .tl-day-header.weekend { background: #FEF9E7; }
-.tl-day-header.weekend .tl-day-num { color: #E74C3C; }
-.tl-day-header.weekend .tl-day-name { color: #E74C3C; }
+.tl-day-header.weekend .tl-day-num { color: #ff3b30; }
+.tl-day-header.weekend .tl-day-name { color: #ff3b30; }
 
 /* タスク行 */
 .tl-task-rows { position: relative; }
@@ -1141,7 +1144,7 @@ body {
 .goal-todo-status { font-size: 10px; font-weight: 700; flex-shrink: 0; }
 .goal-todo-status.status-will  { color: #2980B9; }
 .goal-todo-status.status-doing { color: #F39C12; }
-.goal-todo-status.status-done  { color: #27AE60; }
+.goal-todo-status.status-done  { color: #34c759; }
 
 .mile-form { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .mile-input, .mile-date-input {

@@ -195,9 +195,9 @@ function renderChart() {
   const labels = days.map(fmtDateLabel);
 
   const macroDatasets = [
-    { key: 'protein', label: 'タンパク質', color: '#2563EB' },
-    { key: 'fat',     label: '脂質',       color: '#E67E22' },
-    { key: 'carb',    label: '炭水化物',   color: '#16A085' },
+    { key: 'protein', label: 'タンパク質', color: '#007aff' },
+    { key: 'fat',     label: '脂質',       color: '#ff9500' },
+    { key: 'carb',    label: '炭水化物',   color: '#34c759' },
   ].map(({ key, label, color }) => ({
     type: 'line',
     label,
@@ -285,7 +285,7 @@ function renderPfcChart() {
         {
           label: '実際',
           data: [kcalP, kcalF, kcalC],
-          backgroundColor: ['#2563EB', '#E67E22', '#16A085'],
+          backgroundColor: ['#007aff', '#ff9500', '#34c759'],
           borderWidth: 0,
         },
         {
@@ -358,8 +358,8 @@ function renderBalanceChart() {
       data: {
         labels,
         datasets: [
-          { type: 'bar',  label: '摂取', data: days.map(d => dayMap[d].intake), backgroundColor: '#2563EB' },
-          { type: 'bar',  label: '消費', data: days.map(d => dayMap[d].burn !== null ? Math.round(dayMap[d].burn) : null), backgroundColor: '#E67E22' },
+          { type: 'bar',  label: '摂取', data: days.map(d => dayMap[d].intake), backgroundColor: '#007aff' },
+          { type: 'bar',  label: '消費', data: days.map(d => dayMap[d].burn !== null ? Math.round(dayMap[d].burn) : null), backgroundColor: '#ff9500' },
           {
             type: 'line', label: '収支(累計)',
             data: (() => {
@@ -369,7 +369,7 @@ function renderBalanceChart() {
                 return cum;
               });
             })(),
-            borderColor: '#16A085', backgroundColor: '#16A085',
+            borderColor: '#34c759', backgroundColor: '#34c759',
             tension: 0.3, pointRadius: 2,
           },
         ],
@@ -426,14 +426,14 @@ const EVOLT_SUB   = [
 ];
 
 const BODY_METRICS = {
-  weight_kg:              { label: '体重',         unit: 'kg',   color: '#2563EB', decimals: 1 },
+  weight_kg:              { label: '体重',         unit: 'kg',   color: '#007aff', decimals: 1 },
   bmi:                    { label: 'BMI',          unit: '',     color: '#8B5CF6', decimals: 1 },
-  body_fat_pct:           { label: '体脂肪率',     unit: '%',    color: '#E67E22', decimals: 1 },
+  body_fat_pct:           { label: '体脂肪率',     unit: '%',    color: '#ff9500', decimals: 1 },
   visceral_fat_level:     { label: '内臓脂肪Lv',   unit: '',     color: '#DC2626', decimals: 0 },
   bmr_kcal:               { label: '基礎代謝',     unit: 'kcal', color: '#F59E0B', decimals: 0 },
   body_age:               { label: '体内年齢',     unit: '歳',   color: '#0EA5E9', decimals: 0 },
   // Evoltメイン
-  skeletal_muscle_mass_kg:{ label: '骨格筋量',     unit: 'kg',   color: '#16A085', decimals: 1 },
+  skeletal_muscle_mass_kg:{ label: '骨格筋量',     unit: 'kg',   color: '#34c759', decimals: 1 },
   lean_body_mass_kg:      { label: '除脂肪量',     unit: 'kg',   color: '#0D9488', decimals: 1 },
   // Evoltサブ
   body_fat_mass_kg:              { label: '体脂肪量',       unit: 'kg',  color: '#64748B', decimals: 1 },

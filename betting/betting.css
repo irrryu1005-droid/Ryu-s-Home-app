@@ -4,20 +4,23 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --win:    #27AE60;
-  --loss:   #E74C3C;
-  --purple: #9B59B6;
-  --bg:     #F2F4F7;
+  --f-ja: "Tsukushi A Round Gothic","TsukuARdGothic-Regular","Hiragino Maru Gothic ProN","Zen Maru Gothic",sans-serif;
+  --f-en: -apple-system,BlinkMacSystemFont,system-ui,"Helvetica Neue",sans-serif;
+  --f-mono: ui-monospace,"SF Mono",Menlo,monospace;
+  --win:    #34c759;
+  --loss:   #ff3b30;
+  --purple: #af52de;
+  --bg:     #f5f5f7;
   --white:  #FFFFFF;
-  --text:   #2C3E50;
-  --muted:  #8A9BB0;
-  --border: #E4E9F0;
-  --radius: 14px;
-  --shadow: 0 2px 12px rgba(0,0,0,0.07);
+  --text:   #1d1d1f;
+  --muted:  #8e8e93;
+  --border: #e5e5ea;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06);
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  font-family: var(--f-en), var(--f-ja);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -613,7 +616,7 @@ details[open].settings-section > summary::before { content: '▼ '; }
 .gtc-amount { font-size: 9px; font-weight: 800; }
 .gtc-min  { color: #F39C12; }
 .gtc-real { color: #3B82F6; }
-.gtc-ideal{ color: #27AE60; }
+.gtc-ideal{ color: #34c759; }
 
 /* 損益バーの点線マーカー */
 .goal-marker {
@@ -627,7 +630,7 @@ details[open].settings-section > summary::before { content: '▼ '; }
 }
 .goal-marker-min  { border-color: #F39C12; }
 .goal-marker-real { border-color: #3B82F6; }
-.goal-marker-ideal { border-color: #27AE60; border-right-style: solid; }
+.goal-marker-ideal { border-color: #34c759; border-right-style: solid; }
 /* 理論値マーカー（今日ペース）: solid・半透明でゴール目標線と区別 */
 /* 達成済みマーカーは白のまま透明度を下げ、バーと衝突して途切れて見えないが線の存在はわかる程度に抑える */
 .goal-marker-crossed {
@@ -638,7 +641,7 @@ details[open].settings-section > summary::before { content: '▼ '; }
 .goal-marker-theory { border-right-style: solid; opacity: 0.35; z-index: 2; }
 .gtm-min   { border-color: #F39C12; }
 .gtm-real  { border-color: #3B82F6; }
-.gtm-ideal { border-color: #27AE60; }
+.gtm-ideal { border-color: #34c759; }
 
 /* マーカーツールチップ */
 .goal-marker-tip {
@@ -958,7 +961,7 @@ tr:last-child td { border-bottom: none; }
 .glossary dt { font-size: 12px; font-weight: 700; margin-bottom: 4px; margin-top: 12px; }
 .glossary dt:first-child { margin-top: 0; }
 .glossary dd { font-size: 12px; color: var(--muted); margin-left: 0; }
-.glossary code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; }
+.glossary code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-family: var(--f-mono); font-size: 11px; }
 
 /* ============================================================
    試合予定タブ
@@ -1231,7 +1234,7 @@ tr:last-child td { border-bottom: none; }
   font-weight: 700;
   background: var(--white);
 }
-.pnl-profit-body.is-profit { color: #1D4ED8; }
+.pnl-profit-body.is-profit { color: #0062cc; }
 .pnl-profit-body.is-loss   { color: #B45309; }
 
 /* ============================================================
@@ -1585,18 +1588,18 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   padding: 24px 22px 20px;
   font-size: 15px;
   line-height: 1.6;
-  color: #2C3E50;
+  color: #1d1d1f;
   font-weight: 500;
 }
 .custom-confirm-btns {
   display: flex;
-  border-top: 1px solid #E4E9F0;
+  border-top: 1px solid #e5e5ea;
 }
 .custom-confirm-cancel {
   flex: 1;
   padding: 14px;
   border: none;
-  border-right: 1px solid #E4E9F0;
+  border-right: 1px solid #e5e5ea;
   background: #F8F9FA;
   color: #555;
   cursor: pointer;
@@ -1623,7 +1626,7 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   border-radius: 8px;
   border: 1px solid #D0D7E0;
   background: #F8F9FA;
-  color: #2C3E50;
+  color: #1d1d1f;
   /* iOSはinputのfont-sizeが16px未満だとフォーカス時に画面を自動拡大するため16px以上を維持 */
   font-size: 16px;
   box-sizing: border-box;
@@ -1635,7 +1638,7 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   padding: 1px 6px;
   border-radius: 4px;
   background: #d4edda;
-  color: #27AE60;
+  color: #34c759;
   font-weight: 600;
   vertical-align: middle;
 }
@@ -1645,7 +1648,7 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
   padding: 1px 6px;
   border-radius: 4px;
   background: #fde8e8;
-  color: #E74C3C;
+  color: #ff3b30;
   font-weight: 600;
   vertical-align: middle;
 }
@@ -1891,7 +1894,7 @@ details[open] > .group-summary .group-arrow { transform: rotate(90deg); }
 }
 .cal-day-col-header.current-col { background: rgba(155,89,182,0.08); }
 .cal-day-col-header.current-col .cal-col-label { color: var(--purple); }
-.cal-hdr-sun .cal-col-label { color: #E74C3C; }
+.cal-hdr-sun .cal-col-label { color: #ff3b30; }
 .cal-hdr-sat .cal-col-label { color: #2980B9; }
 .cal-col-dow {
   font-size: 8px;

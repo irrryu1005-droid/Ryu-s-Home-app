@@ -474,7 +474,7 @@ function formatPnl(pnl) {
 }
 
 function resultLabel(result) {
-  return { win: '✅ 勝', loss: '❌ 負', void: '➖ 無効', pending: '⏳ 未確定' }[result] || result;
+  return { win: '勝', loss: '負', void: '無効', pending: '未確定' }[result] || result;
 }
 
 function escapeHtml(str) {
@@ -501,9 +501,9 @@ const CAL_WW         = 42;  // 週カラム幅 (px)
 const CAL_MW         = 54;  // 月カラム幅 (px)
 const CAL_WEEKS      = 18;  // 週ビューで表示する週数
 const CAL_PRESET_COLORS = [
-  '#C0392B','#E74C3C','#E67E22','#F39C12',
-  '#27AE60','#117A65','#2980B9','#5DADE2',
-  '#8E44AD','#9B59B6','#641E16','#2C3E50',
+  '#C0392B','#ff3b30','#ff9500','#F39C12',
+  '#34c759','#117A65','#2980B9','#5DADE2',
+  '#8E44AD','#af52de','#641E16','#1d1d1f',
 ];
 const CAL_ROW_H = 32; // レーン1本あたりの高さ(px)
 const CAL_DW    = 36; // 日別ビューの1日カラム幅(px)
@@ -1342,7 +1342,7 @@ function buildBetRow(bet) {
     : `<td><span class="badge-single">シングル</span>${fbBadge}</td>`;
 
   const resultOpts = (cur) =>
-    [['pending','⏳'],['win','✅ 勝'],['loss','❌ 負'],['void','➖ 無効']]
+    [['pending','未確定'],['win','勝'],['loss','負'],['void','無効']]
       .map(([v, l]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${l}</option>`).join('');
 
   let detailCell;
@@ -1383,7 +1383,7 @@ function buildDepositRow(dep) {
   const isIn   = signed >= 0;
   const isReward = !!dep.campaign_id;
   const campaign = isReward ? _campaigns.find(c => String(c.id) === String(dep.campaign_id)) : null;
-  const label  = isReward ? '🎉 条件達成' : (isIn ? '入金' : '出金');
+  const label  = isReward ? '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></svg> 条件達成' : (isIn ? '入金' : '出金');
   const cls    = isReward ? 'badge-deposit-reward' : (isIn ? 'badge-deposit-in' : 'badge-deposit-out');
   const nameSuffix = campaign ? ` <small>（${escapeHtml(campaign.name)}）</small>` : '';
   // FB報酬は損益扱いなので損益列に金額を表示。入金・出金は「—」のまま
@@ -1748,7 +1748,7 @@ function getLegsFromForm() {
 }
 
 function legResultOptions(selected = 'pending') {
-  return [['pending','⏳ 未確定'],['win','✅ 勝ち'],['loss','❌ 負け'],['void','➖ 無効']]
+  return [['pending','未確定'],['win','勝ち'],['loss','負け'],['void','無効']]
     .map(([v, l]) => `<option value="${v}" ${v === selected ? 'selected' : ''}>${l}</option>`).join('');
 }
 
@@ -1976,7 +1976,7 @@ function renderCampaigns() {
     html += active.map(c => {
       const progress = getCampaignProgress(c.id);
       const pct      = Math.min(100, Math.round(progress / c.wagerRequired * 100));
-      const color    = pct >= 100 ? '#F39C12' : '#9B59B6';
+      const color    = pct >= 100 ? '#F39C12' : '#af52de';
       return `<div class="campaign-item" data-id="${c.id}">
         <div class="campaign-header">
           <span class="campaign-name">${escapeHtml(c.name)}</span>
@@ -1987,8 +1987,8 @@ function renderCampaigns() {
           <span class="progress-label">¥${progress.toLocaleString()} / ¥${Number(c.wagerRequired).toLocaleString()} (${pct}%)</span>
         </div>
         <div class="campaign-actions">
-          <button class="small-btn btn-campaign-complete" data-id="${c.id}">✅ ベット成功</button>
-          <button class="small-btn btn-campaign-end"      data-id="${c.id}">❌ 条件未達</button>
+          <button class="small-btn btn-campaign-complete" data-id="${c.id}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg> ベット成功</button>
+          <button class="small-btn btn-campaign-end"      data-id="${c.id}"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> 条件未達</button>
           <button class="small-btn btn-campaign-edit"     data-id="${c.id}">編集</button>
         </div>
         <form class="campaign-edit-form" data-id="${c.id}" hidden>
@@ -2251,7 +2251,7 @@ function updateSummary() {
     streakEl.textContent = '-';
     streakEl.className   = 's-val';
   } else if (streak.type === 'win') {
-    streakEl.textContent = `${streak.count}連勝🔥`;
+    streakEl.innerHTML = `${streak.count}連勝<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`;
     streakEl.className   = 's-val win';
   } else {
     streakEl.textContent = `${streak.count}連敗`;
@@ -2510,12 +2510,12 @@ function renderGoalProgress() {
   const effectiveMax = (g.goalRealistic && pnl < g.goalRealistic) ? g.goalRealistic : g.goalAmount;
   const pct   = Math.min(100, Math.max(0, Math.round(pnl / effectiveMax * 100)));
   // バー色: ティア超過状況で決定
-  const color = pct >= 100                                   ? '#27AE60'
-              : (g.goalRealistic && pnl >= g.goalRealistic) ? '#27AE60'
+  const color = pct >= 100                                   ? '#34c759'
+              : (g.goalRealistic && pnl >= g.goalRealistic) ? '#34c759'
               : (g.goalMin       && pnl >= g.goalMin)       ? '#3B82F6'
               : '#F39C12';
   const done  = pct >= 100
-    ? (effectiveMax === g.goalAmount ? ' 🎉 理想達成！' : ' ✅ 現実達成！')
+    ? (effectiveMax === g.goalAmount ? ' <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></svg> 理想達成！' : ' <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg> 現実達成！')
     : '';
 
   // マーカー位置は effectiveMax 基準
@@ -2702,7 +2702,7 @@ function renderBalanceChart() {
       balance += ev.deposit + ev.pnl;
       labels.push(ev.date);
       data.push(balance);
-      pointColors.push(ev.reward ? '#9B59B6' : ev.deposit > 0 ? '#F59E0B' : ev.deposit < 0 ? '#27AE60' : '#3498DB');
+      pointColors.push(ev.reward ? '#af52de' : ev.deposit > 0 ? '#F59E0B' : ev.deposit < 0 ? '#34c759' : '#3498DB');
       pointRadii.push(ev.deposit !== 0 ? 6 : 3);
       tooltipDeposits.push(ev.deposit);
     }
@@ -2732,7 +2732,7 @@ function renderBalanceChart() {
       balance += ev.deposit + ev.pnl;
       labels.push(k);
       data.push(balance);
-      pointColors.push(ev.reward !== 0 ? '#9B59B6' : ev.deposit > 0 ? '#F59E0B' : ev.deposit < 0 ? '#27AE60' : '#3498DB');
+      pointColors.push(ev.reward !== 0 ? '#af52de' : ev.deposit > 0 ? '#F59E0B' : ev.deposit < 0 ? '#34c759' : '#3498DB');
       pointRadii.push(ev.deposit !== 0 ? 6 : 3);
       tooltipDeposits.push(ev.deposit);
     }
@@ -2840,7 +2840,7 @@ function renderPnlChart(allBets) {
     iData.push(data[i]);
   }
 
-  const GREEN = '#27AE60', RED = '#E74C3C';
+  const GREEN = '#34c759', RED = '#ff3b30';
   const GREEN_BG = 'rgba(39,174,96,0.15)', RED_BG = 'rgba(231,76,60,0.15)';
   const segColor = c => c.p1.parsed.y >= 0 ? GREEN : RED;
 
@@ -3095,13 +3095,13 @@ function renderStatsTable() {
 // 試合予定タブ（ESPN + MLB Stats API + TheSportsDB）
 // ============================================================
 const SCHEDULE_SPORTS = [
-  { key: 'Soccer',      icon: '⚽', label: 'Football'   },
-  { key: 'Baseball',    icon: '⚾', label: 'Baseball'   },
-  { key: 'Basketball',  icon: '🏀', label: 'Basketball' },
-  { key: 'Tennis',      icon: '🎾', label: 'Tennis'     },
-  { key: 'TableTennis', icon: '🏓', label: 'Table Tennis' },
-  { key: 'Rugby',       icon: '🏉', label: 'Rugby'      },
-  { key: 'Volleyball',  icon: '🏐', label: 'Volleyball' },
+  { key: 'Soccer',      short: 'サッカー', label: 'Football'   },
+  { key: 'Baseball',    short: '野球',     label: 'Baseball'   },
+  { key: 'Basketball',  short: 'バスケ',   label: 'Basketball' },
+  { key: 'Tennis',      short: 'テニス',   label: 'Tennis'     },
+  { key: 'TableTennis', short: '卓球',     label: 'Table Tennis' },
+  { key: 'Rugby',       short: 'ラグビー', label: 'Rugby'      },
+  { key: 'Volleyball',  short: 'バレー',   label: 'Volleyball' },
 ];
 
 // サッカーのリーグ一覧はNetlify Function（netlify/functions/soccer-schedule.js）側に移動済み
@@ -3680,7 +3680,7 @@ function renderPickerSportFilters(evs) {
       .filter(s => presentKeys.includes(s.key))
       .map(s => {
         const active = pickerSportFilter === s.key ? ' active' : '';
-        return `<button class="picker-filter-btn${active}" data-key="${s.key}">${s.icon}</button>`;
+        return `<button class="picker-filter-btn${active}" data-key="${s.key}">${s.short}</button>`;
       }).join('');
 
   container.querySelectorAll('.picker-filter-btn').forEach(btn => {
@@ -3734,14 +3734,14 @@ function renderPickerEvents(evs) {
   }
 
   let html = '';
-  for (const { key, icon, label } of SCHEDULE_SPORTS.filter(s => groups[s.key])) {
+  for (const { key, label } of SCHEDULE_SPORTS.filter(s => groups[s.key])) {
     const sorted = groups[key].sort((a, b) => {
       if (!a.startUtc && !b.startUtc) return 0;
       if (!a.startUtc) return 1;
       if (!b.startUtc) return -1;
       return a.startUtc.localeCompare(b.startUtc);
     });
-    html += `<div class="picker-sport-label">${icon} ${label}</div>`;
+    html += `<div class="picker-sport-label">${label}</div>`;
     for (const ev of sorted) {
       const time = utcToJSTDisplay(ev.startUtc);
       html += `<button type="button" class="picker-match-btn"
@@ -3895,12 +3895,12 @@ function renderSportsEvents() {
       return a.startUtc.localeCompare(b.startUtc);
     });
     html += `<div class="sport-section">
-      <div class="sport-section-title">${info.icon} ${info.label}</div>`;
+      <div class="sport-section-title">${info.label}</div>`;
     for (const ev of sorted) {
       const timeJST    = utcToJSTDisplay(ev.startUtc);
-      const timeDisp   = timeJST ? `🕐 ${timeJST} (JST)` : '🕐 時刻未定';
+      const timeDisp   = timeJST ? `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ${timeJST} (JST)` : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 時刻未定';
       const savedId    = gcalGetEventId(ev.title, ev.dateStr || '', ev.startUtc || '');
-      const btnText    = savedId ? '🗑 削除' : '📅＋';
+      const btnText    = savedId ? '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> 削除' : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>＋';
       const btnStyle   = savedId ? ' style="background:#fde8e8;border-color:#f5b8b8;color:var(--loss)"' : '';
       const btnEventId = savedId ? ` data-event-id="${savedId}"` : '';
       html += `<div class="match-card">
@@ -3970,14 +3970,14 @@ async function addMatchToGcal(btn) {
     );
     if (res.status === 401) {
       gcalTokenClear();
-      btn.textContent = '📅＋'; btn.disabled = false;
+      btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>＋'; btn.disabled = false;
       await showAlert('認証期限切れです。再ログインしてください。');
       return;
     }
     if (res.ok) {
       const created = await res.json();
       btn.dataset.eventId = created.id;
-      btn.textContent = '🗑 削除';
+      btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> 削除';
       btn.style.background   = '#fde8e8';
       btn.style.borderColor  = '#f5b8b8';
       btn.style.color        = 'var(--loss)';
@@ -3986,12 +3986,12 @@ async function addMatchToGcal(btn) {
     } else {
       const errData = await res.json().catch(() => ({}));
       console.error('Calendar API error:', res.status, errData);
-      btn.textContent = '📅＋'; btn.disabled = false;
+      btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>＋'; btn.disabled = false;
       await showAlert(`追加に失敗しました（${errData.error?.message || res.status}）`);
     }
   } catch (e) {
     console.error('addMatchToGcal fetch error:', e);
-    btn.textContent = '📅＋'; btn.disabled = false;
+    btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>＋'; btn.disabled = false;
   }
 }
 
@@ -4009,20 +4009,20 @@ async function removeMatchFromGcal(btn) {
     if (res.ok || res.status === 204 || res.status === 410) {
       gcalStoreDelete(btn.dataset.title, btn.dataset.date, btn.dataset.startUtc);
       delete btn.dataset.eventId;
-      btn.textContent      = '📅＋';
+      btn.innerHTML        = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>＋';
       btn.style.background = '';
       btn.style.borderColor = '';
       btn.style.color      = '';
       btn.disabled = false;
     } else if (res.status === 401) {
       gcalTokenClear();
-      btn.textContent = '🗑 削除'; btn.disabled = false;
+      btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> 削除'; btn.disabled = false;
       await showAlert('認証期限切れです。再ログインしてください。');
     } else {
-      btn.textContent = '🗑 削除'; btn.disabled = false;
+      btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> 削除'; btn.disabled = false;
       await showAlert('削除に失敗しました');
     }
-  } catch { btn.textContent = '🗑 削除'; btn.disabled = false; }
+  } catch { btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> 削除'; btn.disabled = false; }
 }
 
 // ---- カレンダー連携済みの永続化 ----
@@ -4044,7 +4044,7 @@ function gcalGetEventId(title, dateStr, startUtc) {
 function gcalSetConnected() {
   const btn = document.getElementById('gcal-login-btn');
   if (btn) {
-    btn.textContent = '✅ 接続済み';
+    btn.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.5"/><path d="m9 11 3 3L22 4"/></svg> 接続済み';
     btn.classList.add('connected');
   } else {
     setTimeout(gcalSetConnected, 200);
