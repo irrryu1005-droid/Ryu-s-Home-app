@@ -2298,4 +2298,5 @@ h3.section-title {
   cursor: pointer;
 }
 .sim-goal-from-btn.is-set { background: #DCFCE7; border-color: #BBF7D0; color: #15803D; }
+.sim-recv-btn { color: var(--income); }
 #sim-goal-expense-note[hidden] { display: none; }
