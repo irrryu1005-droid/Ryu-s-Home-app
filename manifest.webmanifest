@@ -1,6 +1,6 @@
 {
-  "name": "Ryu's Home",
-  "short_name": "Ryu's Home",
+  "name": "My Home",
+  "short_name": "My Home",
   "start_url": "/home/home.html",
   "scope": "/",
   "display": "standalone",
