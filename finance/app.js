@@ -4495,11 +4495,12 @@ function drawBalanceChart(canvas, oldChart, startD, end, today, startBalance, pa
         // ピンチで拡大・指で左右に動かす（横方向だけ。パソコンは ctrl＋ホイールで拡大）
         zoom: {
           limits: { x: { min: 'original', max: 'original', minRange: 6 } },
-          pan:  { enabled: true, mode: 'x', onPanComplete: ({ chart }) => chartZoomToolsUpdate(chart) },
+          pan:  { enabled: true, mode: 'x', onPan: ({ chart }) => chartZoomToolsUpdate(chart), onPanComplete: ({ chart }) => chartZoomToolsUpdate(chart) },
           zoom: {
             mode: 'x',
             pinch: { enabled: true },
             wheel: { enabled: true, modifierKey: 'ctrl' },
+            onZoom: ({ chart }) => chartZoomToolsUpdate(chart),
             onZoomComplete: ({ chart }) => chartZoomToolsUpdate(chart),
           },
         },
@@ -4548,7 +4549,8 @@ function drawBalanceChart(canvas, oldChart, startD, end, today, startBalance, pa
   return chart;
 }
 
-// グラフの右上に「全画面」「元に戻す」ボタンを付ける（ボタンは1回だけ作り、描き直したグラフは container._chart で差し替える）
+// グラフの上に「全画面」「元に戻す」ボタンと、拡大したときに左右へ動かすスライダーを付ける
+//   （1回だけ作り、描き直したグラフは container._chart で差し替える）
 function chartZoomTools(chart) {
   const box = chart.canvas.parentElement;
   box._chart = chart;
@@ -4556,18 +4558,32 @@ function chartZoomTools(chart) {
     box.classList.add('chart-zoomable');
     box.insertAdjacentHTML('afterbegin', `
       <div class="chart-tools">
+        <input type="range" class="chart-pan-slider" data-chart-pan min="0" max="0" step="1" value="0" aria-label="左右に動かす" hidden>
         <button type="button" class="chart-tool-btn" data-chart-reset hidden>元に戻す</button>
         <button type="button" class="chart-tool-btn" data-chart-full>⤢ 全画面</button>
       </div>`);
     box.querySelector('[data-chart-reset]').addEventListener('click', () => { box._chart.resetZoom(); chartZoomToolsUpdate(box._chart); });
     box.querySelector('[data-chart-full]').addEventListener('click', () => chartToggleFull(box));
+    // スライダー: 見えている日数はそのままで、表示する範囲だけ左右に動かす
+    box.querySelector('[data-chart-pan]').addEventListener('input', e => {
+      const x = box._chart.scales.x, span = Math.round(x.max - x.min), from = Number(e.target.value);
+      box._chart.zoomScale('x', { min: from, max: from + span }, 'none');
+    });
   }
   chartZoomToolsUpdate(chart);
 }
 
 function chartZoomToolsUpdate(chart) {
-  const btn = chart.canvas.parentElement.querySelector('[data-chart-reset]');
-  if (btn) btn.hidden = !chart.isZoomedOrPanned();
+  const box = chart.canvas.parentElement;
+  const btn = box.querySelector('[data-chart-reset]'), slider = box.querySelector('[data-chart-pan]');
+  if (!btn) return;
+  const zoomed = chart.isZoomedOrPanned();
+  btn.hidden = slider.hidden = !zoomed;
+  if (!zoomed) return;
+  // スライダーの位置 = いま見えている最初の日（全部の日数 − 見えている日数 まで動かせる）
+  const x = chart.scales.x, total = chart.data.labels.length;
+  slider.max = Math.max(0, total - 1 - Math.round(x.max - x.min));
+  slider.value = Math.round(x.min);
 }
 
 // 全画面にする／戻す。全画面のあいだは後ろのページがスクロールしないようにする（Esc でも閉じる）

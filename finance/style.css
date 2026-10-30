@@ -2343,7 +2343,10 @@ h3.section-title {
 .chart-zoomable { position: relative; padding-top: 40px; }
 .acct-chart.chart-zoomable, #tab-sim .chart-container.chart-zoomable { height: 250px; }
 .chart-zoomable canvas { touch-action: pan-y !important; }  /* 縦は今までどおりページのスクロール、横の指の動きとピンチはグラフに */
-.chart-tools { position: absolute; top: 8px; right: 10px; display: flex; gap: 6px; z-index: 1; }
+.chart-tools { position: absolute; top: 8px; left: 12px; right: 10px; display: flex; justify-content: flex-end; align-items: center; gap: 6px; z-index: 1; }
+/* 拡大したときだけ出る、左右に動かすスライダー（ボタンの左の空いているところを使う） */
+.chart-pan-slider { flex: 1; min-width: 0; margin-right: 4px; accent-color: #007aff; height: 28px; }
+.chart-pan-slider[hidden] { display: none !important; }
 .chart-tool-btn {
   padding: 4px 10px;
   border: 1px solid var(--border);
@@ -2364,5 +2367,5 @@ h3.section-title {
   border-radius: 0;
   padding: 52px 12px calc(12px + env(safe-area-inset-bottom)) 8px;
 }
-.chart-zoomable.chart-full .chart-tools { top: calc(10px + env(safe-area-inset-top)); right: 12px; }
+.chart-zoomable.chart-full .chart-tools { top: calc(10px + env(safe-area-inset-top)); left: 14px; right: 12px; }
 .chart-zoomable.chart-full canvas { touch-action: none !important; }
