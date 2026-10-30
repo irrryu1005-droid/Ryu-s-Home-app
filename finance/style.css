@@ -1022,10 +1022,12 @@ h3.section-title {
 ============================================================ */
 .list-columns {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, …) にしないと、中身の幅に押されて列が画面からはみ出す */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
   align-items: start;
 }
+.list-col { min-width: 0; }
 .list-col-header {
   display: flex;
   align-items: center;
@@ -1062,6 +1064,29 @@ h3.section-title {
 .list-col .txn-category { font-size: 13px; }
 .list-col .txn-meta { font-size: 11px; }
 .list-col .txn-amount { font-size: 13px; }
+/* スマホ: 1件を2段にする（上: 科目・金額 / 下: 日付・メモ・✎・×） */
+@media (max-width: 767px) {
+  .list-columns { gap: 6px; }
+  .list-col-header { padding: 8px 8px; }
+  .list-col .txn-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "h cat  amt amt"
+      "h meta edit del";
+    align-items: center;
+    column-gap: 4px;
+    row-gap: 2px;
+    padding: 8px 8px;
+  }
+  .list-col .txn-info { display: contents; }
+  .list-col .txn-drag-handle { grid-area: h; margin: -6px 0 -6px -4px; }
+  .list-col .txn-category    { grid-area: cat; }
+  .list-col .txn-meta        { grid-area: meta; margin-top: 0; }
+  .list-col .txn-amount      { grid-area: amt; justify-self: end; }
+  .list-col .txn-edit        { grid-area: edit; font-size: 14px; padding: 2px 4px; }
+  .list-col .txn-delete      { grid-area: del; font-size: 13px; padding: 2px 6px; }
+}
 .txn-empty {
   font-size: 12px;
   color: var(--text-muted);
@@ -1232,6 +1257,17 @@ h3.section-title {
 }
 .pnl-profit-body.is-profit { color: #0062cc; }
 .pnl-profit-body.is-loss   { color: #B45309; }
+/* スマホ: 2列だと1列が約180pxしかないので、棒グラフを隠し、科目名を残りの幅に合わせて縮める（金額は切らない） */
+@media (max-width: 767px) {
+  .pnl-columns { gap: 6px; }
+  .pnl-sec-header { padding: 8px 10px; }
+  .pnl-sec-total { font-size: 14px; }
+  .pnl-row, .pnl-row.sport { padding: 7px 10px; gap: 6px; }
+  .pnl-row.league { padding: 4px 10px 4px 18px; }
+  .pnl-bar-wrap { display: none; }
+  .pnl-row-label { flex: 1 1 auto; min-width: 0; font-size: 12px; }
+  .pnl-row-amount { flex: 0 0 auto; font-size: 12px; }
+}
 
 /* Data タブ サブナビ */
 .data-sub-btn {
@@ -2300,3 +2336,33 @@ h3.section-title {
 .sim-goal-from-btn.is-set { background: #DCFCE7; border-color: #BBF7D0; color: #15803D; }
 .sim-recv-btn { color: var(--income); }
 #sim-goal-expense-note[hidden] { display: none; }
+.sim-row-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.sim-pay-btn { color: var(--expense); }
+
+/* 拡大できるグラフ（残高の推移・貯金の推移）: 右上に「全画面」「元に戻す」 */
+.chart-zoomable { position: relative; padding-top: 40px; }
+.acct-chart.chart-zoomable, #tab-sim .chart-container.chart-zoomable { height: 250px; }
+.chart-zoomable canvas { touch-action: pan-y !important; }  /* 縦は今までどおりページのスクロール、横の指の動きとピンチはグラフに */
+.chart-tools { position: absolute; top: 8px; right: 10px; display: flex; gap: 6px; z-index: 1; }
+.chart-tool-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--white);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+}
+.chart-tool-btn[hidden] { display: none !important; }
+.chart-zoomable.chart-full {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  height: 100dvh !important;
+  margin: 0;
+  border-radius: 0;
+  padding: 52px 12px calc(12px + env(safe-area-inset-bottom)) 8px;
+}
+.chart-zoomable.chart-full .chart-tools { top: calc(10px + env(safe-area-inset-top)); right: 12px; }
+.chart-zoomable.chart-full canvas { touch-action: none !important; }

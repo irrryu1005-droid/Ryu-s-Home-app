@@ -2349,8 +2349,8 @@ let _simPlannedSrc = null;
 let _simAmountOverrides = {}; // { 'YYYY-MM': { 'source:id': 金額 } }
 let _simTrips = [];           // 旅行（事前に払うもの＋旅行中に使うもの）
 let _simGoals = [];           // 貯金の目標（複数）{ id, name, target_amount, start_ym, deadline_ym, saved_amount, monthly_amount, sort_order }
-let _simPaid = new Set();     // 予定支出で✓（支払い済み）にしたもの 'YYYY-MM:source:id'
-let _simReceived = new Map(); // 入るお金で「入金を登録」したもの 'YYYY-MM:row_key' → sim_income_received の行
+let _simPaid = new Map();     // 予定支出で✓（支払い済み）にしたもの 'YYYY-MM:source:id' → planned_paid の行
+let _simActuals = new Map(); // 入るお金・必要な額で「入金/支払いを登録」したもの 'YYYY-MM:row_key' → sim_month_actuals の行（予定支出は _simPaid）
 let _simGoalsDone = [];       // 達成した目標（達成日 achieved_at がある）
 let _simGoalCache = null;     // simGoalsPlan() の結果（データが変わったら null に戻す）
 const SIM_DAILY_LABEL = '日割り';
@@ -2385,6 +2385,10 @@ function simPayWhenLabel(ym, it) {
 const SIM_PAY_OFFSET_MAX = 2;
 const SIM_DEFAULT_ACCOUNT = 'deposit（銀行）'; // 入る口座を決めていない収入は銀行に入ることにする
 const SIM_ADVANCE_ACCOUNT = 'cash（現金）';    // 日払いは手渡し
+// 「この月だけ」の項目・旅行の事前払いに付ける固有のID（入金済み・支払い済みの印を、並び順ではなくこれで見分ける）
+function simUid() {
+  return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
 
 function simSignedYen(n) {
   return (n < 0 ? '−' : n > 0 ? '+' : '') + yen(n);
@@ -2401,11 +2405,11 @@ async function loadSimData() {
     db.from('planned_amount_overrides').select('*'),
     db.from('sim_trips').select('*').order('start_date'),
     db.from('sim_goals').select('*').order('sort_order').order('id'),
-    db.from('planned_paid').select('source, item_id, year_month'),
-    db.from('sim_income_received').select('*'),
+    db.from('planned_paid').select('*'),
+    db.from('sim_month_actuals').select('*'),
   ]);
-  _simPaid = new Set((paidRes.data || []).map(r => `${r.year_month}:${r.source}:${r.item_id}`));
-  _simReceived = new Map((recvRes.data || []).map(r => [`${r.year_month}:${r.row_key}`, r]));
+  _simPaid = new Map((paidRes.data || []).map(r => [`${r.year_month}:${r.source}:${r.item_id}`, r]));
+  _simActuals = new Map((recvRes.data || []).map(r => [`${r.year_month}:${r.row_key}`, r]));
   _simGoals = (goalRes.data || []).filter(g => !g.achieved_at);
   _simGoalsDone = (goalRes.data || []).filter(g => g.achieved_at).sort((a, b) => b.achieved_at.localeCompare(a.achieved_at));
   _simGoalCache = null;
@@ -2418,6 +2422,17 @@ async function loadSimData() {
   _simRecurring = recRes.data || [];
   _simMonths = {};
   for (const r of (monRes.data || [])) _simMonths[r.year_month] = r;
+  // IDのない「この月だけ」の項目・旅行の事前払い（ID を付ける前に登録したもの）に ID を付けて保存しておく
+  for (const r of Object.values(_simMonths)) {
+    if (!(r.items || []).some(it => !it.uid)) continue;
+    r.items = r.items.map(it => it.uid ? it : { ...it, uid: simUid() });
+    db.from('sim_months').update({ items: r.items }).eq('year_month', r.year_month).then(({ error }) => { if (error) console.error(error); });
+  }
+  for (const t of _simTrips) {
+    if (!(t.prepaid || []).some(it => !it.uid)) continue;
+    t.prepaid = t.prepaid.map(it => it.uid ? it : { ...it, uid: simUid() });
+    db.from('sim_trips').update({ prepaid: t.prepaid }).eq('id', t.id).then(({ error }) => { if (error) console.error(error); });
+  }
   _simPlannedSrc = { subs: subRes.data, plans: planRes.data, loans: loanRes.data };
   // 支出・旅行から作った目標は、目標額をいまの支出の額に合わせる（あとで支出の額を変えてもついていく）
   for (const g of _simGoals) {
@@ -2582,12 +2597,20 @@ function simJobMonth(job, wd, ym) {
 
 function simPlannedTotal(y, m) {
   if (!_simPlannedSrc) return 0;
-  const overrides = _simAmountOverrides[simYm(y, m)] || {};
+  const ym = simYm(y, m);
+  const overrides = _simAmountOverrides[ym] || {};
   const { subItems, planItems, loanItems } = buildPlannedItems(_simPlannedSrc.subs, _simPlannedSrc.plans, _simPlannedSrc.loans, {}, overrides);
   // 予定支出タブで確定した金額があればそれを使う。ローンの幅が残っていれば多いほうの額で計算する（足りなくならないように）
+  // 支払いを登録した（✓）ものは、実際に払った額で数える
   return [...subItems, ...planItems, ...loanItems]
     .filter(it => isActiveInMonth(it, y, m))
-    .reduce((s, it) => s + (it.amountMax || it.amount), 0);
+    .reduce((s, it) => s + simPlannedAmount(it, ym), 0);
+}
+
+// 予定支出1件のこの月の額: 支払いを登録していれば実際に払った額、なければ多いほうの額
+function simPlannedAmount(it, ym) {
+  const paid = _simPaid.get(`${ym}:${it.source}:${it.id}`);
+  return paid?.amount != null ? paid.amount : (it.amountMax || it.amount);
 }
 
 // 長期間の支出: start_ym〜end_ym の月だけ（空なら始まり・終わりなし）
@@ -2603,11 +2626,11 @@ function simLongRangeLabel(r) {
 // 旅行のうち、その月に払う分: 事前に払うもの（払う日の月）＋ 旅行中に使うもの（旅行の日数で割って、その月に入る日の分）
 function simTripMonth(trip, ym) {
   const events = [];
-  for (const it of (trip.prepaid || [])) {
+  (trip.prepaid || []).forEach((it, i) => {
     if (it.date && it.date.slice(0, 7) === ym && Number(it.amount)) {
-      events.push({ date: it.date, label: `${trip.name}・${it.name || '事前払い'}`, amount: Number(it.amount), kind: 'prepaid' });
+      events.push({ key: `trip:${trip.id}:${it.uid ?? i}`, date: it.date, label: `${trip.name}・${it.name || '事前払い'}`, amount: Number(it.amount), kind: 'prepaid' });
     }
-  }
+  });
   const onsite = (trip.onsite || []).reduce((t, it) => t + (Number(it.amount) || 0), 0);
   if (onsite && trip.start_date && trip.end_date) {
     const days = [];
@@ -2746,11 +2769,23 @@ function simCalc(ym, noGoals = false, goalUsed = null) {
   const sum = arr => arr.reduce((s, it) => s + (Number(it.amount) || 0), 0);
 
   const planned      = simPlannedTotal(y, m);
-  const recurringExp = sum(_simRecurring.filter(r => r.kind === 'expense' && simLongActive(r, ym)));
+  // 支払いを登録した行（日にちのある支出）は、実際に払った額で数える
+  const act = (key, est) => { const a = _simActuals.get(`${ym}:${key}`); return a?.amount != null ? a.amount : est; };
+  const recurringExp = _simRecurring.filter(r => r.kind === 'expense' && simLongActive(r, ym))
+    .reduce((s, r) => s + (r.day ? act(`long:${r.id}`, Number(r.amount) || 0) : Number(r.amount) || 0), 0);
   // 旅行
-  const tripMonths = _simTrips.map(t => ({ trip: t, ...simTripMonth(t, ym) })).filter(t => t.amount);
+  const tripMonths = _simTrips.map(t => {
+    const tm = simTripMonth(t, ym);
+    for (const e of tm.events) {
+      if (e.kind !== 'prepaid') continue;
+      const a = act(e.key, e.amount);
+      if (a !== e.amount) { e.estimate = e.amount; e.amount = a; }
+    }
+    return { trip: t, ...tm, amount: tm.events.reduce((x, e) => x + e.amount, 0) };
+  }).filter(t => t.amount);
   const tripExp = tripMonths.reduce((t, x) => t + x.amount, 0);
-  const monthExp     = sum(plan.items.filter(it => it.kind === 'expense'));
+  const monthExp = plan.items.reduce((s, it, idx) => it.kind !== 'expense' ? s
+    : s + (it.day ? act(`month:${it.uid ?? idx}`, Number(it.amount) || 0) : Number(it.amount) || 0), 0);
   const recurringInc = sum(_simRecurring.filter(r => r.kind === 'income'));
   // 臨時収入: 働いた（決まった）月で数える額と、実際に受け取る月で数える額を分ける
   const oneOffEarned = sum(plan.items.filter(it => it.kind === 'income'));
@@ -2813,12 +2848,12 @@ function simCalc(ym, noGoals = false, goalUsed = null) {
   for (const r of _simRecurring.filter(r => r.kind === 'income')) pushRow({ key: `rec:${r.id}`, name: r.name, note: '毎月', day: r.day || null, amount: Number(r.amount) || 0, fromPrev: false, account: r.account || SIM_DEFAULT_ACCOUNT });
   for (const it of arriving) {
     const from = it.fromYm !== ym;
-    pushRow({ key: `item:${it.fromYm}:${it.idx}`, name: it.name, note: from ? `${simYmToDate(it.fromYm).getMonth() + 1}月の臨時収入` : '臨時収入', day: it.pay_day || null, amount: Number(it.amount) || 0, fromPrev: from, account: it.account || SIM_DEFAULT_ACCOUNT });
+    pushRow({ key: `item:${it.fromYm}:${it.uid ?? it.idx}`, name: it.name, note: from ? `${simYmToDate(it.fromYm).getMonth() + 1}月の臨時収入` : '臨時収入', day: it.pay_day || null, amount: Number(it.amount) || 0, fromPrev: from, account: it.account || SIM_DEFAULT_ACCOUNT });
   }
   // 入金を登録した行は、予想ではなく実際に入った金額で数える（予想の額は estimate に残す）
   let receivedDiff = 0;
   for (const r of cashRows) {
-    const got = _simReceived.get(`${ym}:${r.key}`);
+    const got = _simActuals.get(`${ym}:${r.key}`);
     if (!got || got.amount == null) continue;
     r.estimate = r.amount;
     receivedDiff += got.amount - r.amount;
@@ -3035,48 +3070,66 @@ async function closeSimPlannedModal() {
 function openSimCashModal() {
   const ym = ymKey(_simMonth), c = simCalc(ym);
   const rows = c.cashRows.map(r => {
-    const got = _simReceived.get(`${ym}:${r.key}`);
-    const btn = got
-      ? `<button type="button" class="sim-goal-from-btn is-set" data-recv-undo="${escapeHtmlF(r.key)}">✓ 入金済み（取り消す）</button>`
-      : `<button type="button" class="sim-goal-from-btn sim-recv-btn" data-recv="${escapeHtmlF(r.key)}">＋ 入金を登録</button>`;
-    // 予想と違う額が入ったときは、予想の額も並べて出す
-    const note = got && r.estimate !== r.amount ? `${r.note}・予想 ${yen(r.estimate)}` : r.note;
-    return { ...r, note, btn };
+    const act = { kind: 'income', key: r.key, account: r.account, category: r.job ? '給与' : r.name, estimate: r.estimate, got: _simActuals.get(`${ym}:${r.key}`) };
+    return { ...r, act };
   });
-  simShowBreakdown(`${_simMonth.getMonth() + 1}月に入るお金`, rows, c.cashIncome, 'この月に入るお金はありません');
-  const list = document.getElementById('sim-cash-list');
-  list.querySelectorAll('[data-recv]').forEach(btn => btn.addEventListener('click', () => {
-    openSimReceiveModal(ym, rows.find(r => r.key === btn.dataset.recv));
-  }));
-  list.querySelectorAll('[data-recv-undo]').forEach(btn => btn.addEventListener('click', () => {
-    simUndoReceive(ym, btn.dataset.recvUndo);
-  }));
+  simShowBreakdown(`${_simMonth.getMonth() + 1}月に入るお金`, simWithActBtns(rows), c.cashIncome, 'この月に入るお金はありません');
+  simBindActBtns(ym, rows, openSimCashModal);
 }
 
-// 入るお金の1行を、実際の収入として登録する画面を開く（日付・金額・口座は予想の値を入れておく）
-function openSimReceiveModal(ym, r) {
+// 入金・支払いを登録した行のボタン（「＋ 入金を登録」か「✓ 入金済み（取り消す）」）。予想と違う額だったら予想の額も出す
+function simWithActBtns(rows) {
+  return rows.map(r => {
+    const a = r.act;
+    if (!a) return r;
+    const inc = a.kind === 'income';
+    const btn = a.got
+      ? `<button type="button" class="sim-goal-from-btn is-set" data-act-undo="${escapeHtmlF(a.key)}">✓ ${inc ? '入金済み' : '支払い済み'}（取り消す）</button>`
+      : `<button type="button" class="sim-goal-from-btn ${inc ? 'sim-recv-btn' : 'sim-pay-btn'}" data-act="${escapeHtmlF(a.key)}">＋ ${inc ? '入金' : '支払い'}を登録</button>`;
+    const note = a.got && a.estimate != null && a.estimate !== r.amount ? `${r.note}・予想 ${yen(a.estimate)}` : r.note;
+    return { ...r, note, btn: `<div class="sim-row-btns">${r.btn || ''}${btn}</div>` };
+  });
+}
+
+function simBindActBtns(ym, rows, reopen) {
+  const list = document.getElementById('sim-cash-list');
+  const find = key => rows.find(r => r.act?.key === key);
+  list.querySelectorAll('[data-act]').forEach(btn => btn.addEventListener('click', () => openSimActModal(ym, find(btn.dataset.act), reopen)));
+  list.querySelectorAll('[data-act-undo]').forEach(btn => btn.addEventListener('click', () => simUndoAct(ym, find(btn.dataset.actUndo).act, reopen)));
+}
+
+// 1行を、実際の収入・支出として登録する画面を開く（日付・金額・口座は予想の値を入れておく）
+let _simActCur = null;
+function openSimActModal(ym, r, reopen) {
+  const a = r.act, inc = a.kind === 'income';
   const f = document.getElementById('sim-receive-form');
   const d = simYmToDate(ym), y = d.getFullYear(), m = d.getMonth();
   const last = new Date(y, m + 1, 0).getDate();
   // 日にちが決まっていない行は、今日（この月なら）か月末
   const today = todayJST();
-  const date = r.day ? dateStr(y, m, Math.min(r.day, last)) : today.startsWith(ym) ? today : dateStr(y, m, last);
-  const cat = INCOME_CATEGORIES.includes(r.name) ? r.name : r.job && INCOME_CATEGORIES.includes('給与') ? '給与' : INCOME_CATEGORIES[0];
-  f.elements.account.innerHTML  = PAYMENT_METHODS.map(a => `<option value="${escapeHtmlF(a)}">${escapeHtmlF(a)}</option>`).join('');
-  f.elements.category.innerHTML = INCOME_CATEGORIES.map(n => `<option value="${escapeHtmlF(n)}">${escapeHtmlF(n)}</option>`).join('');
+  const date = r.day && r.day <= 31 ? dateStr(y, m, Math.min(r.day, last)) : today.startsWith(ym) ? today : dateStr(y, m, last);
+  const cats = inc ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  // 予定支出の subscription / loan のように一覧にないカテゴリはそのまま選べるように足す（予定支出タブの✓と同じ）
+  const catList = a.category && a.category !== r.name && !cats.includes(a.category) ? [a.category, ...cats] : cats;
+  document.getElementById('sim-act-title').textContent = inc ? '収入として登録' : '支払いとして登録';
+  document.getElementById('sim-act-amount-label').textContent = inc ? '実際に入った金額 (¥)' : '実際に払った金額 (¥)';
+  document.getElementById('sim-act-account-label').textContent = inc ? '入った口座' : '払った口座';
+  f.elements.account.innerHTML  = PAYMENT_METHODS.map(x => `<option value="${escapeHtmlF(x)}">${escapeHtmlF(x)}</option>`).join('');
+  f.elements.category.innerHTML = catList.map(n => `<option value="${escapeHtmlF(n)}">${escapeHtmlF(n)}</option>`).join('');
   f.elements.name.value     = r.name;
   f.elements.date.value     = date;
   f.elements.amount.value   = r.amount;
-  f.elements.account.value  = PAYMENT_METHODS.includes(r.account) ? r.account : SIM_DEFAULT_ACCOUNT;
-  f.elements.category.value = cat;
+  f.elements.account.value  = PAYMENT_METHODS.includes(a.account) ? a.account : SIM_DEFAULT_ACCOUNT;
+  f.elements.category.value = catList.includes(a.category) ? a.category : catList[0];
   f.elements.memo.value     = r.name;
-  f.elements.ym.value       = ym;
-  f.elements.key.value      = r.key;
+  _simActCur = { ym, act: a, reopen };
   document.getElementById('sim-receive-modal').hidden = false;
 }
 
-async function simSubmitReceive(e) {
+async function simSubmitAct(e) {
   e.preventDefault();
+  if (!_simActCur) return;
+  const { ym, act: a, reopen } = _simActCur;
   const f = e.target;
   const amount = parseInt(f.elements.amount.value);
   if (!f.elements.date.value || !(amount > 0)) { alert('日付と金額を入れてください'); return; }
@@ -3084,7 +3137,7 @@ async function simSubmitReceive(e) {
   saveBtn.disabled = true;
   const payload = {
     date:           f.elements.date.value,
-    type:           'income',
+    type:           a.kind,
     amount,
     category:       f.elements.category.value,
     payment_method: f.elements.account.value,
@@ -3093,36 +3146,41 @@ async function simSubmitReceive(e) {
   };
   const { data: inserted, error } = await db.from('transactions').insert([payload]).select('id');
   if (error) { alert('登録エラー: ' + error.message); saveBtn.disabled = false; return; }
-  await updateAccountBalance(payload.payment_method, 'income', amount);
-  const { error: e2 } = await db.from('sim_income_received').upsert({
-    year_month: f.elements.ym.value, row_key: f.elements.key.value,
-    transaction_id: inserted?.[0]?.id || null, amount, received_date: payload.date,
-  }, { onConflict: 'year_month,row_key' });
-  if (e2) alert('入金済みの記録に失敗しました: ' + e2.message);
+  await updateAccountBalance(payload.payment_method, a.kind, amount);
+  const txnId = inserted?.[0]?.id || null;
+  // 予定支出（サブスク・ローンなど）は予定支出タブの✓と同じ planned_paid に、それ以外は sim_month_actuals に記録する
+  const { error: e2 } = a.source
+    ? await db.from('planned_paid').upsert({ source: a.source, item_id: a.itemId, year_month: ym, transaction_id: txnId, amount, paid_date: payload.date }, { onConflict: 'source,item_id,year_month' })
+    : await db.from('sim_month_actuals').upsert({ year_month: ym, row_key: a.key, transaction_id: txnId, amount, received_date: payload.date }, { onConflict: 'year_month,row_key' });
+  if (e2) alert('登録済みの記録に失敗しました: ' + e2.message);
   saveBtn.disabled = false;
   document.getElementById('sim-receive-modal').hidden = true;
+  _simActCur = null;
   await loadSimData();
   await renderSimMonth();
-  openSimCashModal();
+  reopen();
 }
 
-// 入金済みを取り消す: 登録した収入を消して、口座の残高も戻す
-async function simUndoReceive(ym, key) {
-  const got = _simReceived.get(`${ym}:${key}`);
+// 登録を取り消す: 登録した収入・支出を消して、口座の残高も戻す
+async function simUndoAct(ym, a, reopen) {
+  const got = a.got;
   if (!got) return;
-  if (!await showConfirm('この入金の登録を取り消しますか？（一覧の収入も削除し、口座の残高を戻します）')) return;
+  const inc = a.kind === 'income';
+  if (!await showConfirm(`この${inc ? '入金' : '支払い'}の登録を取り消しますか？（一覧の${inc ? '収入' : '支出'}も削除し、口座の残高を戻します）`)) return;
   if (got.transaction_id) {
     const { data: txn } = await db.from('transactions').select('amount, payment_method').eq('id', got.transaction_id).maybeSingle();
     if (txn) {
       await db.from('transactions').delete().eq('id', got.transaction_id);
-      await updateAccountBalance(txn.payment_method, 'expense', txn.amount);
+      await updateAccountBalance(txn.payment_method, inc ? 'expense' : 'income', txn.amount);
     }
   }
-  const { error } = await db.from('sim_income_received').delete().eq('id', got.id);
+  const { error } = a.source
+    ? await db.from('planned_paid').delete().eq('source', a.source).eq('item_id', a.itemId).eq('year_month', ym)
+    : await db.from('sim_month_actuals').delete().eq('id', got.id);
   if (error) { alert('取り消しに失敗しました: ' + error.message); return; }
   await loadSimData();
   await renderSimMonth();
-  openSimCashModal();
+  reopen();
 }
 
 // 「必要な額」の明細: 予定支出（サブスク・ローンなど）・長期間・この月だけ・旅行
@@ -3134,16 +3192,30 @@ function openSimNeedModal() {
   const srcLabel = { subscription: 'サブスク', loan: 'ローン', planned: '予定支出' };
   for (const it of [...subItems, ...planItems, ...loanItems]) {
     if (!isActiveInMonth(it, y, m)) continue;
-    rows.push({ goal: true, name: it.name, note: `${srcLabel[it.source]}${it.amountConfirmed ? '・金額確定' : it.amountMax ? '・多いほうの額' : ''}${_simPaid.has(`${ym}:${it.source}:${it.id}`) ? '・✓支払い済み' : ''}`, day: it.billingDay || null, amount: it.amountMax || it.amount });
+    // 支払いを登録できる（予定支出タブの✓と同じ planned_paid）。登録したら実際に払った額で出す
+    const est = it.amountMax || it.amount;
+    const act = { kind: 'expense', key: `planned:${it.source}:${it.id}`, source: it.source, itemId: it.id, category: it.category,
+      account: it.source === 'subscription' && it.paymentMethod ? it.paymentMethod : SIM_DEFAULT_ACCOUNT, estimate: est, got: _simPaid.get(`${ym}:${it.source}:${it.id}`) };
+    rows.push({ goal: true, name: it.name, note: `${srcLabel[it.source]}${it.amountConfirmed ? '・金額確定' : it.amountMax ? '・多いほうの額' : ''}`, day: it.billingDay || null, amount: simPlannedAmount(it, ym), act });
   }
+  // 日にちのある支出（長期間・この月だけ・旅行の事前払い）も支払いを登録できる。日割りの行は毎日少しずつ使うので対象外
+  const actOf = (key, account, category, estimate) => {
+    const got = _simActuals.get(`${ym}:${key}`);
+    return { kind: 'expense', key, account: account || SIM_DEFAULT_ACCOUNT, category, estimate, got };
+  };
   for (const r of _simRecurring) {
-    if (r.kind === 'expense' && simLongActive(r, ym)) rows.push({ goal: true, name: r.name, note: `長期間（${simLongRangeLabel(r)}）${r.day ? '' : '・日割り'}`, day: r.day || null, amount: Number(r.amount) || 0 });
+    if (r.kind !== 'expense' || !simLongActive(r, ym)) continue;
+    const est = Number(r.amount) || 0, act = r.day ? actOf(`long:${r.id}`, r.account, r.name, est) : null;
+    rows.push({ goal: true, name: r.name, note: `長期間（${simLongRangeLabel(r)}）${r.day ? '' : '・日割り'}`, day: r.day || null, amount: act?.got ? act.got.amount : est, act });
   }
-  for (const it of c.plan.items) {
-    if (it.kind === 'expense') rows.push({ goal: true, name: it.name, note: `この月だけ${it.day ? '' : '・日割り'}`, day: it.day || null, amount: Number(it.amount) || 0 });
-  }
+  c.plan.items.forEach((it, idx) => {
+    if (it.kind !== 'expense') return;
+    const est = Number(it.amount) || 0, act = it.day ? actOf(`month:${it.uid ?? idx}`, null, it.name, est) : null;
+    rows.push({ goal: true, name: it.name, note: `この月だけ${it.day ? '' : '・日割り'}`, day: it.day || null, amount: act?.got ? act.got.amount : est, act });
+  });
   for (const t of c.tripMonths) for (const e of t.events.filter(e => e.kind === 'prepaid')) {
-    rows.push({ trip: t.trip, name: e.label, note: '旅行・事前払い', day: Number(e.date.slice(8, 10)), amount: e.amount });
+    rows.push({ trip: t.trip, name: e.label, note: '旅行・事前払い', day: Number(e.date.slice(8, 10)), amount: e.amount,
+      act: actOf(e.key, null, EXPENSE_CATEGORIES.includes('旅費') ? '旅費' : e.label, e.estimate ?? e.amount) });
   }
   for (const t of c.tripMonths) {
     const on = t.events.filter(e => e.kind === 'onsite');
@@ -3171,7 +3243,8 @@ function openSimNeedModal() {
     const names = _simGoals.filter(g => usedPer[g.id]).map(g => g.name).join('・');
     rows.push({ name: '貯めた分から払う', note: names, day: 100, amount: -c.goalUsed });
   }
-  simShowBreakdown(`${m + 1}月に必要な額`, rows.filter(r => r.amount), c.need, 'この月に必要な支出はありません');
+  simShowBreakdown(`${m + 1}月に必要な額`, simWithActBtns(rows.filter(r => r.amount)), c.need, 'この月に必要な支出はありません');
+  simBindActBtns(ym, rows, openSimNeedModal);
   const list = document.getElementById('sim-cash-list');
   list.querySelectorAll('[data-goal-from]').forEach(btn => btn.addEventListener('click', () => {
     const r = rows.find(x => x.ref === btn.dataset.goalFrom);
@@ -3765,7 +3838,7 @@ function renderSimTrips(c) {
 
 function simTripLineHtml(kind, it = {}) {
   return `
-    <div class="sim-trip-line" data-kind="${kind}">
+    <div class="sim-trip-line" data-kind="${kind}" data-uid="${escapeHtmlF(it.uid || '')}">
       <input type="text" class="tl-name" placeholder="${kind === 'prepaid' ? '飛行機・ホテルなど' : '食事・おみやげなど'}" value="${escapeHtmlF(it.name || '')}">
       <input type="number" class="tl-amount" min="0" placeholder="金額" inputmode="numeric" value="${it.amount ?? ''}">
       <button type="button" class="tl-del" title="この行を消す">×</button>
@@ -3801,7 +3874,7 @@ async function saveSimTrip(e) {
   const lines = kind => [...document.querySelectorAll(`#sim-trip-${kind} .sim-trip-line`)].map(l => ({
     name: l.querySelector('.tl-name').value.trim(),
     amount: Number(l.querySelector('.tl-amount').value) || 0,
-    ...(kind === 'prepaid' ? { date: l.querySelector('.tl-date').value || start_date } : {}),
+    ...(kind === 'prepaid' ? { date: l.querySelector('.tl-date').value || start_date, uid: l.dataset.uid || simUid() } : {}),
   })).filter(it => it.amount);
   const row = { name, start_date, end_date, prepaid: lines('prepaid'), onsite: lines('onsite') };
   const id = f.elements.id.value;
@@ -3905,7 +3978,8 @@ async function saveSimItem(e) {
     const ym = ymKey(_simMonth);
     const plan = simMonthPlan(ym);
     const items = [...plan.items];
-    const it = { kind, name, amount };
+    // 編集のときは前と同じIDのまま（入金済み・支払い済みの印が外れないように）
+    const it = { kind, name, amount, uid: (key !== '' && items[Number(key)]?.uid) || simUid() };
     if (target === 'month-income') {
       if (f.elements.account.value !== SIM_DEFAULT_ACCOUNT) it.account = f.elements.account.value;
       if (Number(f.elements.days.value) > 0)      it.days = Number(f.elements.days.value);
@@ -3946,16 +4020,28 @@ function simTrendEvents(today, months) {
     const last = new Date(y, m + 1, 0).getDate();
     const dayStr = day => dateStr(y, m, Math.min(Math.max(Number(day) || 1, 1), last));
     const c = simCalc(ym);
-    for (const r of c.cashRows) if (!_simReceived.has(`${ym}:${r.key}`)) events.push({ date: dayStr(r.day), label: `${r.name}（${r.note}）`, delta: r.amount, projected: true });
+    for (const r of c.cashRows) if (!_simActuals.has(`${ym}:${r.key}`)) events.push({ date: dayStr(r.day), label: `${r.name}（${r.note}）`, delta: r.amount, projected: true });
     const { subItems, planItems, loanItems } = buildPlannedItems(_simPlannedSrc.subs, _simPlannedSrc.plans, _simPlannedSrc.loans, {}, _simAmountOverrides[ym] || {});
     for (const it of [...subItems, ...planItems, ...loanItems]) {
       if (isActiveInMonth(it, y, m) && !_simPaid.has(`${ym}:${it.source}:${it.id}`)) events.push({ date: dayStr(it.billingDay), label: `${it.name}（予定支出）`, delta: -(it.amountMax || it.amount), projected: true });
     }
     // 日にちを決めた支出（毎月の支出・この月だけの支出）はその日に
+    //   支払いを登録した行は実際に払った額で数え、予想の出金としては出さない（もう一覧の支出に入っているので）
     let dated = 0;
-    for (const r of _simRecurring) if (r.kind === 'expense' && r.day && simLongActive(r, ym)) { dated += Number(r.amount) || 0; events.push({ date: dayStr(r.day), label: `${r.name}（長期間）`, delta: -(Number(r.amount) || 0), projected: true }); }
-    for (const t of c.tripMonths) for (const e of t.events) { dated += e.amount; events.push({ date: e.date, label: e.label, delta: -e.amount, projected: true }); }
-    for (const it of c.plan.items) if (it.kind === 'expense' && it.day) { dated += Number(it.amount) || 0; events.push({ date: dayStr(it.day), label: `${it.name}（この月だけ）`, delta: -(Number(it.amount) || 0), projected: true }); }
+    const paidAmt = (key, est) => _simActuals.get(`${ym}:${key}`)?.amount ?? est;
+    const isPaid = key => key && _simActuals.has(`${ym}:${key}`);
+    for (const r of _simRecurring) if (r.kind === 'expense' && r.day && simLongActive(r, ym)) {
+      const key = `long:${r.id}`, amt = paidAmt(key, Number(r.amount) || 0);
+      dated += amt;
+      if (!isPaid(key)) events.push({ date: dayStr(r.day), label: `${r.name}（長期間）`, delta: -amt, projected: true });
+    }
+    for (const t of c.tripMonths) for (const e of t.events) { dated += e.amount; if (!isPaid(e.key)) events.push({ date: e.date, label: e.label, delta: -e.amount, projected: true }); }
+    c.plan.items.forEach((it, idx) => {
+      if (it.kind !== 'expense' || !it.day) return;
+      const key = `month:${it.uid ?? idx}`, amt = paidAmt(key, Number(it.amount) || 0);
+      dated += amt;
+      if (!isPaid(key)) events.push({ date: dayStr(it.day), label: `${it.name}（この月だけ）`, delta: -amt, projected: true });
+    });
     // 残り（日にちのない支出＋自由に使えるお金）は毎日少しずつ。今月は残りの日数の分だけ
     const daily = c.need + c.goalUsed - c.planned - dated + c.free;
     // 日割りの中身（何を日割りしているか）: 日付のない長期間・この月だけの支出、自由に使えるお金
@@ -4260,7 +4346,7 @@ function initSim() {
 
   document.getElementById('btn-sim-add-job').addEventListener('click', () => openSimJobModal());
   document.getElementById('sim-income-card').addEventListener('click', openSimCashModal);
-  document.getElementById('sim-receive-form').addEventListener('submit', simSubmitReceive);
+  document.getElementById('sim-receive-form').addEventListener('submit', simSubmitAct);
   document.getElementById('sim-need-card').addEventListener('click', openSimNeedModal);
   document.getElementById('sim-planned-row').addEventListener('click', openSimPlannedModal);
   document.getElementById('btn-sim-planned-close').addEventListener('click', closeSimPlannedModal);
@@ -4390,7 +4476,7 @@ function drawBalanceChart(canvas, oldChart, startD, end, today, startBalance, pa
     }
   }
   if (oldChart) oldChart.destroy();
-  return new Chart(canvas, {
+  const chart = new Chart(canvas, {
     type: 'line',
     data: {
       labels,
@@ -4406,6 +4492,17 @@ function drawBalanceChart(canvas, oldChart, startD, end, today, startBalance, pa
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
+        // ピンチで拡大・指で左右に動かす（横方向だけ。パソコンは ctrl＋ホイールで拡大）
+        zoom: {
+          limits: { x: { min: 'original', max: 'original', minRange: 6 } },
+          pan:  { enabled: true, mode: 'x', onPanComplete: ({ chart }) => chartZoomToolsUpdate(chart) },
+          zoom: {
+            mode: 'x',
+            pinch: { enabled: true },
+            wheel: { enabled: true, modifierKey: 'ctrl' },
+            onZoomComplete: ({ chart }) => chartZoomToolsUpdate(chart),
+          },
+        },
         tooltip: {
           filter: i => i.parsed.y != null,
           callbacks: {
@@ -4433,6 +4530,13 @@ function drawBalanceChart(canvas, oldChart, startD, end, today, startBalance, pa
             callback: (v, i, ticks) => ticks.length > 12 && Number(dates[v]?.slice(8, 10)) !== 1 ? '' : labels[v],
           },
           afterBuildTicks: axis => {
+            // 拡大して見えている日数が少ない（45日以下）ときは、6個くらいになるように間を空けて出す
+            const span = axis.max - axis.min;
+            if (span <= 45) {
+              const step = Math.max(1, Math.ceil(span / 6));
+              axis.ticks = axis.ticks.filter(t => (t.value - Math.ceil(axis.min)) % step === 0);
+              return;
+            }
             axis.ticks = axis.ticks.filter(t => [1, 15, 25].includes(Number(dates[t.value]?.slice(8, 10))));
           },
         },
@@ -4440,6 +4544,45 @@ function drawBalanceChart(canvas, oldChart, startD, end, today, startBalance, pa
       },
     },
   });
+  chartZoomTools(chart);
+  return chart;
+}
+
+// グラフの右上に「全画面」「元に戻す」ボタンを付ける（ボタンは1回だけ作り、描き直したグラフは container._chart で差し替える）
+function chartZoomTools(chart) {
+  const box = chart.canvas.parentElement;
+  box._chart = chart;
+  if (!box.querySelector('.chart-tools')) {
+    box.classList.add('chart-zoomable');
+    box.insertAdjacentHTML('afterbegin', `
+      <div class="chart-tools">
+        <button type="button" class="chart-tool-btn" data-chart-reset hidden>元に戻す</button>
+        <button type="button" class="chart-tool-btn" data-chart-full>⤢ 全画面</button>
+      </div>`);
+    box.querySelector('[data-chart-reset]').addEventListener('click', () => { box._chart.resetZoom(); chartZoomToolsUpdate(box._chart); });
+    box.querySelector('[data-chart-full]').addEventListener('click', () => chartToggleFull(box));
+  }
+  chartZoomToolsUpdate(chart);
+}
+
+function chartZoomToolsUpdate(chart) {
+  const btn = chart.canvas.parentElement.querySelector('[data-chart-reset]');
+  if (btn) btn.hidden = !chart.isZoomedOrPanned();
+}
+
+// 全画面にする／戻す。全画面のあいだは後ろのページがスクロールしないようにする（Esc でも閉じる）
+function chartToggleFull(box, force) {
+  const full = force ?? !box.classList.contains('chart-full');
+  box.classList.toggle('chart-full', full);
+  document.body.style.overflow = full ? 'hidden' : '';
+  box.querySelector('[data-chart-full]').textContent = full ? '× 閉じる' : '⤢ 全画面';
+  if (full) {
+    box._esc = e => { if (e.key === 'Escape') chartToggleFull(box, false); };
+    document.addEventListener('keydown', box._esc);
+  } else if (box._esc) {
+    document.removeEventListener('keydown', box._esc);
+    box._esc = null;
+  }
 }
 
 // その日の内訳（増えた・減った）
@@ -4477,7 +4620,7 @@ function acctProjectedEvents(account, today, end) {
     const dayStr = day => dateStr(y, m, Math.min(Math.max(Number(day) || 1, 1), last));
     // 入金（シミュの「この月に入るお金」の明細のうち、この口座に入るもの）
     for (const r of simCalc(ym).cashRows) {
-      if (r.account !== account || _simReceived.has(`${ym}:${r.key}`)) continue;
+      if (r.account !== account || _simActuals.has(`${ym}:${r.key}`)) continue;
       events.push({ date: dayStr(r.day), label: `${r.name}（${r.note}）`, delta: r.amount, projected: true, undated: !r.day });
     }
     // 引き落とし（予定支出。サブスクは登録した支払方法、それ以外は銀行から）
